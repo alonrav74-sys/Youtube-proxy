@@ -1,4 +1,4 @@
-// /api/yt.js — Smart Universal Fallback (works when others fail)
+// /api/yt.js — FINAL GLOBAL VERSION (Stable Anywhere)
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCORS(res);
@@ -13,41 +13,25 @@ export default async function handler(req, res) {
 
   if (!id) return res.status(400).json({ error: 'missing or bad id' });
 
-  // 1️⃣ ננסה שוב את piped (אם אחד מהם חזר)
-  const pipedSources = [
-    'https://pipedapi.kavin.rocks',
-    'https://pipedapi.syncpundit.io',
-    'https://pipedapi.moomoo.me',
-    'https://pipedapi.adminforge.de',
-    'https://pipedapi.mint.lgbt',
-    'https://pipedapi.lunar.icu'
-  ];
-
-  for (const base of pipedSources) {
-    try {
-      const r = await fetch(`${base}/streams/${id}`, { timeout: 7000 });
-      if (r.ok) {
-        const data = await r.json();
-        if (data?.audioStreams?.length) return res.status(200).json(data);
-      }
-    } catch (_) {}
-  }
-
-  // 2️⃣ פרוקסי ציבורי שעוקף חסימות (AllOrigins)
+  // 🚀 מקור אמין ראשון: Proxy בינלאומי שעוקף הכל
   try {
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(
-      'https://pipedapi.kavin.rocks/streams/' + id
-    )}`;
-    const r = await fetch(proxyUrl);
+    const r = await fetch(
+      `https://corsproxy.io/?https://pipedapi.kavin.rocks/streams/${id}`
+    );
     if (r.ok) {
       const data = await r.json();
-      if (data?.audioStreams?.length) return res.status(200).json(data);
+      if (data?.audioStreams?.length) {
+        return res.status(200).json(data);
+      }
     }
-  } catch (_) {}
+  } catch (e) {
+    console.log('corsproxy.io failed');
+  }
 
-  // 3️⃣ fallback אחרון - yt.artemislena.eu (תומך חלקית)
+  // 🌎 מקור נוסף - yt.artemislena.eu (דרך proxy)
   try {
-    const r = await fetch(`https://yt.artemislena.eu/api/v1/videos/${id}`);
+    const url = `https://corsproxy.io/?https://yt.artemislena.eu/api/v1/videos/${id}`;
+    const r = await fetch(url);
     if (r.ok) {
       const v = await r.json();
       const audio = (v?.adaptiveFormats || [])
@@ -60,9 +44,26 @@ export default async function handler(req, res) {
         }));
       if (audio.length) return res.status(200).json({ audioStreams: audio });
     }
-  } catch (_) {}
+  } catch (e) {
+    console.log('yt.artemislena.eu failed');
+  }
 
-  return res.status(502).json({ error: 'all sources failed' });
+  // 🔁 ניסיון אחרון - API רשמי של יוטיוב (אם יש לך מפתח)
+  const YT_KEY = process.env.YT_KEY;
+  if (YT_KEY) {
+    try {
+      const api = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${id}&key=${YT_KEY}`;
+      const r = await fetch(api);
+      if (r.ok) {
+        const j = await r.json();
+        return res.status(200).json({ message: 'YouTube API key works', data: j });
+      }
+    } catch (e) {
+      console.log('Google API failed');
+    }
+  }
+
+  return res.status(502).json({ error: 'all sources failed (final)' });
 }
 
 /* ===== Helpers ===== */
