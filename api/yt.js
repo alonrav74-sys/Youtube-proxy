@@ -1,6 +1,5 @@
 // /api/yt.js — Vercel Serverless Function
 export default async function handler(req, res) {
-  // תמיכה גם ב-GET וגם ב-OPTIONS ל-CORS
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -17,7 +16,9 @@ export default async function handler(req, res) {
   const sources = [
     'https://pipedapi.kavin.rocks',
     'https://pipedapi.syncpundit.io',
-    'https://pipedapi.moomoo.me'
+    'https://pipedapi.moomoo.me',
+    'https://pipedapi.adminforge.de',
+    'https://pipedapi.mint.lgbt'
   ];
 
   for (const base of sources) {
