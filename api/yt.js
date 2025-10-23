@@ -1,4 +1,4 @@
-// /api/yt.js — Final Version with Reliable Fallback
+// /api/yt.js — Smart Universal Fallback (works when others fail)
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     setCORS(res);
@@ -13,62 +13,54 @@ export default async function handler(req, res) {
 
   if (!id) return res.status(400).json({ error: 'missing or bad id' });
 
-  // ====== שלב 1: Piped instances ======
-  const piped = [
+  // 1️⃣ ננסה שוב את piped (אם אחד מהם חזר)
+  const pipedSources = [
     'https://pipedapi.kavin.rocks',
     'https://pipedapi.syncpundit.io',
     'https://pipedapi.moomoo.me',
     'https://pipedapi.adminforge.de',
     'https://pipedapi.mint.lgbt',
-    'https://pipedapi.lunar.icu',
-    'https://yt.artemislena.eu'
+    'https://pipedapi.lunar.icu'
   ];
 
-  for (const base of piped) {
+  for (const base of pipedSources) {
     try {
-      const r = await fetchWithTimeout(`${base}/streams/${id}`, 8000);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (data?.audioStreams?.length) return res.status(200).json(data);
+      const r = await fetch(`${base}/streams/${id}`, { timeout: 7000 });
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.audioStreams?.length) return res.status(200).json(data);
+      }
     } catch (_) {}
   }
 
-  // ====== שלב 2: Invidious fallback ======
-  const invidious = [
-    'https://yewtu.be',
-    'https://inv.nadeko.net',
-    'https://invidious.nerdvpn.de'
-  ];
+  // 2️⃣ פרוקסי ציבורי שעוקף חסימות (AllOrigins)
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(
+      'https://pipedapi.kavin.rocks/streams/' + id
+    )}`;
+    const r = await fetch(proxyUrl);
+    if (r.ok) {
+      const data = await r.json();
+      if (data?.audioStreams?.length) return res.status(200).json(data);
+    }
+  } catch (_) {}
 
-  for (const base of invidious) {
-    try {
-      const r = await fetchWithTimeout(`${base}/api/v1/videos/${id}`, 9000);
-      if (!r.ok) continue;
+  // 3️⃣ fallback אחרון - yt.artemislena.eu (תומך חלקית)
+  try {
+    const r = await fetch(`https://yt.artemislena.eu/api/v1/videos/${id}`);
+    if (r.ok) {
       const v = await r.json();
       const audio = (v?.adaptiveFormats || [])
         .filter(f => (f?.type || '').includes('audio'))
         .map(f => ({
           url: f.url,
           mimeType: f.type,
-          bitrate: Number(f.bitrate || f.averageBitrate),
+          bitrate: f.bitrate || f.averageBitrate,
           quality: f.audioQuality || 'audio'
         }));
       if (audio.length) return res.status(200).json({ audioStreams: audio });
-    } catch (_) {}
-  }
-
-  // ====== שלב 3: fallback ציבורי (עובד בכל מקום) ======
-  try {
-    const proxyUrl = `https://yt-proxy.corsproxy.io/?id=${id}`;
-    const r = await fetch(proxyUrl);
-    if (r.ok) {
-      const data = await r.json();
-      if (data?.audioStreams?.length)
-        return res.status(200).json(data);
     }
-  } catch (err) {
-    console.error('Final fallback failed', err);
-  }
+  } catch (_) {}
 
   return res.status(502).json({ error: 'all sources failed' });
 }
@@ -88,13 +80,4 @@ function extractId(input) {
     if (pathId && /^[a-zA-Z0-9_-]{11}$/.test(pathId)) return pathId;
   } catch {}
   return '';
-}
-async function fetchWithTimeout(url, ms, init) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { ...init, signal: ctrl.signal });
-  } finally {
-    clearTimeout(t);
-  }
 }
