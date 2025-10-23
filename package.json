@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "YouTube audio proxy for Chord Finder",
   "dependencies": {
-    "ytdl-core": "^4.11.9"
+    "ytdl-core": "^4.11.13"
   }
 }
