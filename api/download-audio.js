@@ -1,4 +1,4 @@
-const ytdl = require('ytdl-core');
+const ytdl = require('@distube/ytdl-core');
 
 module.exports = async (req, res) => {
   // Enable CORS
