@@ -1,84 +1,66 @@
-// /api/yt.js — FINAL GLOBAL VERSION (Stable Anywhere)
 export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
-    setCORS(res);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    return res.status(204).end();
-  }
+  const { q, id } = req.query;
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Content-Type", "application/json");
 
-  const rawId = (req.query.id || req.query.url || '').toString().trim();
-  const id = extractId(rawId);
-  setCORS(res);
-
-  if (!id) return res.status(400).json({ error: 'missing or bad id' });
-
-  // 🚀 מקור אמין ראשון: Proxy בינלאומי שעוקף הכל
   try {
-    const r = await fetch(
-      `https://corsproxy.io/?https://pipedapi.kavin.rocks/streams/${id}`
-    );
-    if (r.ok) {
+    // 🔍 חיפוש ביוטיוב מיוזיק
+    if (q) {
+      const r = await fetch(
+        "https://music.youtube.com/youtubei/v1/search?key=AIzaSyC-9AB4XkRW4Zy5s5r6ZjYq8mlFfVRR6_k",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context: { client: { clientName: "WEB_REMIX", clientVersion: "1.20241001.01.00" } },
+            query: q,
+          }),
+        }
+      );
+
       const data = await r.json();
-      if (data?.audioStreams?.length) {
-        return res.status(200).json(data);
+      const sections = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+      const results = [];
+
+      for (const section of sections) {
+        const items = section.musicShelfRenderer?.contents || [];
+        for (const item of items) {
+          const vid = item.musicResponsiveListItemRenderer?.playlistItemData?.videoId;
+          const title = item.musicResponsiveListItemRenderer?.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+          const artist = item.musicResponsiveListItemRenderer?.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+          const thumb = item.musicResponsiveListItemRenderer?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.pop()?.url;
+          if (vid) results.push({ id: vid, title, artist, thumbnail: thumb });
+        }
       }
+
+      return res.status(200).json(results.slice(0, 10));
     }
-  } catch (e) {
-    console.log('corsproxy.io failed');
-  }
 
-  // 🌎 מקור נוסף - yt.artemislena.eu (דרך proxy)
-  try {
-    const url = `https://corsproxy.io/?https://yt.artemislena.eu/api/v1/videos/${id}`;
-    const r = await fetch(url);
-    if (r.ok) {
-      const v = await r.json();
-      const audio = (v?.adaptiveFormats || [])
-        .filter(f => (f?.type || '').includes('audio'))
-        .map(f => ({
-          url: f.url,
-          mimeType: f.type,
-          bitrate: f.bitrate || f.averageBitrate,
-          quality: f.audioQuality || 'audio'
-        }));
-      if (audio.length) return res.status(200).json({ audioStreams: audio });
+    // 🎧 פרטים על שיר
+    if (id) {
+      const r = await fetch(
+        "https://music.youtube.com/youtubei/v1/player?key=AIzaSyC-9AB4XkRW4Zy5s5r6ZjYq8mlFfVRR6_k",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context: { client: { clientName: "WEB_REMIX", clientVersion: "1.20241001.01.00" } },
+            videoId: id,
+          }),
+        }
+      );
+
+      const data = await r.json();
+      return res.status(200).json({
+        id,
+        title: data.videoDetails?.title,
+        author: data.videoDetails?.author,
+        url: `https://music.youtube.com/watch?v=${id}`,
+      });
     }
-  } catch (e) {
-    console.log('yt.artemislena.eu failed');
+
+    return res.status(400).json({ error: "missing query or id" });
+  } catch (err) {
+    return res.status(500).json({ error: "ytmusic failed", details: err.message });
   }
-
-  // 🔁 ניסיון אחרון - API רשמי של יוטיוב (אם יש לך מפתח)
-  const YT_KEY = process.env.YT_KEY;
-  if (YT_KEY) {
-    try {
-      const api = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${id}&key=${YT_KEY}`;
-      const r = await fetch(api);
-      if (r.ok) {
-        const j = await r.json();
-        return res.status(200).json({ message: 'YouTube API key works', data: j });
-      }
-    } catch (e) {
-      console.log('Google API failed');
-    }
-  }
-
-  return res.status(502).json({ error: 'all sources failed (final)' });
-}
-
-/* ===== Helpers ===== */
-function setCORS(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-}
-function extractId(input) {
-  if (!input) return '';
-  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
-  try {
-    const u = new URL(input);
-    const v = u.searchParams.get('v');
-    if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) return v;
-    const pathId = u.pathname.split('/').filter(Boolean).pop();
-    if (pathId && /^[a-zA-Z0-9_-]{11}$/.test(pathId)) return pathId;
-  } catch {}
-  return '';
 }
