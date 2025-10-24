@@ -1,7 +1,5 @@
 {
-  "name": "youtube-proxy",
-  "version": "1.0.0",
-  "type": "module",
+  "type": "commonjs",
   "dependencies": {
     "ytdl-core": "^4.13.3",
     "node-fetch": "^3.3.2",
