@@ -10,11 +10,11 @@ export const config = {
 
 export default async function handler(req, res) {
   try {
-    const file = req.query.file || "test.mp3"; // ברירת מחדל
-    const filePath = `./public/audio/${file}`; // תיקייה ב־Vercel
+    const file = req.query.file || "test.mp3";
+    const filePath = `./public/audio/${file}`;
 
     if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Audio file not found" });
+      return res.status(404).json({ error: "Audio file not found", filePath });
     }
 
     const formData = new FormData();
@@ -31,11 +31,13 @@ export default async function handler(req, res) {
     });
 
     const data = await openaiRes.json();
+
     if (openaiRes.ok) {
       return res.status(200).json({ text: data.text });
     } else {
       return res.status(500).json({ error: "Transcription failed", details: data });
     }
+
   } catch (err) {
     console.error("🚨 Whisper error:", err);
     return res.status(500).json({ error: "Server crashed", details: err.message });
