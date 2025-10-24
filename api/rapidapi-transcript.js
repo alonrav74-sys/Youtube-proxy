@@ -1,7 +1,6 @@
 export default async function handler(req, res) {
   const videoId = req.query.videoId;
 
-  // בדיקה אם יש videoId בפרמטרים
   if (!videoId) {
     return res
       .status(400)
@@ -15,16 +14,14 @@ export default async function handler(req, res) {
       .json({ success: false, error: "Missing RAPIDAPI_KEY" });
   }
 
-  const url = `https://youtube-transcript.p.rapidapi.com/api/transcript?video_id=${encodeURIComponent(
-    videoId
-  )}`;
+  const url = `https://youtube-transcript3.p.rapidapi.com/api/transcript?videoId=${encodeURIComponent(videoId)}`;
 
   try {
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "x-rapidapi-key": RAPID_KEY,
-        "x-rapidapi-host": "youtube-transcript.p.rapidapi.com",
+        "x-rapidapi-host": "youtube-transcript3.p.rapidapi.com",
       },
     });
 
@@ -32,12 +29,15 @@ export default async function handler(req, res) {
       const txt = await response.text();
       return res
         .status(response.status)
-        .json({ success: false, error: `RapidAPI error ${response.status}`, details: txt });
+        .json({
+          success: false,
+          error: `RapidAPI error ${response.status}`,
+          details: txt,
+        });
     }
 
     const data = await response.json();
 
-    // פורמט אחיד לתגובה (segments או text)
     let transcriptText = "";
     if (Array.isArray(data)) {
       transcriptText = data.map(s => s.text).join(" ");
