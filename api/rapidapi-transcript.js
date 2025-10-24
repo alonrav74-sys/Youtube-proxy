@@ -1,12 +1,14 @@
 export default async function handler(req, res) {
   const videoId = req.query.videoId;
 
+  // בדיקה אם הועבר מזהה סרטון
   if (!videoId) {
     return res
       .status(400)
       .json({ success: false, error: "videoId is required" });
   }
 
+  // קריאת מפתח מהסביבה
   const RAPID_KEY = process.env.RAPIDAPI_KEY;
   if (!RAPID_KEY) {
     return res
@@ -14,6 +16,7 @@ export default async function handler(req, res) {
       .json({ success: false, error: "Missing RAPIDAPI_KEY" });
   }
 
+  // כתובת השירות שלך לפי RapidAPI (YouTube Transcript 3)
   const url = `https://youtube-transcript3.p.rapidapi.com/api/transcript?videoId=${encodeURIComponent(videoId)}`;
 
   try {
@@ -38,6 +41,7 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
+    // עיבוד התמלול לפורמט טקסט אחיד
     let transcriptText = "";
     if (Array.isArray(data)) {
       transcriptText = data.map(s => s.text).join(" ");
@@ -47,16 +51,17 @@ export default async function handler(req, res) {
       transcriptText = data.text;
     }
 
+    // הודעת fallback חכמה אם אין תמלול
+    const finalText =
+      transcriptText && transcriptText.trim().length > 0
+        ? transcriptText
+        : "🎤 אין תמלול לסרטון זה (ייתכן שאין כתוביות ביוטיוב)";
+
     res.status(200).json({
       success: true,
       videoId,
-      text: transcriptText || "(No transcript found)",
+      text: finalText,
     });
   } catch (err) {
     res.status(500).json({
-      success: false,
-      error: "Server error",
-      details: err.message,
-    });
-  }
-}
+      success: fals
