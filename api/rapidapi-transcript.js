@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // ✅ קריאת מפתח RapidAPI מהסביבה
+  // ✅ מפתח RapidAPI מהסביבה
   const RAPID_KEY = process.env.RAPIDAPI_KEY;
   if (!RAPID_KEY) {
     return res.status(500).json({
@@ -18,8 +18,11 @@ export default async function handler(req, res) {
     });
   }
 
-  // ✅ נתיב מדויק לשירות שלך (Solid API - youtube-transcript3)
-  const url = `https://youtube-transcript3.p.rapidapi.com/api/transcript?videoId=${encodeURIComponent(videoId)}`;
+  // ✅ נתיב חדש לפי Solid API - transcript-with-url
+  const ytUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  const url = `https://youtube-transcript3.p.rapidapi.com/api/transcript-with-url?url=${encodeURIComponent(
+    ytUrl
+  )}&flat_text=true&lang=en`;
 
   try {
     const response = await fetch(url, {
@@ -41,12 +44,14 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // ✅ עיבוד התמלול לפורמט אחיד
+    // ✅ עיבוד תוצאה לפורמט אחיד
     let transcriptText = "";
-    if (Array.isArray(data)) {
+    if (typeof data === "string") {
+      transcriptText = data;
+    } else if (Array.isArray(data)) {
       transcriptText = data.map((s) => s.text).join(" ");
-    } else if (data.segments) {
-      transcriptText = data.segments.map((s) => s.text).join(" ");
+    } else if (data.transcript) {
+      transcriptText = data.transcript;
     } else if (data.text) {
       transcriptText = data.text;
     }
