@@ -1,7 +1,10 @@
 {
   "name": "youtube-proxy",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
-    "@distube/ytdl-core": "^4.13.3"
+    "@distube/ytdl-core": "^4.13.3",
+    "node-fetch": "^3.3.2",
+    "form-data": "^4.0.0"
   }
 }
