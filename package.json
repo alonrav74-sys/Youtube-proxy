@@ -1,8 +1,6 @@
 {
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "ytdl-core": "^4.13.3",
-    "node-fetch": "^3.3.2",
-    "form-data": "^4.0.0"
+    "ytdl-core": "^4.13.3"
   }
 }
