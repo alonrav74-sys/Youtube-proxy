@@ -1,22 +1,24 @@
 export default async function handler(req, res) {
   const videoId = req.query.videoId;
 
-  // בדיקה אם הועבר מזהה סרטון
+  // ✅ בדיקה אם נשלח מזהה סרטון
   if (!videoId) {
-    return res
-      .status(400)
-      .json({ success: false, error: "videoId is required" });
+    return res.status(400).json({
+      success: false,
+      error: "videoId is required",
+    });
   }
 
-  // קריאת מפתח מהסביבה
+  // ✅ קריאת מפתח RapidAPI מהסביבה
   const RAPID_KEY = process.env.RAPIDAPI_KEY;
   if (!RAPID_KEY) {
-    return res
-      .status(500)
-      .json({ success: false, error: "Missing RAPIDAPI_KEY" });
+    return res.status(500).json({
+      success: false,
+      error: "Missing RAPIDAPI_KEY",
+    });
   }
 
-  // כתובת השירות שלך לפי RapidAPI (YouTube Transcript 3)
+  // ✅ נתיב מדויק לשירות שלך (Solid API - youtube-transcript3)
   const url = `https://youtube-transcript3.p.rapidapi.com/api/transcript?videoId=${encodeURIComponent(videoId)}`;
 
   try {
@@ -30,28 +32,26 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const txt = await response.text();
-      return res
-        .status(response.status)
-        .json({
-          success: false,
-          error: `RapidAPI error ${response.status}`,
-          details: txt,
-        });
+      return res.status(response.status).json({
+        success: false,
+        error: `RapidAPI error ${response.status}`,
+        details: txt,
+      });
     }
 
     const data = await response.json();
 
-    // עיבוד התמלול לפורמט טקסט אחיד
+    // ✅ עיבוד התמלול לפורמט אחיד
     let transcriptText = "";
     if (Array.isArray(data)) {
-      transcriptText = data.map(s => s.text).join(" ");
+      transcriptText = data.map((s) => s.text).join(" ");
     } else if (data.segments) {
-      transcriptText = data.segments.map(s => s.text).join(" ");
+      transcriptText = data.segments.map((s) => s.text).join(" ");
     } else if (data.text) {
       transcriptText = data.text;
     }
 
-    // הודעת fallback חכמה אם אין תמלול
+    // ✅ הודעת fallback חכמה
     const finalText =
       transcriptText && transcriptText.trim().length > 0
         ? transcriptText
