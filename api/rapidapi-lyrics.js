@@ -16,16 +16,16 @@ export default async function handler(req, res) {
     });
   }
 
-  // ✅ שלב 1 - חיפוש השיר ב-Genius לפי שם ואמן
-  const searchUrl = `https://genius-song-lyrics1.p.rapidapi.com/search/?q=${encodeURIComponent(
-    `${artist} ${title}`
-  )}`;
   const headers = {
     "x-rapidapi-key": RAPID_KEY,
     "x-rapidapi-host": "genius-song-lyrics1.p.rapidapi.com",
   };
 
   try {
+    // 🔍 חיפוש שיר לפי אמן + שם
+    const searchUrl = `https://genius-song-lyrics1.p.rapidapi.com/search/?q=${encodeURIComponent(
+      `${artist} ${title}`
+    )}`;
     const searchRes = await fetch(searchUrl, { headers });
     if (!searchRes.ok) throw new Error("Search request failed");
     const searchData = await searchRes.json();
@@ -40,18 +40,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ שלב 2 - בקשת מילים לפי מזהה השיר
+    // 📝 בקשת המילים לפי ID
     const lyricsUrl = `https://genius-song-lyrics1.p.rapidapi.com/song/lyrics/?id=${song.id}`;
     const lyricsRes = await fetch(lyricsUrl, { headers });
     if (!lyricsRes.ok) throw new Error("Lyrics request failed");
     const lyricsData = await lyricsRes.json();
 
-    const plainLyrics =
+    // 🧩 שליפה חכמה של טקסט — גם מ־HTML
+    let lyrics =
       lyricsData?.lyrics?.lyrics?.body?.plain ||
       lyricsData?.lyrics?.body?.plain ||
+      lyricsData?.lyrics?.lyrics?.body?.html ||
+      lyricsData?.lyrics?.body?.html ||
       null;
 
-    if (!plainLyrics) {
+    if (!lyrics) {
       return res.status(404).json({
         success: false,
         artist,
@@ -60,11 +63,17 @@ export default async function handler(req, res) {
       });
     }
 
+    // 🧼 ניקוי תגיות HTML אם יש
+    lyrics = lyrics
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/?[^>]+(>|$)/g, "")
+      .trim();
+
     res.status(200).json({
       success: true,
       artist,
       title,
-      lyrics: plainLyrics,
+      lyrics,
     });
   } catch (err) {
     res.status(500).json({
