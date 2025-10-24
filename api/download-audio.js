@@ -1,26 +1,26 @@
 import ytdl from "ytdl-core";
 
 export default async function handler(req, res) {
+  const videoUrl = req.query.url;
+
+  if (!videoUrl) {
+    return res.status(400).json({ error: "Missing YouTube URL" });
+  }
+
   try {
-    const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({ error: "Missing YouTube URL" });
+    const info = await ytdl.getInfo(videoUrl);
+    const audioFormat = ytdl.chooseFormat(info.formats, { quality: "highestaudio" });
+
+    if (!audioFormat || !audioFormat.url) {
+      throw new Error("No valid audio format found");
     }
 
-    if (!ytdl.validateURL(url)) {
-      return res.status(400).json({ error: "Invalid YouTube URL" });
-    }
-
-    const info = await ytdl.getInfo(url);
-    const format = ytdl.chooseFormat(info.formats, { quality: "highestaudio" });
-
-    if (!format || !format.url) {
-      throw new Error("No audio format found");
-    }
-
-    return res.status(200).json({ audioUrl: format.url });
-  } catch (err) {
-    console.error("Download error:", err);
-    return res.status(500).json({ error: "Failed to fetch audio", details: err.message });
+    res.status(200).json({ audioUrl: audioFormat.url });
+  } catch (error) {
+    console.error("Audio download error:", error);
+    res.status(500).json({
+      error: "Failed to download audio",
+      details: error.message,
+    });
   }
 }
