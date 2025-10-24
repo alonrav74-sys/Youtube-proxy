@@ -1,6 +1,6 @@
 const ytdl = require("ytdl-core");
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: "Missing YouTube URL" });
@@ -21,4 +21,4 @@ export default async function handler(req, res) {
     console.error("Download error:", err);
     return res.status(500).json({ error: "Failed to fetch audio", details: err.message });
   }
-}
+};
