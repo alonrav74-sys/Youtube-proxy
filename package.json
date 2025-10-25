@@ -1,17 +1,20 @@
 {
   "name": "youtube-proxy",
   "version": "1.0.0",
-  "description": "Serverless proxy for YouTube audio, lyrics, and transcription APIs",
-  "main": "index.js",
+  "description": "YouTube audio and lyrics proxy API for ChordFinder Pro",
+  "main": "api/rapidapi-audio.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js"
+    "start": "vercel dev",
+    "build": "echo 'Vercel handles the build step automatically'"
   },
   "dependencies": {
     "node-fetch": "^3.3.2"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Alon Ravia",
+  "private": false
 }
