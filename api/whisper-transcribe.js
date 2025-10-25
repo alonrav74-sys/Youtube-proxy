@@ -8,21 +8,10 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { url, videoId } = req.query;
-    let audioUrl = url;
+    const { videoId } = req.query;
     
-    if (!audioUrl && videoId) {
-      const baseUrl = 'https://youtube-proxy-pied.vercel.app';
-      const audioResponse = await fetch(`${baseUrl}/api/rapidapi-audio?videoId=${videoId}`);
-      
-      if (audioResponse.ok) {
-        const audioData = await audioResponse.json();
-        audioUrl = audioData.audioUrl || audioData.url;
-      }
-    }
-    
-    if (!audioUrl) {
-      return res.status(400).json({ error: 'Missing url or videoId' });
+    if (!videoId) {
+      return res.status(400).json({ error: 'Missing videoId' });
     }
     
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
@@ -31,43 +20,78 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'API key not configured' });
     }
     
-    const response = await fetch('https://openai-whisper-speech-to-text1.p.rapidapi.com/speech-to-text', {
+    // Step 1: Get audio URL from our audio API
+    const baseUrl = 'https://youtube-proxy-pied.vercel.app';
+    const audioResponse = await fetch(`${baseUrl}/api/rapidapi-audio?videoId=${videoId}`);
+    
+    if (!audioResponse.ok) {
+      return res.status(400).json({ error: 'Could not get audio URL' });
+    }
+    
+    const audioData = await audioResponse.json();
+    const audioUrl = audioData.audioUrl || audioData.url;
+    
+    if (!audioUrl) {
+      return res.status(400).json({ error: 'No audio URL found' });
+    }
+    
+    // Step 2: Download the audio file
+    const audioFileResponse = await fetch(audioUrl);
+    
+    if (!audioFileResponse.ok) {
+      return res.status(400).json({ error: 'Could not download audio file' });
+    }
+    
+    const audioBuffer = await audioFileResponse.arrayBuffer();
+    const audioBlob = Buffer.from(audioBuffer);
+    
+    // Step 3: Send to Whisper API with multipart/form-data
+    const FormData = (await import('form-data')).default;
+    const form = new FormData();
+    form.append('file', audioBlob, {
+      filename: 'audio.mp3',
+      contentType: 'audio/mpeg'
+    });
+    form.append('language', 'auto');
+    
+    const whisperResponse = await fetch('https://openai-whisper-speech-to-text1.p.rapidapi.com/speech-to-text', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...form.getHeaders(),
         'X-RapidAPI-Key': RAPIDAPI_KEY,
         'X-RapidAPI-Host': 'openai-whisper-speech-to-text1.p.rapidapi.com'
       },
-      body: JSON.stringify({
-        audio_url: audioUrl,
-        language: 'auto'
-      })
+      body: form
     });
     
-    if (!response.ok) {
-      return res.status(response.status).json({ 
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      return res.status(whisperResponse.status).json({ 
         error: 'Whisper API failed',
-        status: response.status
+        details: errorText,
+        status: whisperResponse.status
       });
     }
     
-    const data = await response.json();
-    const text = data.text || data.transcription || '';
+    const whisperData = await whisperResponse.json();
+    const text = whisperData.text || whisperData.transcription || whisperData.transcript || '';
     
     if (!text) {
       return res.status(200).json({ 
         success: false,
-        text: '🎤 לא הצלחתי לתמלל את האודיו'
+        text: '🎤 לא הצלחתי לתמלל את האודיו',
+        rawResponse: whisperData
       });
     }
     
     return res.status(200).json({ 
       success: true,
       text: text.trim(),
-      videoId: videoId || null
+      videoId: videoId
     });
     
   } catch (error) {
+    console.error('Whisper error:', error);
     return res.status(500).json({ 
       error: error.message,
       text: '⚠️ שגיאת שרת בתמלול'
