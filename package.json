@@ -1,14 +1,5 @@
 {
   "name": "youtube-proxy",
   "version": "1.0.0",
-  "description": "YouTube proxy API for ChordFinder Pro - Serverless Functions",
-  "scripts": {
-    "dev": "vercel dev"
-  },
-  "keywords": ["youtube", "api", "proxy", "serverless"],
-  "author": "",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "description": "YouTube proxy API - Serverless Functions"
 }
