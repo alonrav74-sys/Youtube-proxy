@@ -2,15 +2,7 @@
   "name": "youtube-proxy",
   "version": "1.0.0",
   "type": "module",
-  "description": "YouTube proxy server for ChordFinderPro",
-  "main": "index.js",
-  "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel"
-  },
-  "engines": {
-    "node": ">=18.x"
-  },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "form-data": "^4.0.0"
+  }
 }
