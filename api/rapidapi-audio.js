@@ -1,40 +1,38 @@
-// api/rapidapi-audio.js
-// Vercel Serverless Function for downloading YouTube audio via RapidAPI
-
-export default async function handler(req, res) {
-  // Enable CORS
+module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
+  const { videoId } = req.query;
+  
+  if (!videoId) {
+    return res.status(400).json({ error: 'Missing videoId' });
+  }
+  
   try {
-    const { videoId } = req.query;
-    
-    if (!videoId) {
-      return res.status(400).json({ 
-        error: 'Missing videoId parameter',
-        example: '/api/rapidapi-audio?videoId=dQw4w9WgXcQ'
-      });
-    }
-    
-    // RapidAPI configuration
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-    const RAPIDAPI_HOST = 'youtube-mp36.p.rapidapi.com';
     
-    if (!RAPIDAPI_KEY || RAPIDAPI_KEY === 'YOUR_KEY_HERE') {
-      console.error('❌ RAPIDAPI_KEY not configured');
-      return res.status(500).json({ 
-        error: 'Server configuration error',
-        details: 'RAPIDAPI_KEY not set in environment variables'
-      });
+    const response = await fetch(`https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`, {
+      headers: {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com'
+      }
+    });
+    
+    const data = await response.json();
+    const audioUrl = data.link || data.url;
+    
+    if (!audioUrl) {
+      return res.status(500).json({ error: 'No audio URL', data });
     }
     
-    console.log(`🎵 Fetching audio for video: ${videoId}`);
+    return res.json({ success: true, audioUrl });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+};    console.log(`🎵 Fetching audio for video: ${videoId}`);
     
     // Call RapidAPI
     const apiUrl = `https://${RAPIDAPI_HOST}/dl?id=${videoId}`;
