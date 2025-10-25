@@ -1,5 +1,5 @@
 // api/yt.js
-// Vercel Serverless Function for searching YouTube videos
+// Vercel Serverless Function for searching YouTube videos via RapidAPI
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { q } = req.query;
+    const { q, limit = 10, maxResults = 10 } = req.query;
     
     if (!q) {
       return res.status(400).json({ 
@@ -22,27 +22,58 @@ export default async function handler(req, res) {
       });
     }
     
-    console.log(`Searching YouTube for: ${q}`);
+    console.log(`🔍 Searching YouTube for: "${q}" (limit: ${limit || maxResults})`);
     
-    // Use YouTube's autocomplete/search suggestions (no API key needed)
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    // RapidAPI YouTube Search
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
-    // Simple mock response for now - replace with actual scraping if needed
-    const mockResults = [
-      {
-        id: 'dQw4w9WgXcQ',
-        title: q,
-        author: 'YouTube',
-        thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg'
+    if (!RAPIDAPI_KEY) {
+      console.error('❌ RAPIDAPI_KEY not found in environment variables');
+      return res.status(500).json({ 
+        error: 'Server configuration error: API key missing'
+      });
+    }
+    
+    const searchUrl = `https://yt-api.p.rapidapi.com/search?query=${encodeURIComponent(q)}`;
+    
+    const response = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key': RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'yt-api.p.rapidapi.com'
       }
-    ];
+    });
     
-    return res.status(200).json(mockResults);
+    if (!response.ok) {
+      throw new Error(`RapidAPI error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Extract video results
+    const videos = (data.data || [])
+      .filter(item => item.type === 'video')
+      .slice(0, parseInt(limit || maxResults))
+      .map(video => ({
+        id: video.videoId,
+        videoId: video.videoId,
+        title: video.title,
+        author: video.channelTitle || video.channelName,
+        channel: video.channelTitle || video.channelName,
+        thumbnail: video.thumbnail?.[0]?.url || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+        duration: video.lengthText,
+        viewCount: video.viewCount
+      }));
+    
+    console.log(`✅ Found ${videos.length} results`);
+    
+    return res.status(200).json(videos);
     
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('❌ Search error:', error);
     return res.status(500).json({ 
-      error: error.message
+      error: error.message,
+      details: 'Failed to search YouTube via RapidAPI'
     });
   }
 }
