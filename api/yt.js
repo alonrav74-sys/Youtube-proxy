@@ -1,5 +1,5 @@
 // api/yt.js
-// Vercel Serverless Function for searching YouTube videos via RapidAPI
+// Vercel Serverless Function for searching YouTube videos (direct scraping)
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { q, limit = 10, maxResults = 10 } = req.query;
+    const { q, limit = 10 } = req.query;
     
     if (!q) {
       return res.status(400).json({ 
@@ -22,58 +22,79 @@ export default async function handler(req, res) {
       });
     }
     
-    console.log(`🔍 Searching YouTube for: "${q}" (limit: ${limit || maxResults})`);
+    console.log(`🔍 Searching YouTube for: "${q}"`);
     
-    // RapidAPI YouTube Search
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-    
-    if (!RAPIDAPI_KEY) {
-      console.error('❌ RAPIDAPI_KEY not found in environment variables');
-      return res.status(500).json({ 
-        error: 'Server configuration error: API key missing'
-      });
-    }
-    
-    const searchUrl = `https://yt-api.p.rapidapi.com/search?query=${encodeURIComponent(q)}`;
+    // Search YouTube directly using their internal API
+    const searchUrl = `https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`;
     
     const response = await fetch(searchUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'X-RapidAPI-Key': RAPIDAPI_KEY,
-        'X-RapidAPI-Host': 'yt-api.p.rapidapi.com'
-      }
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'WEB',
+            clientVersion: '2.20240101.00.00'
+          }
+        },
+        query: q
+      })
     });
     
     if (!response.ok) {
-      throw new Error(`RapidAPI error: ${response.status} ${response.statusText}`);
+      throw new Error(`YouTube API error: ${response.status}`);
     }
     
     const data = await response.json();
     
     // Extract video results
-    const videos = (data.data || [])
-      .filter(item => item.type === 'video')
-      .slice(0, parseInt(limit || maxResults))
-      .map(video => ({
-        id: video.videoId,
-        videoId: video.videoId,
-        title: video.title,
-        author: video.channelTitle || video.channelName,
-        channel: video.channelTitle || video.channelName,
-        thumbnail: video.thumbnail?.[0]?.url || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
-        duration: video.lengthText,
-        viewCount: video.viewCount
-      }));
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+    const videoResults = [];
     
-    console.log(`✅ Found ${videos.length} results`);
+    for (const section of contents) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      
+      for (const item of items) {
+        const videoRenderer = item?.videoRenderer;
+        if (!videoRenderer) continue;
+        
+        const videoId = videoRenderer.videoId;
+        const title = videoRenderer.title?.runs?.[0]?.text || videoRenderer.title?.simpleText || '';
+        const channel = videoRenderer.ownerText?.runs?.[0]?.text || videoRenderer.shortBylineText?.runs?.[0]?.text || '';
+        const thumbnail = videoRenderer.thumbnail?.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+        
+        videoResults.push({
+          id: videoId,
+          videoId: videoId,
+          title: title,
+          author: channel,
+          channel: channel,
+          thumbnail: thumbnail.split('?')[0], // Remove query params
+          duration: videoRenderer.lengthText?.simpleText || '',
+          viewCount: videoRenderer.viewCountText?.simpleText || ''
+        });
+        
+        if (videoResults.length >= parseInt(limit)) break;
+      }
+      
+      if (videoResults.length >= parseInt(limit)) break;
+    }
     
-    return res.status(200).json(videos);
+    console.log(`✅ Found ${videoResults.length} results`);
+    
+    if (videoResults.length === 0) {
+      return res.status(200).json([]);
+    }
+    
+    return res.status(200).json(videoResults);
     
   } catch (error) {
     console.error('❌ Search error:', error);
     return res.status(500).json({ 
       error: error.message,
-      details: 'Failed to search YouTube via RapidAPI'
+      details: 'Failed to search YouTube'
     });
   }
 }
