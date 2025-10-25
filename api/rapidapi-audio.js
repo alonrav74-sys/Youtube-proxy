@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // נחלץ מזה מזהה וידאו אם נשלחה כתובת
+    // חילוץ מזהה וידאו אם נשלחה כתובת
     const videoId = id || new URL(url).searchParams.get("v");
 
     const rapidRes = await fetch(`https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`, {
