@@ -1,82 +1,47 @@
-// /api/whisper-transcribe.js
-// Server downloads audio and sends to Replica
+// /api/whisper-upload.js
+// Receives audio blob from browser and sends to Replica
 
 export const config = {
-  maxDuration: 300, // 5 minutes
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb', // Support larger files
+    },
+  },
+  maxDuration: 300,
 };
 
 export default async function handler(req, res) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
-      error: 'Method not allowed. Use GET with ?videoId=' 
-    });
-  }
-
-  const { videoId } = req.query;
-
-  if (!videoId) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'Missing videoId parameter' 
+      error: 'Method not allowed. Use POST.' 
     });
   }
 
   try {
-    console.log('🎤 Whisper request for videoId:', videoId);
+    console.log('🎤 Whisper upload request received');
 
-    // Step 1: Get audio URL from RapidAPI
-    console.log('📥 Step 1: Getting audio URL from RapidAPI...');
+    // Get base64 audio from body
+    const { audio } = req.body;
     
-    const rapidApiResponse = await fetch(
-      `https://youtube-proxy-pied.vercel.app/api/rapidapi-audio?videoId=${videoId}`
-    );
-
-    if (!rapidApiResponse.ok) {
-      throw new Error('Failed to get audio URL from RapidAPI');
-    }
-
-    const rapidApiData = await rapidApiResponse.json();
-    
-    if (!rapidApiData.success || !rapidApiData.audioUrl) {
-      throw new Error('No audio URL returned from RapidAPI');
-    }
-
-    const audioUrl = rapidApiData.audioUrl;
-    console.log('✅ Got audio URL');
-
-    // Step 2: Download audio file
-    console.log('📥 Step 2: Downloading audio from URL...');
-    
-    const audioResponse = await fetch(audioUrl);
-    
-    if (!audioResponse.ok) {
-      throw new Error('Failed to download audio file');
-    }
-
-    const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
-    console.log('✅ Downloaded audio, size:', audioBuffer.length, 'bytes');
-
-    // Check size limit (4.5MB for Vercel Hobby)
-    if (audioBuffer.length > 4.5 * 1024 * 1024) {
-      return res.status(413).json({
-        success: false,
-        error: 'Audio file too large (max 4.5MB for Vercel Hobby plan)'
+    if (!audio) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing audio data' 
       });
     }
 
-    // Step 3: Send to Replica
-    console.log('📤 Step 3: Sending to Replica Whisper...');
+    console.log('📦 Received audio data, length:', audio.length);
 
+    // Get Replica API key
     const REPLICA_API_KEY = process.env.REPLICA_API_KEY;
     
     if (!REPLICA_API_KEY) {
@@ -86,10 +51,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Convert to base64
-    const base64Audio = audioBuffer.toString('base64');
+    console.log('📤 Forwarding to Replica...');
 
-    // Call Replica
+    // Send to Replica
     const replicaResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -99,7 +63,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         version: '4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2',
         input: {
-          audio: `data:audio/mpeg;base64,${base64Audio}`,
+          audio: audio,
           model: 'large-v3',
           language: 'auto',
           translate: false,
@@ -118,18 +82,19 @@ export default async function handler(req, res) {
     if (!replicaResponse.ok) {
       const errorText = await replicaResponse.text();
       console.error('❌ Replica error:', errorText);
-      throw new Error(`Replica API error: ${replicaResponse.status}`);
+      return res.status(500).json({ 
+        success: false, 
+        error: `Replica API error: ${replicaResponse.status}` 
+      });
     }
 
     const prediction = await replicaResponse.json();
     console.log('✅ Replica prediction created:', prediction.id);
 
-    // Step 4: Poll for result
-    console.log('⏳ Step 4: Waiting for transcription...');
-    
+    // Poll for result
     let result = prediction;
     let attempts = 0;
-    const maxAttempts = 60; // 60 seconds max
+    const maxAttempts = 60;
 
     while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -147,7 +112,7 @@ export default async function handler(req, res) {
       attempts++;
       
       if (attempts % 5 === 0) {
-        console.log(`⏳ Still waiting... ${attempts}s (status: ${result.status})`);
+        console.log(`⏳ Waiting... ${attempts}s (${result.status})`);
       }
     }
 
@@ -160,7 +125,7 @@ export default async function handler(req, res) {
     }
 
     if (result.status !== 'succeeded') {
-      console.error('⏰ Timeout after', attempts, 'seconds');
+      console.error('⏰ Timeout');
       return res.status(408).json({ 
         success: false, 
         error: 'Transcription timeout' 
@@ -169,12 +134,10 @@ export default async function handler(req, res) {
 
     console.log('✅ Transcription complete!');
 
-    // Step 5: Return result
+    // Return result
     const output = result.output;
     const segments = output.segments || [];
     const text = output.text || output.transcription || '';
-
-    console.log('📦 Returning', segments.length, 'segments');
 
     return res.status(200).json({
       success: true,
