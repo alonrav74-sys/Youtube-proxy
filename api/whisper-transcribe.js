@@ -25,25 +25,12 @@ export default async function handler(req, res) {
     
     console.log('🎤 [WHISPER-REPLICATE] Starting transcription for:', videoId);
     
-    // Step 1: Get audio URL from existing rapidapi-audio endpoint
-    const baseUrl = req.headers.host ? 
-      (req.headers.host.includes('localhost') ? 'http://localhost:3000' : `https://${req.headers.host}`) 
-      : 'https://youtube-proxy-pied.vercel.app';
+    // Construct YouTube URL
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    const audioResponse = await fetch(`${baseUrl}/api/rapidapi-audio?videoId=${videoId}`);
+    console.log('📡 [WHISPER-REPLICATE] Sending YouTube URL to Replicate...');
     
-    if (!audioResponse.ok) {
-      throw new Error('Failed to get audio URL');
-    }
-    
-    const audioData = await audioResponse.json();
-    if (!audioData.success || !audioData.audioUrl) {
-      throw new Error('No audio URL received');
-    }
-    
-    console.log('🎵 [WHISPER-REPLICATE] Got audio URL, starting transcription...');
-    
-    // Step 2: Create Replicate prediction
+    // Step 1: Create Replicate prediction with YouTube URL directly
     const prediction = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -54,7 +41,7 @@ export default async function handler(req, res) {
         // Using villesau/whisper-timestamped model
         version: 'dc2754ae248fca9eb1628f1f037041f7524b3fbb014a9ed7ef61084c14c1fcca',
         input: {
-          audio: audioData.audioUrl,
+          audio: youtubeUrl,  // Send YouTube URL directly!
           language: null, // Auto-detect (null for auto)
           task: 'transcribe',
           vad: true // Voice Activity Detection for better accuracy
@@ -71,7 +58,7 @@ export default async function handler(req, res) {
     let result = await prediction.json();
     console.log('⏳ [WHISPER-REPLICATE] Prediction created:', result.id);
     
-    // Step 3: Poll for result (max 60 seconds)
+    // Step 2: Poll for result (max 60 seconds)
     const maxAttempts = 30;
     let attempts = 0;
     
@@ -96,7 +83,7 @@ export default async function handler(req, res) {
     
     console.log('✅ [WHISPER-REPLICATE] Transcription completed!');
     
-    // Step 4: Process result
+    // Step 3: Process result
     const output = result.output;
     
     // Replicate whisper-timestamped returns JSON with segments and words
