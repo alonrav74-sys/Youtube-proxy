@@ -25,12 +25,68 @@ export default async function handler(req, res) {
     
     console.log('🎤 [WHISPER-REPLICATE] Starting transcription for:', videoId);
     
-    // Construct YouTube URL
-    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // Step 1: Get direct audio URL using yt-dlp API
+    console.log('📥 [WHISPER-REPLICATE] Getting audio URL...');
     
-    console.log('📡 [WHISPER-REPLICATE] Sending YouTube URL to Replicate...');
+    let audioUrl = null;
     
-    // Step 1: Create Replicate prediction with YouTube URL directly
+    try {
+      // Try using a public yt-dlp API service
+      const ytDlpResponse = await fetch(`https://yt-dlp-api.vercel.app/api/info?url=https://www.youtube.com/watch?v=${videoId}`);
+      
+      if (!ytDlpResponse.ok) {
+        throw new Error('Failed to get video info from yt-dlp');
+      }
+      
+      const ytData = await ytDlpResponse.json();
+      
+      // Get the best audio format
+      if (ytData.formats) {
+        const audioFormats = ytData.formats
+          .filter(f => f.acodec && f.acodec !== 'none' && !f.vcodec)
+          .sort((a, b) => (b.abr || 0) - (a.abr || 0));
+        
+        if (audioFormats.length > 0) {
+          audioUrl = audioFormats[0].url;
+        }
+      }
+      
+      if (!audioUrl && ytData.url) {
+        audioUrl = ytData.url;
+      }
+      
+      if (!audioUrl) {
+        throw new Error('No audio URL found');
+      }
+      
+      console.log('✅ [WHISPER-REPLICATE] Got audio URL');
+      
+    } catch (ytError) {
+      console.log('⚠️ [WHISPER-REPLICATE] yt-dlp failed, trying rapidapi-audio...');
+      
+      // Fallback: use your existing rapidapi-audio endpoint
+      const baseUrl = req.headers.host ? 
+        (req.headers.host.includes('localhost') ? 'http://localhost:3000' : `https://${req.headers.host}`) 
+        : 'https://youtube-proxy-pied.vercel.app';
+      
+      const audioResponse = await fetch(`${baseUrl}/api/rapidapi-audio?videoId=${videoId}`);
+      
+      if (!audioResponse.ok) {
+        throw new Error('Failed to get audio URL from rapidapi-audio');
+      }
+      
+      const audioData = await audioResponse.json();
+      if (!audioData.success || !audioData.audioUrl) {
+        throw new Error('No audio URL received from rapidapi-audio');
+      }
+      
+      audioUrl = audioData.audioUrl;
+      console.log('✅ [WHISPER-REPLICATE] Got audio URL from rapidapi');
+    }
+    
+    // Step 2: Create Replicate prediction
+    console.log('🚀 [WHISPER-REPLICATE] Sending to Replicate...');
+    
     const prediction = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -38,13 +94,12 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Using villesau/whisper-timestamped model
         version: 'dc2754ae248fca9eb1628f1f037041f7524b3fbb014a9ed7ef61084c14c1fcca',
         input: {
-          audio: youtubeUrl,  // Send YouTube URL directly!
-          language: null, // Auto-detect (null for auto)
+          audio: audioUrl,  // Direct audio URL
+          language: null,
           task: 'transcribe',
-          vad: true // Voice Activity Detection for better accuracy
+          vad: true
         }
       })
     });
@@ -58,7 +113,7 @@ export default async function handler(req, res) {
     let result = await prediction.json();
     console.log('⏳ [WHISPER-REPLICATE] Prediction created:', result.id);
     
-    // Step 2: Poll for result (max 60 seconds)
+    // Step 3: Poll for result (max 60 seconds)
     const maxAttempts = 30;
     let attempts = 0;
     
@@ -83,7 +138,7 @@ export default async function handler(req, res) {
     
     console.log('✅ [WHISPER-REPLICATE] Transcription completed!');
     
-    // Step 3: Process result
+    // Step 4: Process result
     const output = result.output;
     
     // Replicate whisper-timestamped returns JSON with segments and words
