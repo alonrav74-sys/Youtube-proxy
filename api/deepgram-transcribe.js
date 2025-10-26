@@ -41,36 +41,67 @@ export default async function handler(req, res) {
       });
     }
 
-    // Check if URL or file
-    const { audioUrl } = req.body || {};
+    // Check if YouTube URL or audio URL
+    const { youtubeUrl, audioUrl } = req.body || {};
     
-    let deepgramResponse;
+    let finalAudioUrl = audioUrl;
     
-    if (audioUrl) {
-      // Use URL method
-      console.log('🔗 Using URL method:', audioUrl);
+    // If YouTube URL, get audio URL first
+    if (youtubeUrl && !audioUrl) {
+      console.log('📺 Getting audio from YouTube:', youtubeUrl);
       
-      deepgramResponse = await fetch(
-        'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&language=auto',
+      // Extract video ID
+      const videoId = youtubeUrl.includes('watch?v=') 
+        ? youtubeUrl.split('watch?v=')[1].split('&')[0]
+        : youtubeUrl.split('/').pop();
+      
+      // Get audio URL from RapidAPI
+      const rapidApiRes = await fetch(
+        `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=320`,
         {
-          method: 'POST',
           headers: {
-            'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            url: audioUrl
-          }),
+            'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
+            'x-rapidapi-key': process.env.RAPIDAPI_KEY || ''
+          }
         }
       );
-    } else {
-      // File upload method
-      console.log('📦 Using file upload method');
+      
+      if (!rapidApiRes.ok) {
+        throw new Error('Failed to get audio from YouTube');
+      }
+      
+      const rapidData = await rapidApiRes.json();
+      finalAudioUrl = rapidData.dlink;
+      
+      if (!finalAudioUrl) {
+        throw new Error('No audio URL in RapidAPI response');
+      }
+      
+      console.log('✅ Got audio URL from YouTube');
+    }
+    
+    if (!finalAudioUrl) {
       return res.status(400).json({ 
         success: false, 
-        error: 'File upload not implemented yet. Use audioUrl parameter.' 
+        error: 'No audio URL or YouTube URL provided' 
       });
     }
+    
+    console.log('🔗 Using audio URL for Deepgram');
+    
+    let deepgramResponse = await fetch(
+      'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&language=auto',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: finalAudioUrl
+        }),
+      }
+    );
 
     if (!deepgramResponse.ok) {
       const errorText = await deepgramResponse.text();
