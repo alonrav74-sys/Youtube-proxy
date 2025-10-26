@@ -1,5 +1,5 @@
 // api/whisper-transcribe.js
-// UPDATED: Now uses Replicate API with whisper-timestamped for accurate word-level timestamps
+// FINAL: Downloads audio to memory, uploads as base64 to Replicate
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,23 +25,54 @@ export default async function handler(req, res) {
     
     console.log('🎤 [WHISPER-REPLICATE] Starting transcription for:', videoId);
     
-    // Build YouTube URL - Replicate will download the audio directly
-    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // Step 1: Get audio URL
+    console.log('📥 [WHISPER-REPLICATE] Getting audio URL...');
     
-    console.log('🚀 [WHISPER-REPLICATE] Sending YouTube URL to Replicate...');
-    console.log('📺 [WHISPER-REPLICATE] URL:', youtubeUrl);
+    const baseUrl = req.headers.host ? 
+      (req.headers.host.includes('localhost') ? 'http://localhost:3000' : `https://${req.headers.host}`) 
+      : 'https://youtube-proxy-pied.vercel.app';
     
-    // Send YouTube URL directly - Replicate handles the download
+    const audioResponse = await fetch(`${baseUrl}/api/rapidapi-audio?videoId=${videoId}`);
+    
+    if (!audioResponse.ok) {
+      throw new Error('Failed to get audio URL');
+    }
+    
+    const audioData = await audioResponse.json();
+    if (!audioData.success || !audioData.audioUrl) {
+      throw new Error('No audio URL received');
+    }
+    
+    console.log('✅ [WHISPER-REPLICATE] Got audio URL');
+    
+    // Step 2: Download audio file to memory
+    console.log('📥 [WHISPER-REPLICATE] Downloading audio file...');
+    
+    const audioFileResponse = await fetch(audioData.audioUrl);
+    if (!audioFileResponse.ok) {
+      throw new Error('Failed to download audio file');
+    }
+    
+    const audioArrayBuffer = await audioFileResponse.arrayBuffer();
+    const audioBase64 = Buffer.from(audioArrayBuffer).toString('base64');
+    const audioDataUri = `data:audio/mpeg;base64,${audioBase64}`;
+    
+    console.log(`✅ [WHISPER-REPLICATE] Downloaded ${(audioArrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+    
+    // Step 3: Create prediction with base64 audio
+    console.log('🚀 [WHISPER-REPLICATE] Sending to Replicate...');
+    
     const prediction = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
         'Authorization': `Token ${REPLICATE_API_TOKEN}`,
         'Content-Type': 'application/json',
+        'Prefer': 'wait=60'
       },
       body: JSON.stringify({
         version: 'dc2754ae248fca9eb1628f1f037041f7524b3fbb014a9ed7ef61084c14c1fcca',
         input: {
-          audio: youtubeUrl,  // YouTube URL - Replicate downloads it
+          audio: audioDataUri,
           language: null,
           task: 'transcribe',
           vad: true
@@ -51,25 +82,30 @@ export default async function handler(req, res) {
     
     if (!prediction.ok) {
       const errorText = await prediction.text();
-      console.error('❌ [WHISPER-REPLICATE] Prediction creation failed:', errorText);
-      throw new Error('Failed to create prediction');
+      console.error('❌ [WHISPER-REPLICATE] Prediction failed:', errorText);
+      throw new Error(`Failed to create prediction: ${errorText}`);
     }
     
     let result = await prediction.json();
     console.log('⏳ [WHISPER-REPLICATE] Prediction created:', result.id);
     
-    // Poll for result (max 60 seconds)
-    const maxAttempts = 30;
+    // Step 4: Poll for result (max 2 minutes)
+    const maxAttempts = 60;
     let attempts = 0;
     
-    while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    while (result.status !== 'succeeded' && result.status !== 'failed' && result.status !== 'canceled' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
         headers: {
           'Authorization': `Token ${REPLICATE_API_TOKEN}`,
         }
       });
+      
+      if (!statusResponse.ok) {
+        console.error('❌ [WHISPER-REPLICATE] Status check failed');
+        break;
+      }
       
       result = await statusResponse.json();
       attempts++;
@@ -78,20 +114,24 @@ export default async function handler(req, res) {
     }
     
     if (result.status !== 'succeeded') {
-      throw new Error(`Transcription failed with status: ${result.status}`);
+      const errorMsg = result.error || `Status: ${result.status}`;
+      console.error('❌ [WHISPER-REPLICATE] Final status:', result.status);
+      throw new Error(`Transcription failed: ${errorMsg}`);
     }
     
     console.log('✅ [WHISPER-REPLICATE] Transcription completed!');
     
-    // Process result
+    // Step 5: Process result
     const output = result.output;
     
-    // Replicate whisper-timestamped returns JSON with segments and words
+    if (!output) {
+      throw new Error('No output in result');
+    }
+    
     const segments = [];
     
     if (output.segments && Array.isArray(output.segments)) {
       for (const segment of output.segments) {
-        // Each segment has words with precise timestamps
         if (segment.words && Array.isArray(segment.words)) {
           for (const word of segment.words) {
             segments.push({
@@ -101,7 +141,6 @@ export default async function handler(req, res) {
             });
           }
         } else {
-          // Fallback: use segment-level timestamps
           segments.push({
             text: segment.text || '',
             start: parseFloat(segment.start || 0),
@@ -111,12 +150,11 @@ export default async function handler(req, res) {
       }
     }
     
-    // Verify timestamps
     const hasTimestamps = segments.some(s => s.start > 0 || s.end > 0);
     console.log(`📊 [WHISPER-REPLICATE] Created ${segments.length} segments, timestamps: ${hasTimestamps ? 'YES ✅' : 'NO ❌'}`);
     
     if (segments.length > 0) {
-      console.log('📝 [WHISPER-REPLICATE] Sample segment:', segments[0]);
+      console.log('📝 [WHISPER-REPLICATE] Sample:', segments[0]);
     }
     
     const fullText = output.text || segments.map(s => s.text).join(' ');
