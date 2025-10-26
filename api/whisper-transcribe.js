@@ -1,5 +1,5 @@
 // api/whisper-transcribe.js
-// Fixed version with proper timestamp parsing
+// FIXED: Request word-level timestamps and split into smaller segments
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,11 +25,10 @@ export default async function handler(req, res) {
     
     console.log('🎤 [WHISPER] Starting transcription for:', videoId);
     
-    // Build YouTube URL
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // The working endpoint: GET /transcribe?url=...
-    const apiUrl = `https://speech-to-text-ai.p.rapidapi.com/transcribe?url=${encodeURIComponent(youtubeUrl)}`;
+    // Try to get word-level timestamps
+    const apiUrl = `https://speech-to-text-ai.p.rapidapi.com/transcribe?url=${encodeURIComponent(youtubeUrl)}&word_timestamps=true&chunk_length=10`;
     
     console.log('📡 [WHISPER] Calling API...');
     
@@ -54,65 +53,60 @@ export default async function handler(req, res) {
     }
     
     const data = await response.json();
-    console.log('📦 [WHISPER] Response data:', JSON.stringify(data).substring(0, 500));
+    console.log('📦 [WHISPER] Processing chunks...');
     
-    // ⭐ Convert chunks to segments with proper timestamp parsing
+    // Split chunks into smaller segments (5 words each)
     const segments = [];
+    
     if (data.chunks && Array.isArray(data.chunks)) {
       console.log(`📝 [WHISPER] Processing ${data.chunks.length} chunks...`);
       
-      for (let i = 0; i < data.chunks.length; i++) {
-        const chunk = data.chunks[i];
-        
-        // Parse timestamps - ensure they're numbers
+      for (const chunk of data.chunks) {
         const offset = parseFloat(chunk.offset || chunk.start || 0);
         const duration = parseFloat(chunk.duration || chunk.dur || 0);
         const end = offset + duration;
+        const text = (chunk.text || '').trim();
         
-        // Skip empty chunks
-        if (!chunk.text || !chunk.text.trim()) continue;
+        if (!text) continue;
         
-        const segment = {
-          text: chunk.text.trim(),
-          start: offset,
-          end: end
-        };
+        // Split into words
+        const words = text.split(/\s+/);
+        const wordDuration = duration / Math.max(1, words.length);
         
-        segments.push(segment);
-        
-        // Log first few segments for debugging
-        if (i < 3) {
-          console.log(`   Segment ${i}:`, segment);
+        // Create segments of 5 words each
+        for (let j = 0; j < words.length; j += 5) {
+          const wordGroup = words.slice(j, j + 5);
+          const groupStart = offset + (j * wordDuration);
+          const groupEnd = offset + ((j + wordGroup.length) * wordDuration);
+          
+          segments.push({
+            text: wordGroup.join(' '),
+            start: groupStart,
+            end: groupEnd
+          });
         }
       }
       
-      console.log(`✅ [WHISPER] Created ${segments.length} segments with timestamps`);
+      console.log(`✅ [WHISPER] Created ${segments.length} segments from ${data.chunks.length} chunks`);
       
-      // Verify timestamps exist
+      // Verify timestamps
       const hasTimestamps = segments.some(s => s.start > 0 || s.end > 0);
-      if (!hasTimestamps) {
-        console.warn('⚠️ [WHISPER] WARNING: All timestamps are 0!');
+      if (hasTimestamps) {
+        console.log('✅ [WHISPER] Timestamps OK');
       } else {
-        console.log('✅ [WHISPER] Timestamps verified - first:', segments[0], 'last:', segments[segments.length - 1]);
+        console.warn('⚠️ [WHISPER] No timestamps!');
       }
-    } else {
-      console.warn('⚠️ [WHISPER] No chunks in response');
     }
     
-    // Get full text
     const text = data.text || segments.map(s => s.text).join(' ');
     
-    const result = {
+    return res.status(200).json({
       success: true,
       text: text,
       segments: segments,
       language: data.lang || data.language || 'unknown',
       duration: parseFloat(data.duration || 0)
-    };
-    
-    console.log('✅ [WHISPER] Success! Returning', segments.length, 'segments');
-    
-    return res.status(200).json(result);
+    });
     
   } catch (error) {
     console.error('💥 [WHISPER] Server error:', error);
