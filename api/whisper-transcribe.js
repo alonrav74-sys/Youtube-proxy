@@ -1,22 +1,19 @@
-// /api/whisper-upload.js
-// Receives audio blob from browser and sends to Replica
+// /api/whisper-transcribe.js
+// Receives audio file via FormData and sends to Replica
 
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Support larger files
-    },
+    bodyParser: false, // Handle FormData manually
   },
   maxDuration: 300,
 };
 
 export default async function handler(req, res) {
-  // CORS - allow all origins including file://
+  // CORS
   const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -30,19 +27,47 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🎤 Whisper upload request received');
+    console.log('🎤 Whisper transcribe request received');
 
-    // Get base64 audio from body
-    const { audio } = req.body;
+    // Read raw body
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
     
-    if (!audio) {
+    console.log('📦 Received data, size:', buffer.length, 'bytes');
+
+    // Get boundary from Content-Type
+    const contentType = req.headers['content-type'] || '';
+    const boundary = contentType.split('boundary=')[1];
+    
+    if (!boundary) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing audio data' 
+        error: 'Missing boundary in Content-Type' 
       });
     }
 
-    console.log('📦 Received audio data, length:', audio.length);
+    // Extract audio file from FormData
+    const audioBuffer = extractAudioFromFormData(buffer, boundary);
+    
+    if (!audioBuffer) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No audio file found in request' 
+      });
+    }
+
+    console.log('🎵 Extracted audio, size:', audioBuffer.length, 'bytes');
+
+    // Check size (10MB limit)
+    if (audioBuffer.length > 10 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        error: 'Audio file too large (max 10MB)'
+      });
+    }
 
     // Get Replica API key
     const REPLICA_API_KEY = process.env.REPLICA_API_KEY;
@@ -54,9 +79,12 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('📤 Forwarding to Replica...');
+    console.log('📤 Sending to Replica...');
 
-    // Send to Replica
+    // Convert to base64
+    const base64Audio = audioBuffer.toString('base64');
+
+    // Call Replica
     const replicaResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -66,7 +94,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         version: '4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2',
         input: {
-          audio: audio,
+          audio: `data:audio/mpeg;base64,${base64Audio}`,
           model: 'large-v3',
           language: 'auto',
           translate: false,
@@ -160,5 +188,46 @@ export default async function handler(req, res) {
       success: false, 
       error: error.message || 'Internal server error' 
     });
+  }
+}
+
+// Extract audio from FormData
+function extractAudioFromFormData(buffer, boundary) {
+  try {
+    const boundaryBuffer = Buffer.from(`--${boundary}`);
+    const parts = [];
+    let start = 0;
+    
+    while (true) {
+      const boundaryIndex = buffer.indexOf(boundaryBuffer, start);
+      if (boundaryIndex === -1) break;
+      
+      if (start > 0) {
+        parts.push(buffer.slice(start, boundaryIndex));
+      }
+      
+      start = boundaryIndex + boundaryBuffer.length;
+    }
+    
+    for (const part of parts) {
+      const partStr = part.toString('utf8', 0, Math.min(500, part.length));
+      
+      if (partStr.includes('Content-Disposition') && partStr.includes('name="audio"')) {
+        const headerEnd = part.indexOf('\r\n\r\n');
+        if (headerEnd === -1) continue;
+        
+        const fileStart = headerEnd + 4;
+        const fileEnd = part.length - 2;
+        
+        if (fileEnd <= fileStart) continue;
+        
+        return part.slice(fileStart, fileEnd);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing FormData:', error);
+    return null;
   }
 }
