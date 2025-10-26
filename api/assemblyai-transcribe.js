@@ -31,7 +31,6 @@ export default async function handler(req, res) {
     // Check environment
     console.log('📋 Environment Variables:');
     console.log('   ASSEMBLYAI_API_KEY:', process.env.ASSEMBLYAI_API_KEY ? '✅ Set (' + process.env.ASSEMBLYAI_API_KEY.length + ' chars)' : '❌ Missing');
-    console.log('   RAPIDAPI_KEY:', process.env.RAPIDAPI_KEY ? '✅ Set (' + process.env.RAPIDAPI_KEY.length + ' chars)' : '❌ Missing');
 
     const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
     
@@ -43,112 +42,45 @@ export default async function handler(req, res) {
       });
     }
 
-    // Parse request
-    const { youtubeUrl, audioUrl } = req.body || {};
-    console.log('\n📥 Request Parameters:');
-    console.log('   youtubeUrl:', youtubeUrl ? youtubeUrl.substring(0, 60) + '...' : 'Not provided');
-    console.log('   audioUrl:', audioUrl ? audioUrl.substring(0, 60) + '...' : 'Not provided');
-    
-    if (!youtubeUrl && !audioUrl) {
-      console.error('❌ No URLs provided in request');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'No YouTube URL or audio URL provided' 
-      });
-    }
-
-    let finalAudioUrl = audioUrl;
-    
-    // Get audio URL from RapidAPI if needed
-    if (!finalAudioUrl && youtubeUrl) {
-      console.log('\n🔗 Getting audio URL from RapidAPI...');
-      
-      const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-      if (!RAPIDAPI_KEY) {
-        console.error('❌ RAPIDAPI_KEY not configured');
-        throw new Error('RAPIDAPI_KEY not configured');
-      }
-      
-      const rapidApiUrl = `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`;
-      console.log('   API URL:', rapidApiUrl.substring(0, 100) + '...');
-      
-      try {
-        const rapidStart = Date.now();
-        const rapidRes = await fetch(rapidApiUrl, {
-          headers: {
-            'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
-            'x-rapidapi-key': RAPIDAPI_KEY
-          }
-        });
-        const rapidTime = Date.now() - rapidStart;
-        
-        console.log('   Response status:', rapidRes.status);
-        console.log('   Response time:', rapidTime, 'ms');
-        
-        if (!rapidRes.ok) {
-          const errorText = await rapidRes.text();
-          console.error('❌ RapidAPI error response:', errorText.substring(0, 300));
-          throw new Error(`RapidAPI failed: ${rapidRes.status}`);
-        }
-        
-        const rapidData = await rapidRes.json();
-        console.log('   Response keys:', Object.keys(rapidData).join(', '));
-        
-        finalAudioUrl = rapidData.dlink;
-        
-        if (!finalAudioUrl) {
-          console.error('❌ No dlink in RapidAPI response:', JSON.stringify(rapidData).substring(0, 200));
-          throw new Error('No audio URL from RapidAPI');
-        }
-        
-        console.log('✅ Got audio URL:', finalAudioUrl.substring(0, 80) + '...');
-        
-      } catch (rapidError) {
-        console.error('💥 RapidAPI Error:', rapidError.message);
-        throw rapidError;
-      }
-    }
-
-    // Step 1: Download audio file
-    console.log('\n⬇️  STEP 1: Downloading Audio File');
-    console.log('-'.repeat(60));
-    console.log('   URL:', finalAudioUrl.substring(0, 100) + '...');
+    // Check if we received a file
+    const contentType = req.headers['content-type'] || '';
+    console.log('📥 Content-Type:', contentType);
     
     let audioBuffer;
-    try {
-      const downloadStart = Date.now();
+    
+    if (contentType.includes('multipart/form-data')) {
+      // File uploaded - parse it
+      console.log('📎 Receiving audio file from browser...');
       
-      console.log('   Fetching...');
-      const audioResponse = await fetch(finalAudioUrl);
-      const fetchTime = Date.now() - downloadStart;
+      // Read the raw body
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const body = Buffer.concat(chunks);
+      console.log('   Body size:', body.length, 'bytes');
       
-      console.log('   Status:', audioResponse.status, audioResponse.statusText);
-      console.log('   Fetch time:', fetchTime, 'ms');
-      console.log('   Content-Type:', audioResponse.headers.get('content-type') || 'Not provided');
-      console.log('   Content-Length:', audioResponse.headers.get('content-length') || 'Not provided');
+      // Simple multipart parsing - find the binary data
+      const boundary = contentType.split('boundary=')[1];
+      const parts = body.toString('binary').split('--' + boundary);
       
-      if (!audioResponse.ok) {
-        const errorText = await audioResponse.text();
-        console.error('❌ Download failed:', errorText.substring(0, 300));
-        throw new Error(`Download failed: ${audioResponse.status} ${audioResponse.statusText}`);
+      for (const part of parts) {
+        if (part.includes('Content-Type: audio')) {
+          // Found the audio part
+          const startIdx = part.indexOf('\r\n\r\n') + 4;
+          const endIdx = part.lastIndexOf('\r\n');
+          const audioBinary = part.substring(startIdx, endIdx);
+          audioBuffer = Buffer.from(audioBinary, 'binary');
+          console.log('✅ Got audio file:', audioBuffer.length, 'bytes');
+          break;
+        }
       }
       
-      console.log('   Reading arraybuffer...');
-      const arrayBuffer = await audioResponse.arrayBuffer();
-      audioBuffer = Buffer.from(arrayBuffer);
-      
-      const downloadTime = Date.now() - downloadStart;
-      console.log('✅ Download complete!');
-      console.log('   Total time:', downloadTime, 'ms');
-      console.log('   Size:', audioBuffer.length, 'bytes');
-      console.log('   Size (MB):', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
-      
-    } catch (downloadError) {
-      console.error('💥 Download Error:');
-      console.error('   Name:', downloadError.name);
-      console.error('   Message:', downloadError.message);
-      console.error('   Stack:', downloadError.stack);
-      throw new Error(`Audio download failed: ${downloadError.message}`);
+      if (!audioBuffer) {
+        throw new Error('No audio file found in request');
+      }
+    } else {
+      throw new Error('Expected multipart/form-data with audio file');
     }
 
     // Step 2: Upload to AssemblyAI
