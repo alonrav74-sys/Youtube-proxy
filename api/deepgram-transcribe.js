@@ -45,18 +45,62 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('📺 URL:', youtubeUrl);
+    console.log('📺 YouTube URL:', youtubeUrl);
 
-    // Send to Deepgram
+    // Step 1: Get audio URL from RapidAPI
+    console.log('📡 Getting audio from RapidAPI...');
+    
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+    if (!RAPIDAPI_KEY) {
+      throw new Error('RAPIDAPI_KEY not configured');
+    }
+    
+    const rapidRes = await fetch(
+      `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`,
+      {
+        headers: {
+          'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
+          'x-rapidapi-key': RAPIDAPI_KEY
+        }
+      }
+    );
+    
+    if (!rapidRes.ok) {
+      throw new Error('RapidAPI failed: ' + rapidRes.status);
+    }
+    
+    const rapidData = await rapidRes.json();
+    const audioUrl = rapidData.dlink;
+    
+    if (!audioUrl) {
+      throw new Error('No audio URL from RapidAPI');
+    }
+    
+    console.log('✅ Got audio URL');
+    
+    // Step 2: Download audio file
+    console.log('⬇️ Downloading audio...');
+    const audioRes = await fetch(audioUrl);
+    
+    if (!audioRes.ok) {
+      throw new Error('Failed to download audio: ' + audioRes.status);
+    }
+    
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    console.log('✅ Downloaded:', audioBuffer.length, 'bytes');
+    
+    // Step 3: Send to Deepgram
+    console.log('📤 Sending to Deepgram...');
+    
     const deepgramResponse = await fetch(
       'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&language=auto',
       {
         method: 'POST',
         headers: {
           'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'audio/mpeg',
         },
-        body: JSON.stringify({ url: youtubeUrl }),
+        body: audioBuffer,
       }
     );
 
