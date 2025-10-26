@@ -1,16 +1,24 @@
 // /api/whisper-transcribe.js
-// Vercel Serverless Function for Whisper AI Transcription via Replica
-
-import { buffer } from 'micro';
+// Vercel Serverless Function for Whisper AI Transcription via Replicate
+// Native Vercel implementation - no external dependencies needed!
 
 export const config = {
   api: {
-    bodyParser: false, // Disable default body parser to handle FormData
+    bodyParser: false, // Disable to handle FormData manually
   },
+  maxDuration: 300, // 5 minutes max
 };
 
 export default async function handler(req, res) {
-  // Only accept POST requests
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
@@ -21,7 +29,7 @@ export default async function handler(req, res) {
   try {
     console.log('🎤 Whisper transcription request received');
 
-    // Parse FormData manually
+    // Get content type
     const contentType = req.headers['content-type'] || '';
     
     if (!contentType.includes('multipart/form-data')) {
@@ -31,10 +39,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get the audio file buffer
-    const buf = await buffer(req);
+    // Read the raw body
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
     
-    console.log('📦 Received audio file, size:', buf.length, 'bytes');
+    console.log('📦 Received data, size:', buffer.length, 'bytes');
 
     // Parse boundary from Content-Type
     const boundary = contentType.split('boundary=')[1];
@@ -45,9 +57,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // Extract the audio file from FormData
-    // Simple parser - in production consider using a library like 'busboy' or 'formidable'
-    const audioBuffer = extractAudioFromFormData(buf, boundary);
+    // Extract audio file from FormData
+    const audioBuffer = extractAudioFromFormData(buffer, boundary);
     
     if (!audioBuffer) {
       return res.status(400).json({ 
@@ -58,21 +69,22 @@ export default async function handler(req, res) {
 
     console.log('🎵 Extracted audio buffer, size:', audioBuffer.length, 'bytes');
 
-    // Send to Replica Whisper API
+    // Get Replica API key
     const REPLICA_API_KEY = process.env.REPLICA_API_KEY;
     
     if (!REPLICA_API_KEY) {
       return res.status(500).json({ 
         success: false, 
-        error: 'REPLICA_API_KEY not configured' 
+        error: 'REPLICA_API_KEY not configured in environment variables' 
       });
     }
 
-    console.log('📤 Sending to Replica...');
+    console.log('📤 Sending to Replicate...');
 
-    // Convert to base64 for Replica
+    // Convert to base64
     const base64Audio = audioBuffer.toString('base64');
 
+    // Call Replicate API
     const replicaResponse = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -80,7 +92,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        version: 'openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2',
+        version: '4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2',
         input: {
           audio: `data:audio/mpeg;base64,${base64Audio}`,
           model: 'large-v3',
@@ -100,20 +112,20 @@ export default async function handler(req, res) {
 
     if (!replicaResponse.ok) {
       const errorText = await replicaResponse.text();
-      console.error('❌ Replica error:', errorText);
+      console.error('❌ Replicate error:', errorText);
       return res.status(500).json({ 
         success: false, 
-        error: `Replica API error: ${replicaResponse.status}` 
+        error: `Replicate API error: ${replicaResponse.status}` 
       });
     }
 
     const prediction = await replicaResponse.json();
-    console.log('📥 Replica prediction created:', prediction.id);
+    console.log('📥 Replicate prediction created:', prediction.id);
 
-    // Poll for result
+    // Poll for result (max 60 seconds)
     let result = prediction;
     let attempts = 0;
-    const maxAttempts = 60; // 60 seconds max
+    const maxAttempts = 60;
 
     while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -131,7 +143,7 @@ export default async function handler(req, res) {
     }
 
     if (result.status === 'failed') {
-      console.error('❌ Replica failed:', result.error);
+      console.error('❌ Replicate failed:', result.error);
       return res.status(500).json({ 
         success: false, 
         error: 'Transcription failed: ' + (result.error || 'Unknown error')
@@ -139,7 +151,7 @@ export default async function handler(req, res) {
     }
 
     if (result.status !== 'succeeded') {
-      console.error('⏰ Timeout');
+      console.error('⏰ Timeout after', attempts, 'seconds');
       return res.status(408).json({ 
         success: false, 
         error: 'Transcription timeout' 
@@ -150,8 +162,6 @@ export default async function handler(req, res) {
 
     // Parse Whisper output
     const output = result.output;
-    
-    // Whisper returns: { text, segments, language, duration }
     const segments = output.segments || [];
     const text = output.text || output.transcription || '';
 
@@ -179,23 +189,38 @@ export default async function handler(req, res) {
 // Helper function to extract audio buffer from FormData
 function extractAudioFromFormData(buffer, boundary) {
   try {
-    const boundaryStr = `--${boundary}`;
-    const parts = buffer.toString('binary').split(boundaryStr);
+    const boundaryBuffer = Buffer.from(`--${boundary}`);
+    const parts = [];
+    let start = 0;
     
+    // Split buffer by boundary
+    while (true) {
+      const boundaryIndex = buffer.indexOf(boundaryBuffer, start);
+      if (boundaryIndex === -1) break;
+      
+      if (start > 0) {
+        parts.push(buffer.slice(start, boundaryIndex));
+      }
+      
+      start = boundaryIndex + boundaryBuffer.length;
+    }
+    
+    // Find the part with audio file
     for (const part of parts) {
-      if (part.includes('Content-Disposition') && part.includes('name="audio"')) {
-        // Find the start of the file data (after headers)
+      const partStr = part.toString('utf8', 0, Math.min(500, part.length));
+      
+      if (partStr.includes('Content-Disposition') && partStr.includes('name="audio"')) {
+        // Find where headers end (double CRLF)
         const headerEnd = part.indexOf('\r\n\r\n');
         if (headerEnd === -1) continue;
         
-        // Extract binary data
-        const fileDataStart = headerEnd + 4;
-        const fileDataEnd = part.lastIndexOf('\r\n');
+        // Extract file data (skip headers, trim trailing CRLF)
+        const fileStart = headerEnd + 4;
+        const fileEnd = part.length - 2; // Remove trailing \r\n
         
-        if (fileDataEnd <= fileDataStart) continue;
+        if (fileEnd <= fileStart) continue;
         
-        const fileData = part.substring(fileDataStart, fileDataEnd);
-        return Buffer.from(fileData, 'binary');
+        return part.slice(fileStart, fileEnd);
       }
     }
     
