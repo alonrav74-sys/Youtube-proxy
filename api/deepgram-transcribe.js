@@ -51,6 +51,9 @@ export default async function handler(req, res) {
     console.log('📡 Getting audio from RapidAPI...');
     
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+    console.log('🔑 RAPIDAPI_KEY exists:', !!RAPIDAPI_KEY);
+    console.log('🔑 Key length:', RAPIDAPI_KEY?.length || 0);
+    
     if (!RAPIDAPI_KEY) {
       throw new Error('RAPIDAPI_KEY not configured');
     }
