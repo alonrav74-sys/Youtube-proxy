@@ -36,45 +36,52 @@ export default async function handler(req, res) {
       });
     }
 
-    const { youtubeUrl } = req.body || {};
+    const { youtubeUrl, audioUrl } = req.body || {};
     
-    if (!youtubeUrl) {
+    if (!youtubeUrl && !audioUrl) {
       return res.status(400).json({ 
         success: false, 
-        error: 'No YouTube URL' 
+        error: 'No YouTube URL or audio URL' 
       });
     }
 
-    console.log('📺 URL:', youtubeUrl);
+    let finalAudioUrl = audioUrl;
+    
+    // If we don't have audioUrl, get it from YouTube
+    if (!finalAudioUrl && youtubeUrl) {
+      console.log('📺 YouTube URL:', youtubeUrl);
 
-    // Get audio URL
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-    if (!RAPIDAPI_KEY) {
-      throw new Error('RAPIDAPI_KEY not configured');
-    }
-    
-    const rapidRes = await fetch(
-      `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`,
-      {
-        headers: {
-          'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
-          'x-rapidapi-key': RAPIDAPI_KEY
-        }
+      // Get audio URL
+      const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+      if (!RAPIDAPI_KEY) {
+        throw new Error('RAPIDAPI_KEY not configured');
       }
-    );
-    
-    if (!rapidRes.ok) {
-      throw new Error('RapidAPI failed: ' + rapidRes.status);
+      
+      const rapidRes = await fetch(
+        `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`,
+        {
+          headers: {
+            'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY
+          }
+        }
+      );
+      
+      if (!rapidRes.ok) {
+        throw new Error('RapidAPI failed: ' + rapidRes.status);
+      }
+      
+      const rapidData = await rapidRes.json();
+      finalAudioUrl = rapidData.dlink;
+      
+      if (!finalAudioUrl) {
+        throw new Error('No audio URL');
+      }
+      
+      console.log('✅ Got audio URL');
+    } else {
+      console.log('✅ Using provided audio URL');
     }
-    
-    const rapidData = await rapidRes.json();
-    const audioUrl = rapidData.dlink;
-    
-    if (!audioUrl) {
-      throw new Error('No audio URL');
-    }
-    
-    console.log('✅ Got audio URL');
 
     // Send to Gladia
     console.log('📤 Sending to Gladia...');
@@ -88,7 +95,7 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audio_url: audioUrl,
+          audio_url: finalAudioUrl,
           enable_code_switching: true,
           language_behaviour: 'automatic single language',
         }),
