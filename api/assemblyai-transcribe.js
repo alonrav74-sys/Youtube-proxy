@@ -82,8 +82,39 @@ export default async function handler(req, res) {
       console.log('✅ Using provided audio URL');
     }
 
-    // Step 1: Submit to AssemblyAI
-    console.log('📤 Submitting to AssemblyAI...');
+    // Step 1: Download the audio file
+    console.log('⬇️ Downloading audio file...');
+    
+    const audioResponse = await fetch(finalAudioUrl);
+    if (!audioResponse.ok) {
+      throw new Error('Failed to download audio');
+    }
+    
+    const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+    console.log('✅ Downloaded:', audioBuffer.length, 'bytes');
+
+    // Step 2: Upload to AssemblyAI
+    console.log('📤 Uploading to AssemblyAI...');
+    
+    const uploadRes = await fetch('https://api.assemblyai.com/v2/upload', {
+      method: 'POST',
+      headers: {
+        'authorization': ASSEMBLYAI_API_KEY,
+      },
+      body: audioBuffer,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error(`AssemblyAI upload error: ${uploadRes.status}`);
+    }
+
+    const uploadData = await uploadRes.json();
+    const uploadUrl = uploadData.upload_url;
+    
+    console.log('✅ Uploaded to AssemblyAI storage');
+
+    // Step 3: Submit for transcription
+    console.log('📤 Submitting for transcription...');
     
     const submitRes = await fetch('https://api.assemblyai.com/v2/transcript', {
       method: 'POST',
@@ -92,7 +123,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        audio_url: finalAudioUrl,
+        audio_url: uploadUrl,
         language_code: 'auto',
         speech_model: 'best',
       }),
