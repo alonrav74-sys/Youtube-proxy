@@ -1,12 +1,7 @@
 // /api/deepgram-transcribe.js
-// Transcription using Deepgram - supports both URL and file upload
+// Send YouTube URL directly to Deepgram
 
 export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
   maxDuration: 300,
 };
 
@@ -24,98 +19,61 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
-      error: 'Method not allowed. Use POST.' 
+      error: 'Method not allowed' 
     });
   }
 
   try {
-    console.log('🎤 Deepgram transcribe request received');
+    console.log('🎤 Deepgram request');
 
-    // Get Deepgram API key
     const DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
     
     if (!DEEPGRAM_API_KEY) {
+      console.error('❌ No API key');
       return res.status(500).json({ 
         success: false, 
         error: 'DEEPGRAM_API_KEY not configured' 
       });
     }
 
-    // Check if YouTube URL or audio URL
-    const { youtubeUrl, audioUrl } = req.body || {};
+    const { youtubeUrl } = req.body || {};
     
-    let finalAudioUrl = audioUrl;
-    
-    // If YouTube URL, get audio URL first
-    if (youtubeUrl && !audioUrl) {
-      console.log('📺 Getting audio from YouTube:', youtubeUrl);
-      
-      // Extract video ID
-      const videoId = youtubeUrl.includes('watch?v=') 
-        ? youtubeUrl.split('watch?v=')[1].split('&')[0]
-        : youtubeUrl.split('/').pop();
-      
-      // Get audio URL from RapidAPI
-      const rapidApiRes = await fetch(
-        `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=320`,
-        {
-          headers: {
-            'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
-            'x-rapidapi-key': process.env.RAPIDAPI_KEY || ''
-          }
-        }
-      );
-      
-      if (!rapidApiRes.ok) {
-        throw new Error('Failed to get audio from YouTube');
-      }
-      
-      const rapidData = await rapidApiRes.json();
-      finalAudioUrl = rapidData.dlink;
-      
-      if (!finalAudioUrl) {
-        throw new Error('No audio URL in RapidAPI response');
-      }
-      
-      console.log('✅ Got audio URL from YouTube');
-    }
-    
-    if (!finalAudioUrl) {
+    if (!youtubeUrl) {
       return res.status(400).json({ 
         success: false, 
-        error: 'No audio URL or YouTube URL provided' 
+        error: 'No YouTube URL' 
       });
     }
-    
-    console.log('🔗 Using audio URL for Deepgram');
-    
-    let deepgramResponse = await fetch(
-      'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&utterances=true&language=auto',
+
+    console.log('📺 URL:', youtubeUrl);
+
+    // Send to Deepgram
+    const deepgramResponse = await fetch(
+      'https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&punctuate=true&language=auto',
       {
         method: 'POST',
         headers: {
           'Authorization': `Token ${DEEPGRAM_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          url: finalAudioUrl
-        }),
+        body: JSON.stringify({ url: youtubeUrl }),
       }
     );
 
+    console.log('📡 Status:', deepgramResponse.status);
+
     if (!deepgramResponse.ok) {
       const errorText = await deepgramResponse.text();
-      console.error('❌ Deepgram error:', errorText);
+      console.error('❌ Error:', errorText);
       return res.status(500).json({ 
         success: false, 
-        error: `Deepgram API error: ${deepgramResponse.status}` 
+        error: `Deepgram error: ${deepgramResponse.status}` 
       });
     }
 
     const data = await deepgramResponse.json();
-    console.log('✅ Transcription complete!');
+    console.log('✅ Done!');
 
-    // Extract results
     const results = data.results;
     const channels = results?.channels?.[0];
     const alternatives = channels?.alternatives?.[0];
@@ -123,50 +81,34 @@ export default async function handler(req, res) {
     if (!alternatives) {
       return res.status(500).json({ 
         success: false, 
-        error: 'No transcription results' 
+        error: 'No results' 
       });
     }
 
     const transcript = alternatives.transcript || '';
     const words = alternatives.words || [];
     
-    // Convert to our format (matching Whisper format)
+    // Create segments
     const segments = [];
-    let currentSegment = { text: '', start: 0, end: 0, words: [] };
+    let current = { text: '', start: 0, end: 0 };
     
     words.forEach((word, i) => {
-      // Group words into segments (every 10 words or by punctuation)
-      if (currentSegment.words.length === 0) {
-        currentSegment.start = word.start;
-      }
+      if (!current.text) current.start = word.start;
       
-      currentSegment.words.push({
-        word: word.word,
-        start: word.start,
-        end: word.end,
-        confidence: word.confidence,
-      });
+      current.text += (current.text ? ' ' : '') + word.word;
+      current.end = word.end;
       
-      currentSegment.text += (currentSegment.text ? ' ' : '') + word.word;
-      currentSegment.end = word.end;
-      
-      // End segment at punctuation or every 10 words
-      const isPunctuation = /[.!?]$/.test(word.punctuated_word || word.word);
-      if (isPunctuation || currentSegment.words.length >= 10 || i === words.length - 1) {
-        segments.push({
-          text: currentSegment.text,
-          start: currentSegment.start,
-          end: currentSegment.end,
-          words: currentSegment.words,
-        });
-        currentSegment = { text: '', start: 0, end: 0, words: [] };
+      const isPunct = /[.!?]$/.test(word.punctuated_word || word.word);
+      if (isPunct || i === words.length - 1 || (i > 0 && i % 10 === 0)) {
+        segments.push({ ...current });
+        current = { text: '', start: 0, end: 0 };
       }
     });
 
-    // Get metadata
-    const metadata = results?.channels?.[0]?.metadata;
-    const duration = metadata?.duration || 0;
-    const language = results?.channels?.[0]?.detected_language || 'unknown';
+    const language = channels?.detected_language || 'unknown';
+    const duration = channels?.metadata?.duration || 0;
+
+    console.log('📊', words.length, 'words,', segments.length, 'segments');
 
     return res.status(200).json({
       success: true,
@@ -176,18 +118,17 @@ export default async function handler(req, res) {
         word: w.word,
         start: w.start,
         end: w.end,
-        confidence: w.confidence,
+        confidence: w.confidence || 1.0,
       })),
       language: language,
       duration: duration,
-      provider: 'deepgram',
     });
 
   } catch (error) {
-    console.error('💥 Error:', error);
+    console.error('💥', error);
     return res.status(500).json({ 
       success: false, 
-      error: error.message || 'Internal server error' 
+      error: error.message 
     });
   }
 }
