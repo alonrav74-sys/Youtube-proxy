@@ -2,15 +2,12 @@
   "name": "youtube-proxy",
   "version": "1.0.0",
   "description": "YouTube proxy with Whisper transcription",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "build": "vercel build",
     "deploy": "vercel --prod"
   },
-  "dependencies": {
-    "micro": "^10.0.1"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=18.0.0"
   }
