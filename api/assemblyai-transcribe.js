@@ -72,6 +72,8 @@ export default async function handler(req, res) {
     console.log('   API URL:', rapidApiUrl);
     
     let audioUrl;
+    let audioBuffer;
+    
     try {
       const rapidStart = Date.now();
       const rapidRes = await fetch(rapidApiUrl, {
@@ -99,7 +101,6 @@ export default async function handler(req, res) {
       if (contentType && contentType.includes('audio')) {
         console.log('✅ Got audio file directly from API!');
         // Read the audio buffer directly - skip download step!
-        const rapidTime = Date.now() - rapidStart;
         audioBuffer = Buffer.from(await rapidRes.arrayBuffer());
         console.log('✅ Audio received:', audioBuffer.length, 'bytes in', rapidTime, 'ms');
       } else {
@@ -142,16 +143,6 @@ export default async function handler(req, res) {
     } catch (rapidError) {
       console.error('💥 RapidAPI Error:', rapidError.message);
       throw new Error(`RapidAPI failed: ${rapidError.message}`);
-    }
-
-    // Step 2: Upload to AssemblyAI
-      
-    } catch (downloadError) {
-      console.error('💥 Download Error:');
-      console.error('   Name:', downloadError.name);
-      console.error('   Message:', downloadError.message);
-      console.error('   Stack:', downloadError.stack);
-      throw new Error(`Audio download failed: ${downloadError.message}`);
     }
 
     // Step 2: Upload to AssemblyAI
