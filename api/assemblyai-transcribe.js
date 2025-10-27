@@ -68,17 +68,16 @@ export default async function handler(req, res) {
     console.log('\n🔗 STEP 1: Getting Audio URL from RapidAPI');
     console.log('-'.repeat(60));
     
-    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log('   YouTube URL:', youtubeUrl);
-    
-    const rapidApiUrl = `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`;
+    const rapidApiUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/dl?id=${videoId}`;
+    console.log('   API URL:', rapidApiUrl);
     
     let audioUrl;
     try {
       const rapidStart = Date.now();
       const rapidRes = await fetch(rapidApiUrl, {
+        method: 'GET',
         headers: {
-          'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
+          'x-rapidapi-host': 'youtube-mp3-audio-video-downloader.p.rapidapi.com',
           'x-rapidapi-key': RAPIDAPI_KEY
         }
       });
@@ -94,10 +93,23 @@ export default async function handler(req, res) {
       }
       
       const rapidData = await rapidRes.json();
-      audioUrl = rapidData.dlink;
+      console.log('   Response keys:', Object.keys(rapidData).join(', '));
+      
+      // This API returns different formats - find the audio one
+      if (rapidData.link) {
+        audioUrl = rapidData.link;
+      } else if (rapidData.url) {
+        audioUrl = rapidData.url;
+      } else if (rapidData.formats && rapidData.formats.length > 0) {
+        // Find audio format
+        const audioFormat = rapidData.formats.find(f => f.format && f.format.includes('audio'));
+        if (audioFormat && audioFormat.url) {
+          audioUrl = audioFormat.url;
+        }
+      }
       
       if (!audioUrl) {
-        console.error('❌ No dlink in response');
+        console.error('❌ No audio URL in response:', JSON.stringify(rapidData).substring(0, 500));
         throw new Error('No audio URL from RapidAPI');
       }
       
