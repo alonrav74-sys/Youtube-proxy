@@ -98,46 +98,44 @@ export default async function handler(req, res) {
       const contentType = rapidRes.headers.get('content-type');
       console.log('   Content-Type:', contentType);
       
-      if (contentType && contentType.includes('audio')) {
-        console.log('✅ Got audio file directly from API!');
+      // Check if it's audio or binary data (octet-stream)
+      if (contentType && (contentType.includes('audio') || contentType.includes('octet-stream'))) {
+        console.log('✅ Got audio/binary file directly from API!');
         // Read the audio buffer directly - skip download step!
         audioBuffer = Buffer.from(await rapidRes.arrayBuffer());
         console.log('✅ Audio received:', audioBuffer.length, 'bytes in', rapidTime, 'ms');
-      } else {
-        // Maybe it's JSON after all?
-        const text = await rapidRes.text();
-        try {
-          const rapidData = JSON.parse(text);
-          console.log('   Response keys:', Object.keys(rapidData).join(', '));
-          
-          audioUrl = rapidData.link || rapidData.url || rapidData.dlink;
-          
-          if (!audioUrl) {
-            console.error('❌ No audio URL in response:', JSON.stringify(rapidData).substring(0, 500));
-            throw new Error('No audio URL from RapidAPI');
-          }
-          
-          console.log('✅ Got audio URL:', audioUrl.substring(0, 80) + '...');
-          
-          // Download from URL
-          console.log('\n⬇️  STEP 2: Downloading Audio File');
-          console.log('-'.repeat(60));
-          
-          const downloadStart = Date.now();
-          const audioRes = await fetch(audioUrl);
-          
-          if (!audioRes.ok) {
-            throw new Error(`Download failed: ${audioRes.status}`);
-          }
-          
-          audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-          const downloadTime = Date.now() - downloadStart;
-          console.log('✅ Downloaded:', audioBuffer.length, 'bytes in', downloadTime, 'ms');
-          
-        } catch (parseError) {
-          console.error('❌ Could not parse response');
-          throw new Error('Unexpected response format from RapidAPI');
+      } else if (contentType && contentType.includes('json')) {
+        // It's JSON with a URL
+        const rapidData = await rapidRes.json();
+        console.log('   Response keys:', Object.keys(rapidData).join(', '));
+        
+        audioUrl = rapidData.link || rapidData.url || rapidData.dlink;
+        
+        if (!audioUrl) {
+          console.error('❌ No audio URL in response:', JSON.stringify(rapidData).substring(0, 500));
+          throw new Error('No audio URL from RapidAPI');
         }
+        
+        console.log('✅ Got audio URL:', audioUrl.substring(0, 80) + '...');
+        
+        // Download from URL
+        console.log('\n⬇️  STEP 2: Downloading Audio File');
+        console.log('-'.repeat(60));
+        
+        const downloadStart = Date.now();
+        const audioRes = await fetch(audioUrl);
+        
+        if (!audioRes.ok) {
+          throw new Error(`Download failed: ${audioRes.status}`);
+        }
+        
+        audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+        const downloadTime = Date.now() - downloadStart;
+        console.log('✅ Downloaded:', audioBuffer.length, 'bytes in', downloadTime, 'ms');
+      } else {
+        // Unknown content type - log it and fail gracefully
+        console.error('❌ Unexpected Content-Type:', contentType);
+        throw new Error(`Unexpected Content-Type from RapidAPI: ${contentType}`);
       }
       
     } catch (rapidError) {
