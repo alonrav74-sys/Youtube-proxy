@@ -24,7 +24,10 @@ export default async function handler(req, res) {
   
   try {
     // Using YouTube MP3 Audio Video Downloader API
-    const apiUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/dl?id=${videoId}`;
+    // This API returns the MP3 file directly
+    const apiUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/download-mp3/${videoId}`;
+    
+    console.log('Fetching from:', apiUrl);
     
     const r = await fetch(apiUrl, {
       method: 'GET',
@@ -44,52 +47,19 @@ export default async function handler(req, res) {
       });
     }
     
-    const data = await r.json();
-    console.log('RapidAPI response keys:', Object.keys(data).join(', '));
+    // Stream the audio file directly to the client!
+    const contentType = r.headers.get('content-type') || 'audio/mpeg';
+    const contentLength = r.headers.get('content-length');
     
-    // This API can return different response formats
-    let audioUrl = null;
-    
-    // Try different possible fields
-    if (data.link) {
-      audioUrl = data.link;
-    } else if (data.url) {
-      audioUrl = data.url;
-    } else if (data.dlink) {
-      audioUrl = data.dlink;
-    } else if (data.formats && Array.isArray(data.formats)) {
-      // Find audio format
-      const audioFormat = data.formats.find(f => 
-        f.format && (f.format.includes('audio') || f.format.includes('mp3'))
-      );
-      if (audioFormat && audioFormat.url) {
-        audioUrl = audioFormat.url;
-      }
-    } else if (data.adaptiveFormats && Array.isArray(data.adaptiveFormats)) {
-      // Try adaptive formats
-      const audioFormat = data.adaptiveFormats.find(f => 
-        f.mimeType && f.mimeType.includes('audio')
-      );
-      if (audioFormat && audioFormat.url) {
-        audioUrl = audioFormat.url;
-      }
+    res.setHeader('Content-Type', contentType);
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
     }
     
-    if (audioUrl) {
-      res.json({ 
-        success: true, 
-        audioUrl: audioUrl,
-        title: data.title || 'Unknown'
-      });
-    } else {
-      console.error('No audio URL found in response:', JSON.stringify(data).substring(0, 500));
-      res.status(500).json({ 
-        success: false,
-        error: 'No audio URL in response', 
-        responseKeys: Object.keys(data).join(', '),
-        data: data 
-      });
-    }
+    // Pipe the response
+    const buffer = await r.arrayBuffer();
+    res.send(Buffer.from(buffer));
+    
   } catch (e) {
     console.error('Error:', e.message);
     res.status(500).json({ 
