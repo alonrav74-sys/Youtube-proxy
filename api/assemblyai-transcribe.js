@@ -42,45 +42,58 @@ export default async function handler(req, res) {
       });
     }
 
-    // Check if we received a file
-    const contentType = req.headers['content-type'] || '';
-    console.log('📥 Content-Type:', contentType);
+    // Parse JSON body
+    const { audioUrl } = req.body || {};
+    console.log('📥 Request body:', { audioUrl: audioUrl ? audioUrl.substring(0, 100) + '...' : 'Missing' });
+    
+    if (!audioUrl) {
+      console.error('❌ No audioUrl provided');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No audioUrl provided' 
+      });
+    }
+
+    // Step 1: Download audio from the provided URL
+    console.log('\n⬇️  STEP 1: Downloading Audio File');
+    console.log('-'.repeat(60));
+    console.log('   URL:', audioUrl.substring(0, 100) + '...');
     
     let audioBuffer;
-    
-    if (contentType.includes('multipart/form-data')) {
-      // File uploaded - parse it
-      console.log('📎 Receiving audio file from browser...');
+    try {
+      const downloadStart = Date.now();
       
-      // Read the raw body
-      const chunks = [];
-      for await (const chunk of req) {
-        chunks.push(chunk);
-      }
-      const body = Buffer.concat(chunks);
-      console.log('   Body size:', body.length, 'bytes');
+      console.log('   Fetching...');
+      const audioResponse = await fetch(audioUrl);
+      const fetchTime = Date.now() - downloadStart;
       
-      // Simple multipart parsing - find the binary data
-      const boundary = contentType.split('boundary=')[1];
-      const parts = body.toString('binary').split('--' + boundary);
+      console.log('   Status:', audioResponse.status, audioResponse.statusText);
+      console.log('   Fetch time:', fetchTime, 'ms');
+      console.log('   Content-Type:', audioResponse.headers.get('content-type') || 'Not provided');
+      console.log('   Content-Length:', audioResponse.headers.get('content-length') || 'Not provided');
       
-      for (const part of parts) {
-        if (part.includes('Content-Type: audio')) {
-          // Found the audio part
-          const startIdx = part.indexOf('\r\n\r\n') + 4;
-          const endIdx = part.lastIndexOf('\r\n');
-          const audioBinary = part.substring(startIdx, endIdx);
-          audioBuffer = Buffer.from(audioBinary, 'binary');
-          console.log('✅ Got audio file:', audioBuffer.length, 'bytes');
-          break;
-        }
+      if (!audioResponse.ok) {
+        const errorText = await audioResponse.text();
+        console.error('❌ Download failed:', errorText.substring(0, 300));
+        throw new Error(`Download failed: ${audioResponse.status} ${audioResponse.statusText}`);
       }
       
-      if (!audioBuffer) {
-        throw new Error('No audio file found in request');
-      }
-    } else {
-      throw new Error('Expected multipart/form-data with audio file');
+      console.log('   Reading arraybuffer...');
+      const arrayBuffer = await audioResponse.arrayBuffer();
+      audioBuffer = Buffer.from(arrayBuffer);
+      
+      const downloadTime = Date.now() - downloadStart;
+      console.log('✅ Download complete!');
+      console.log('   Total time:', downloadTime, 'ms');
+      console.log('   Size:', audioBuffer.length, 'bytes');
+      console.log('   Size (MB):', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+      
+    } catch (downloadError) {
+      console.error('💥 Download Error:');
+      console.error('   Name:', downloadError.name);
+      console.error('   Message:', downloadError.message);
+      console.error('   Stack:', downloadError.stack);
+      throw new Error(`Audio download failed: ${downloadError.message}`);
     }
 
     // Step 2: Upload to AssemblyAI
