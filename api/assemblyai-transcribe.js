@@ -209,7 +209,6 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           audio_url: uploadUrl,
-          language_code: 'auto',
           speech_model: 'best',
         }),
       });
