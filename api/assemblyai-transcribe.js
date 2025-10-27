@@ -30,9 +30,11 @@ export default async function handler(req, res) {
     
     // Check environment
     console.log('📋 Environment Variables:');
-    console.log('   ASSEMBLYAI_API_KEY:', process.env.ASSEMBLYAI_API_KEY ? '✅ Set (' + process.env.ASSEMBLYAI_API_KEY.length + ' chars)' : '❌ Missing');
+    console.log('   ASSEMBLYAI_API_KEY:', process.env.ASSEMBLYAI_API_KEY ? '✅ Set' : '❌ Missing');
+    console.log('   RAPIDAPI_KEY:', process.env.RAPIDAPI_KEY ? '✅ Set' : '❌ Missing');
 
     const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
     if (!ASSEMBLYAI_API_KEY) {
       console.error('❌ ASSEMBLYAI_API_KEY not configured');
@@ -42,20 +44,72 @@ export default async function handler(req, res) {
       });
     }
 
-    // Parse JSON body
-    const { audioUrl } = req.body || {};
-    console.log('📥 Request body:', { audioUrl: audioUrl ? audioUrl.substring(0, 100) + '...' : 'Missing' });
-    
-    if (!audioUrl) {
-      console.error('❌ No audioUrl provided');
-      return res.status(400).json({ 
+    if (!RAPIDAPI_KEY) {
+      console.error('❌ RAPIDAPI_KEY not configured');
+      return res.status(500).json({ 
         success: false, 
-        error: 'No audioUrl provided' 
+        error: 'RAPIDAPI_KEY not configured' 
       });
     }
 
-    // Step 1: Download audio from the provided URL
-    console.log('\n⬇️  STEP 1: Downloading Audio File');
+    // Parse JSON body
+    const { videoId } = req.body || {};
+    console.log('📥 Request body:', { videoId: videoId || 'Missing' });
+    
+    if (!videoId) {
+      console.error('❌ No videoId provided');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No videoId provided' 
+      });
+    }
+
+    // Step 1: Get audio URL from RapidAPI
+    console.log('\n🔗 STEP 1: Getting Audio URL from RapidAPI');
+    console.log('-'.repeat(60));
+    
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log('   YouTube URL:', youtubeUrl);
+    
+    const rapidApiUrl = `https://youtube-mp3-downloader2.p.rapidapi.com/ytmp3/ytmp3/custom/?url=${encodeURIComponent(youtubeUrl)}&quality=128`;
+    
+    let audioUrl;
+    try {
+      const rapidStart = Date.now();
+      const rapidRes = await fetch(rapidApiUrl, {
+        headers: {
+          'x-rapidapi-host': 'youtube-mp3-downloader2.p.rapidapi.com',
+          'x-rapidapi-key': RAPIDAPI_KEY
+        }
+      });
+      const rapidTime = Date.now() - rapidStart;
+      
+      console.log('   Response status:', rapidRes.status);
+      console.log('   Response time:', rapidTime, 'ms');
+      
+      if (!rapidRes.ok) {
+        const errorText = await rapidRes.text();
+        console.error('❌ RapidAPI error:', errorText.substring(0, 300));
+        throw new Error(`RapidAPI failed: ${rapidRes.status}`);
+      }
+      
+      const rapidData = await rapidRes.json();
+      audioUrl = rapidData.dlink;
+      
+      if (!audioUrl) {
+        console.error('❌ No dlink in response');
+        throw new Error('No audio URL from RapidAPI');
+      }
+      
+      console.log('✅ Got audio URL:', audioUrl.substring(0, 80) + '...');
+      
+    } catch (rapidError) {
+      console.error('💥 RapidAPI Error:', rapidError.message);
+      throw new Error(`RapidAPI failed: ${rapidError.message}`);
+    }
+
+    // Step 2: Download audio immediately (before it expires!)
+    console.log('\n⬇️  STEP 2: Downloading Audio File IMMEDIATELY');
     console.log('-'.repeat(60));
     console.log('   URL:', audioUrl.substring(0, 100) + '...');
     
