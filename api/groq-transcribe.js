@@ -30,25 +30,15 @@ export default async function handler(req, res) {
     
     // Check environment
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
     console.log('📋 Environment:');
     console.log('   GROQ_API_KEY:', GROQ_API_KEY ? '✅ Set' : '❌ Missing');
-    console.log('   RAPIDAPI_KEY:', RAPIDAPI_KEY ? '✅ Set' : '❌ Missing');
     
     if (!GROQ_API_KEY) {
       console.error('❌ GROQ_API_KEY not configured');
       return res.status(500).json({ 
         success: false, 
         error: 'GROQ_API_KEY not configured. Get one free at: https://console.groq.com' 
-      });
-    }
-
-    if (!RAPIDAPI_KEY) {
-      console.error('❌ RAPIDAPI_KEY not configured');
-      return res.status(500).json({ 
-        success: false, 
-        error: 'RAPIDAPI_KEY not configured' 
       });
     }
 
@@ -62,62 +52,41 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 1: Get audio from RapidAPI
-    console.log('\n🔗 STEP 1: Getting Audio from YouTube');
+    // Step 1: Get audio using Cobalt API (via our endpoint)
+    console.log('\n🔗 STEP 1: Getting Audio via Cobalt');
     console.log('-'.repeat(60));
-    
-    const rapidApiUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/download-mp3/${videoId}`;
     
     let audioBuffer;
     
     try {
-      const rapidStart = Date.now();
-      const rapidRes = await fetch(rapidApiUrl, {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-host': 'youtube-mp3-audio-video-downloader.p.rapidapi.com',
-          'x-rapidapi-key': RAPIDAPI_KEY
-        }
-      });
+      const cobaltStart = Date.now();
       
-      const rapidTime = Date.now() - rapidStart;
-      console.log('   Status:', rapidRes.status);
-      console.log('   Time:', rapidTime, 'ms');
+      // Call our Cobalt endpoint
+      const baseUrl = req.headers.host?.includes('localhost') 
+        ? 'http://localhost:3000' 
+        : `https://${req.headers.host}`;
       
-      if (!rapidRes.ok) {
-        throw new Error(`RapidAPI failed: ${rapidRes.status}`);
+      const cobaltUrl = `${baseUrl}/api/cobalt-audio?videoId=${videoId}`;
+      console.log('   Cobalt endpoint:', cobaltUrl);
+      
+      const cobaltRes = await fetch(cobaltUrl);
+      
+      const cobaltTime = Date.now() - cobaltStart;
+      console.log('   Status:', cobaltRes.status);
+      console.log('   Time:', cobaltTime, 'ms');
+      
+      if (!cobaltRes.ok) {
+        const errorText = await cobaltRes.text();
+        console.error('❌ Cobalt error:', errorText.substring(0, 300));
+        throw new Error(`Cobalt failed: ${cobaltRes.status}`);
       }
       
-      const contentType = rapidRes.headers.get('content-type');
-      console.log('   Content-Type:', contentType);
+      audioBuffer = Buffer.from(await cobaltRes.arrayBuffer());
+      console.log('✅ Audio received:', audioBuffer.length, 'bytes in', cobaltTime, 'ms (⚡ FAST!)');
       
-      if (contentType && (contentType.includes('audio') || contentType.includes('octet-stream'))) {
-        audioBuffer = Buffer.from(await rapidRes.arrayBuffer());
-        console.log('✅ Audio received:', audioBuffer.length, 'bytes');
-      } else if (contentType && contentType.includes('json')) {
-        const rapidData = await rapidRes.json();
-        const audioUrl = rapidData.link || rapidData.url || rapidData.dlink;
-        
-        if (!audioUrl) {
-          throw new Error('No audio URL from RapidAPI');
-        }
-        
-        console.log('   Downloading from URL...');
-        const audioRes = await fetch(audioUrl);
-        
-        if (!audioRes.ok) {
-          throw new Error(`Download failed: ${audioRes.status}`);
-        }
-        
-        audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-        console.log('✅ Downloaded:', audioBuffer.length, 'bytes');
-      } else {
-        throw new Error(`Unexpected Content-Type: ${contentType}`);
-      }
-      
-    } catch (rapidError) {
-      console.error('💥 RapidAPI Error:', rapidError.message);
-      throw new Error(`Failed to get audio: ${rapidError.message}`);
+    } catch (cobaltError) {
+      console.error('💥 Cobalt Error:', cobaltError.message);
+      throw new Error(`Failed to get audio: ${cobaltError.message}`);
     }
 
     // Step 2: Send to Groq Whisper
