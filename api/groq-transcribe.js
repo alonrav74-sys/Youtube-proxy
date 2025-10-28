@@ -1,5 +1,5 @@
 // /api/groq-transcribe.js
-// Groq Whisper Large v3 - Fast & accurate Hebrew transcription
+// Groq Whisper Large v3 with YouTube Media Downloader API
 
 export const config = {
   maxDuration: 300,
@@ -30,15 +30,25 @@ export default async function handler(req, res) {
     
     // Check environment
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
     console.log('📋 Environment:');
     console.log('   GROQ_API_KEY:', GROQ_API_KEY ? '✅ Set' : '❌ Missing');
+    console.log('   RAPIDAPI_KEY:', RAPIDAPI_KEY ? '✅ Set' : '❌ Missing');
     
     if (!GROQ_API_KEY) {
       console.error('❌ GROQ_API_KEY not configured');
       return res.status(500).json({ 
         success: false, 
         error: 'GROQ_API_KEY not configured. Get one free at: https://console.groq.com' 
+      });
+    }
+
+    if (!RAPIDAPI_KEY) {
+      console.error('❌ RAPIDAPI_KEY not configured');
+      return res.status(500).json({ 
+        success: false, 
+        error: 'RAPIDAPI_KEY not configured' 
       });
     }
 
@@ -52,45 +62,84 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 1: Get audio using our YouTube endpoint (ytdl-core)
-    console.log('\n🔗 STEP 1: Getting Audio from YouTube');
+    // Step 1: Get video details and audio URL from YouTube Media Downloader
+    console.log('\n🔗 STEP 1: Getting Audio from YouTube Media Downloader');
     console.log('-'.repeat(60));
+    
+    const rapidApiUrl = `https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=${videoId}`;
+    console.log('   API URL:', rapidApiUrl);
     
     let audioBuffer;
     
     try {
+      const rapidStart = Date.now();
+      const rapidRes = await fetch(rapidApiUrl, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com',
+          'x-rapidapi-key': RAPIDAPI_KEY
+        }
+      });
+      
+      const rapidTime = Date.now() - rapidStart;
+      console.log('   Status:', rapidRes.status);
+      console.log('   Time:', rapidTime, 'ms');
+      
+      if (!rapidRes.ok) {
+        const errorText = await rapidRes.text();
+        console.error('❌ RapidAPI error:', errorText.substring(0, 300));
+        throw new Error(`RapidAPI failed: ${rapidRes.status}`);
+      }
+      
+      const rapidData = await rapidRes.json();
+      console.log('   Response keys:', Object.keys(rapidData).join(', '));
+      
+      // Extract audio URL from response
+      let audioUrl;
+      
+      // Try different possible locations for audio URL
+      if (rapidData.audios && rapidData.audios.length > 0) {
+        audioUrl = rapidData.audios[0].url;
+      } else if (rapidData.audio_url) {
+        audioUrl = rapidData.audio_url;
+      } else if (rapidData.formats && rapidData.formats.length > 0) {
+        // Find audio-only format
+        const audioFormat = rapidData.formats.find(f => f.audio_only || f.type === 'audio');
+        audioUrl = audioFormat ? audioFormat.url : rapidData.formats[0].url;
+      } else if (rapidData.url) {
+        audioUrl = rapidData.url;
+      }
+      
+      if (!audioUrl) {
+        console.error('❌ No audio URL in response:', JSON.stringify(rapidData).substring(0, 500));
+        throw new Error('No audio URL from RapidAPI');
+      }
+      
+      console.log('✅ Got audio URL!');
+      console.log('   URL:', audioUrl.substring(0, 80) + '...');
+      
+      // Download audio
+      console.log('\n⬇️  STEP 2: Downloading Audio');
+      console.log('-'.repeat(60));
+      
       const downloadStart = Date.now();
-      
-      // Call our internal youtube-audio endpoint
-      const baseUrl = req.headers.host?.includes('localhost') 
-        ? 'http://localhost:3000' 
-        : `https://${req.headers.host}`;
-      
-      const audioUrl = `${baseUrl}/api/youtube-audio?videoId=${videoId}`;
-      console.log('   Endpoint:', audioUrl);
-      
       const audioRes = await fetch(audioUrl);
       
-      const downloadTime = Date.now() - downloadStart;
-      console.log('   Status:', audioRes.status);
-      console.log('   Time:', downloadTime, 'ms');
-      
       if (!audioRes.ok) {
-        const errorText = await audioRes.text();
-        console.error('❌ Download error:', errorText.substring(0, 300));
-        throw new Error(`YouTube download failed: ${audioRes.status}`);
+        throw new Error(`Download failed: ${audioRes.status}`);
       }
       
       audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-      console.log('✅ Audio received:', audioBuffer.length, 'bytes in', downloadTime, 'ms (⚡ ytdl-core!)');
+      const downloadTime = Date.now() - downloadStart;
+      console.log('✅ Downloaded:', audioBuffer.length, 'bytes in', downloadTime, 'ms');
       
-    } catch (downloadError) {
-      console.error('💥 Download Error:', downloadError.message);
-      throw new Error(`Failed to get audio: ${downloadError.message}`);
+    } catch (rapidError) {
+      console.error('💥 RapidAPI Error:', rapidError.message);
+      throw new Error(`Failed to get audio: ${rapidError.message}`);
     }
 
-    // Step 2: Send to Groq Whisper
-    console.log('\n🎯 STEP 2: Transcribing with Groq Whisper Large v3');
+    // Step 3: Send to Groq Whisper
+    console.log('\n🎯 STEP 3: Transcribing with Groq Whisper Large v3');
     console.log('-'.repeat(60));
     console.log('   Model: whisper-large-v3');
     console.log('   Language: auto-detect (Hebrew + English)');
