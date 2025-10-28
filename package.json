@@ -1,13 +1,11 @@
 {
   "name": "youtube-proxy",
   "version": "1.0.0",
-  "description": "YouTube proxy with Whisper transcription",
+  "description": "YouTube audio proxy with Groq Whisper transcription",
   "type": "module",
-  "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod"
+  "dependencies": {
+    "formdata-node": "^6.0.3"
   },
-  "dependencies": {},
   "engines": {
     "node": ">=18.0.0"
   }

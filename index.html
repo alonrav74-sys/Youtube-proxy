@@ -69,7 +69,7 @@
   <div class="wrap">
     <h1>🎵 Chord Finder Pro 🎯
       <span class="badge pro">Professional</span>
-      <span class="badge whisper">AssemblyAI</span>
+      <span class="badge whisper">Groq Whisper</span>
     </h1>
     <div class="muted">אקורדים מעל מילים בזמן אמת + דף נגינה מלא. RTL/LTR אוטומטי.</div>
 
@@ -108,7 +108,7 @@
         
         <div id="ytStatus" class="pill" style="display:none;margin-top:8px"></div>
         <div id="whisperStatus" class="pill warn" style="display:none;margin-top:8px">
-          <span class="spin"></span> 🎤 AssemblyAI עובד ברקע...
+          <span class="spin"></span> 🎤 Groq Whisper עובד ברקע...
         </div>
       </div>
 
@@ -313,10 +313,9 @@ async function runWhisperInBackground(videoId) {
   if(WHISPER_RUNNING) return;
   WHISPER_RUNNING = true;
   whisperStatusEl.style.display = 'inline-flex';
-  whisperStatusEl.textContent = '⏳ AssemblyAI...';
-  whisperStatusEl.className = 'pill warn';
+  whisperStatusEl.textContent = '⏳ Groq Whisper...';
   try {
-    const r = await fetch(`${SERVER}/api/assemblyai-transcribe`, {
+    const r = await fetch(`${SERVER}/api/groq-transcribe`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ videoId: videoId })
@@ -328,15 +327,11 @@ async function runWhisperInBackground(videoId) {
       WHISPER_WORDS = data.words || [];
       WHISPER_TEXT = data.text || '';
       DETECTED_LANGUAGE = data.language || 'en';
-      whisperStatusEl.textContent = '✓ AssemblyAI';
+      whisperStatusEl.textContent = '✓ Groq Whisper';
       whisperStatusEl.classList.remove('warn');
       whisperStatusEl.classList.add('ok');
-      
-      console.log('✅ Transcription complete:', WHISPER_WORDS.length, 'words');
-      
       if(window.__STATE && window.__STATE.timeline) {
         syncChordsWithLyrics();
-        displayWhisperResult();
         refreshSheetTabView();
       }
       setTimeout(() => whisperStatusEl.style.display = 'none', 2500);
@@ -344,9 +339,8 @@ async function runWhisperInBackground(videoId) {
       throw new Error(data.error || 'Failed');
     }
   } catch(e) {
-    console.error('Transcription error:', e);
+    console.error('Error:', e);
     whisperStatusEl.textContent = '❌ שגיאה';
-    whisperStatusEl.classList.remove('warn');
     whisperStatusEl.classList.add('err');
     setTimeout(() => whisperStatusEl.style.display = 'none', 4000);
   } finally {
@@ -391,7 +385,7 @@ function displayWhisperResult() {
     return;
   }
   const lang = DETECTED_LANGUAGE === 'he' ? 'עברית' : (DETECTED_LANGUAGE === 'en' ? 'English' : DETECTED_LANGUAGE);
-  fullTranscriptEl.textContent = `🎤 [AssemblyAI - ${lang}]\n\n${WHISPER_TEXT}`;
+  fullTranscriptEl.textContent = `🎤 [Groq Whisper - ${lang}]\n\n${WHISPER_TEXT}`;
 }
 
 ytSearchBtn.onclick = async () => {
@@ -529,14 +523,7 @@ analyzeBtn.onclick=async()=>{
   secDomCountEl.textContent='—'; 
   modalBorrowCountEl.textContent='—';
   
-  // Clear previous transcription
-  WHISPER_SEGMENTS = [];
-  WHISPER_WORDS = [];
-  WHISPER_TEXT = '';
-  DETECTED_LANGUAGE = 'en';
-  WHISPER_RUNNING = false;
-  fullTranscriptEl.textContent = '⏳ ממתין לתמלול...';
-  fullSheetEl.textContent = '⏳ מנתח...';
+  if(!WHISPER_TEXT) fullTranscriptEl.textContent = '⏳ ממתין...';
 
   let audioSource = null;
   if(currentTab === 'file') {
@@ -1239,18 +1226,13 @@ function refreshSheetTabView(){
   fullSheetEl.className = `synced-sheet ${isRTL ? 'rtl' : ''}`;
   
   if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
-    if(WHISPER_RUNNING) {
-      fullSheetEl.innerHTML = '<div style="color:#f59e0b;font-size:18px;padding:20px">⏳ AssemblyAI עובד ברקע...<br><br>המילים יופיעו בעוד כ-30 שניות</div>';
-      return;
-    }
-    
     let output = '<div style="color:#000;font-family:Arial">🎸 אקורדים:<br><br>';
     st.timeline.forEach((ev, i) => {
       const chord = applyCapoToLabel(ev.label, capo);
       output += `${chord}  `;
       if((i + 1) % 8 === 0) output += '<br>';
     });
-    output += '<br><br>💡 לסנכרון מילים צריך AssemblyAI (עובד אוטומטית עם YouTube)</div>';
+    output += '<br><br>💡 לסנכרון מילים צריך Groq Whisper</div>';
     fullSheetEl.innerHTML = output;
     return;
   }
