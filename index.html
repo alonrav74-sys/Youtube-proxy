@@ -1264,56 +1264,55 @@ function refreshSheetTabView(){
   
   let html = '';
   
+  // ✅ הקוד המתוקן - מציג את כל האקורדים והמילים
   for(const line of lines){
     if(line.length === 0) continue;
     
-    // Build chord line and lyric line
-    let chordLine = '';
-    let lyricLine = '';
-    let position = 0;
-    
-    for(const w of line){
-      const wordText = (w.word || w.text || '').trim();
-      const start = w.start;
-      const end = w.end ?? (w.start + 0.1);
-      
-      // Find chord at this word's timing
-      const chord = tl.find(ch => ch.t >= start - 0.05 && ch.t <= end + 0.05);
-      
-      if(chord){
-        const chordLabel = applyCapoToLabel(sanitizeLabel(chord.label), capo);
-        // Pad to current position
-        while(chordLine.length < position) chordLine += ' ';
-        chordLine += chordLabel;
-        position = chordLine.length;
-      }
-      
-      lyricLine += wordText + ' ';
-      position = lyricLine.length;
-    }
-    
-    // Check for chords between words in this line
     const lineStart = line[0].start;
     const lineEnd = (line[line.length-1].end ?? line[line.length-1].start) + 0.5;
+    
+    // קבל את כל האקורדים בטווח הזמן של השורה
     const chordsInLine = tl.filter(ch => ch.t >= lineStart && ch.t <= lineEnd);
     
-    for(const ch of chordsInLine){
-      const hasWordAtChord = line.some(w => {
-        const start = w.start, end = w.end ?? (w.start + 0.1);
-        return ch.t >= start - 0.05 && ch.t <= end + 0.05;
+    // צור timeline משולב של מילים ואקורדים
+    const merged = [];
+    
+    // הוסף את כל המילים
+    for(const w of line){
+      merged.push({
+        type: 'word',
+        time: w.start,
+        text: (w.word || w.text || '').trim(),
+        start: w.start,
+        end: w.end ?? (w.start + 0.1)
       });
-      
-      if(!hasWordAtChord){
-        // Find position in lyric line based on timing
-        let insertPos = 0;
-        for(let i = 0; i < line.length; i++){
-          if(line[i].start > ch.t) break;
-          insertPos += (line[i].word || line[i].text || '').trim().length + 1;
-        }
-        
-        const chordLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
-        while(chordLine.length < insertPos) chordLine += ' ';
-        chordLine = chordLine.slice(0, insertPos) + chordLabel + chordLine.slice(insertPos + chordLabel.length);
+    }
+    
+    // הוסף את כל האקורדים
+    for(const ch of chordsInLine){
+      const chordLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
+      merged.push({
+        type: 'chord',
+        time: ch.t,
+        text: chordLabel
+      });
+    }
+    
+    // מיין לפי זמן
+    merged.sort((a, b) => a.time - b.time);
+    
+    // בנה שורות אקורדים ומילים
+    let chordLine = '';
+    let lyricLine = '';
+    
+    for(const item of merged){
+      if(item.type === 'chord'){
+        // הוסף אקורד במיקום הנוכחי
+        while(chordLine.length < lyricLine.length) chordLine += ' ';
+        chordLine += item.text;
+      } else {
+        // הוסף מילה
+        lyricLine += item.text + ' ';
       }
     }
     
