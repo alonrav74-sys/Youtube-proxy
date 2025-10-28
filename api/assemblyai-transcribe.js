@@ -1,5 +1,5 @@
 // /api/assemblyai-transcribe.js
-// AssemblyAI transcription with detailed debug logging
+// AssemblyAI transcription with language detection for Hebrew & English
 
 export const config = {
   maxDuration: 300,
@@ -193,9 +193,10 @@ export default async function handler(req, res) {
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
-    // Step 3: Submit transcription
+    // Step 3: Submit transcription with language detection
     console.log('\n🎯 STEP 3: Submitting for Transcription');
     console.log('-'.repeat(60));
+    console.log('   🌍 Language detection: ENABLED (Hebrew + English)');
     
     let transcriptId;
     try {
@@ -210,6 +211,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           audio_url: uploadUrl,
           speech_model: 'best',
+          language_detection: true,  // ✅ זיהוי שפה אוטומטי!
         }),
       });
       
@@ -307,8 +309,9 @@ export default async function handler(req, res) {
           console.log('📊 Results:');
           console.log('   Words:', formattedWords.length);
           console.log('   Segments:', segments.length);
-          console.log('   Language:', result.language_code);
+          console.log('   Language detected:', result.language_code || 'unknown');
           console.log('   Duration:', result.audio_duration, 's');
+          console.log('   Text preview:', fullText.substring(0, 100) + '...');
           console.log('='.repeat(60));
           
           return res.status(200).json({
