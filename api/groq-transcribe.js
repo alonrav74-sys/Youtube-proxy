@@ -52,41 +52,41 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 1: Get audio using Cobalt API (via our endpoint)
-    console.log('\n🔗 STEP 1: Getting Audio via Cobalt');
+    // Step 1: Get audio using our YouTube endpoint (ytdl-core)
+    console.log('\n🔗 STEP 1: Getting Audio from YouTube');
     console.log('-'.repeat(60));
     
     let audioBuffer;
     
     try {
-      const cobaltStart = Date.now();
+      const downloadStart = Date.now();
       
-      // Call our Cobalt endpoint
+      // Call our internal youtube-audio endpoint
       const baseUrl = req.headers.host?.includes('localhost') 
         ? 'http://localhost:3000' 
         : `https://${req.headers.host}`;
       
-      const cobaltUrl = `${baseUrl}/api/cobalt-audio?videoId=${videoId}`;
-      console.log('   Cobalt endpoint:', cobaltUrl);
+      const audioUrl = `${baseUrl}/api/youtube-audio?videoId=${videoId}`;
+      console.log('   Endpoint:', audioUrl);
       
-      const cobaltRes = await fetch(cobaltUrl);
+      const audioRes = await fetch(audioUrl);
       
-      const cobaltTime = Date.now() - cobaltStart;
-      console.log('   Status:', cobaltRes.status);
-      console.log('   Time:', cobaltTime, 'ms');
+      const downloadTime = Date.now() - downloadStart;
+      console.log('   Status:', audioRes.status);
+      console.log('   Time:', downloadTime, 'ms');
       
-      if (!cobaltRes.ok) {
-        const errorText = await cobaltRes.text();
-        console.error('❌ Cobalt error:', errorText.substring(0, 300));
-        throw new Error(`Cobalt failed: ${cobaltRes.status}`);
+      if (!audioRes.ok) {
+        const errorText = await audioRes.text();
+        console.error('❌ Download error:', errorText.substring(0, 300));
+        throw new Error(`YouTube download failed: ${audioRes.status}`);
       }
       
-      audioBuffer = Buffer.from(await cobaltRes.arrayBuffer());
-      console.log('✅ Audio received:', audioBuffer.length, 'bytes in', cobaltTime, 'ms (⚡ FAST!)');
+      audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+      console.log('✅ Audio received:', audioBuffer.length, 'bytes in', downloadTime, 'ms (⚡ ytdl-core!)');
       
-    } catch (cobaltError) {
-      console.error('💥 Cobalt Error:', cobaltError.message);
-      throw new Error(`Failed to get audio: ${cobaltError.message}`);
+    } catch (downloadError) {
+      console.error('💥 Download Error:', downloadError.message);
+      throw new Error(`Failed to get audio: ${downloadError.message}`);
     }
 
     // Step 2: Send to Groq Whisper
