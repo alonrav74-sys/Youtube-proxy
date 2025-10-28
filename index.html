@@ -58,11 +58,11 @@
     .tab-content.active{display:block}
     .info-box{background:#1f2a40;padding:10px;border-radius:8px;margin-top:8px;font-size:13px;color:#cbd5e1}
     .info-box.success{background:#0d2e1f;border:1px solid #22c55e}
-    .synced-sheet{background:#fff;color:#000;padding:20px;border-radius:8px;font-family:Arial, sans-serif;white-space:pre-wrap;line-height:1.6}
+    .synced-sheet{background:#fff;color:#000;padding:20px;border-radius:8px;font-family:'Courier New',Courier,monospace;line-height:1.8;overflow-x:auto;max-width:100%}
     .synced-sheet.rtl{direction:rtl;text-align:right}
     .synced-sheet.ltr{direction:ltr;text-align:left}
-    .chord-line{color:#2563eb;font-weight:700;font-size:14px;margin:0;white-space:pre}
-    .lyric-line{color:#000;font-size:16px;margin:0 0 12px 0;white-space:pre}
+    .chord-line{color:#2563eb;font-weight:700;font-size:14px;margin:0;white-space:pre;font-family:'Courier New',Courier,monospace}
+    .lyric-line{color:#000;font-size:16px;margin:0 0 16px 0;white-space:pre;font-family:'Courier New',Courier,monospace}
   </style>
 </head>
 <body>
@@ -1322,14 +1322,23 @@ function refreshSheetTabView(){
       }
     }
     
-    // בנה את שתי השורות - alignment מדויק
+    // בנה את שתי השורות - alignment מדויק עם line wrapping
     let chordLine = '';
     let lyricLine = '';
+    const MAX_LINE_WIDTH = 60; // מספר תווים מקסימלי בשורה
     
     for(const item of items){
       if(item.isSpacer){
         // אקורד בלי מילה - צריך ליצור רווח בשורת המילים
         const spacerWidth = item.chord.length + 3;
+        
+        // בדוק אם צריך לרדת שורה
+        if(lyricLine.length + spacerWidth > MAX_LINE_WIDTH && lyricLine.length > 0){
+          html += `<div class="chord-line">${chordLine}</div>`;
+          html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
+          chordLine = '';
+          lyricLine = '';
+        }
         
         // הוסף רווחים עד שנגיע לאורך הנכון
         while(chordLine.length < lyricLine.length) {
@@ -1340,6 +1349,16 @@ function refreshSheetTabView(){
         
       } else {
         // מילה רגילה (עם או בלי אקורד)
+        const wordLength = item.word.length + 1; // +1 לרווח אחרי
+        
+        // בדוק אם צריך לרדת שורה
+        if(lyricLine.length + wordLength > MAX_LINE_WIDTH && lyricLine.length > 0){
+          html += `<div class="chord-line">${chordLine}</div>`;
+          html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
+          chordLine = '';
+          lyricLine = '';
+        }
+        
         if(item.chord){
           // יש אקורד מעל המילה
           while(chordLine.length < lyricLine.length) {
@@ -1353,8 +1372,11 @@ function refreshSheetTabView(){
       }
     }
     
-    html += `<div class="chord-line">${chordLine}</div>`;
-    html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
+    // הוסף את מה שנשאר
+    if(lyricLine.trim().length > 0){
+      html += `<div class="chord-line">${chordLine}</div>`;
+      html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
+    }
   }
   
   fullSheetEl.innerHTML = html || '<div style="color:#999">אין תוצאות</div>';
