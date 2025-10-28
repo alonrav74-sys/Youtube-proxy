@@ -314,6 +314,7 @@ async function runWhisperInBackground(videoId) {
   WHISPER_RUNNING = true;
   whisperStatusEl.style.display = 'inline-flex';
   whisperStatusEl.textContent = '⏳ AssemblyAI...';
+  whisperStatusEl.className = 'pill warn';
   try {
     const r = await fetch(`${SERVER}/api/assemblyai-transcribe`, {
       method: 'POST',
@@ -330,8 +331,12 @@ async function runWhisperInBackground(videoId) {
       whisperStatusEl.textContent = '✓ AssemblyAI';
       whisperStatusEl.classList.remove('warn');
       whisperStatusEl.classList.add('ok');
+      
+      console.log('✅ Transcription complete:', WHISPER_WORDS.length, 'words');
+      
       if(window.__STATE && window.__STATE.timeline) {
         syncChordsWithLyrics();
+        displayWhisperResult();
         refreshSheetTabView();
       }
       setTimeout(() => whisperStatusEl.style.display = 'none', 2500);
@@ -339,8 +344,9 @@ async function runWhisperInBackground(videoId) {
       throw new Error(data.error || 'Failed');
     }
   } catch(e) {
-    console.error('Error:', e);
+    console.error('Transcription error:', e);
     whisperStatusEl.textContent = '❌ שגיאה';
+    whisperStatusEl.classList.remove('warn');
     whisperStatusEl.classList.add('err');
     setTimeout(() => whisperStatusEl.style.display = 'none', 4000);
   } finally {
@@ -523,7 +529,14 @@ analyzeBtn.onclick=async()=>{
   secDomCountEl.textContent='—'; 
   modalBorrowCountEl.textContent='—';
   
-  if(!WHISPER_TEXT) fullTranscriptEl.textContent = '⏳ ממתין...';
+  // Clear previous transcription
+  WHISPER_SEGMENTS = [];
+  WHISPER_WORDS = [];
+  WHISPER_TEXT = '';
+  DETECTED_LANGUAGE = 'en';
+  WHISPER_RUNNING = false;
+  fullTranscriptEl.textContent = '⏳ ממתין לתמלול...';
+  fullSheetEl.textContent = '⏳ מנתח...';
 
   let audioSource = null;
   if(currentTab === 'file') {
@@ -1226,13 +1239,18 @@ function refreshSheetTabView(){
   fullSheetEl.className = `synced-sheet ${isRTL ? 'rtl' : ''}`;
   
   if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
+    if(WHISPER_RUNNING) {
+      fullSheetEl.innerHTML = '<div style="color:#f59e0b;font-size:18px;padding:20px">⏳ AssemblyAI עובד ברקע...<br><br>המילים יופיעו בעוד כ-30 שניות</div>';
+      return;
+    }
+    
     let output = '<div style="color:#000;font-family:Arial">🎸 אקורדים:<br><br>';
     st.timeline.forEach((ev, i) => {
       const chord = applyCapoToLabel(ev.label, capo);
       output += `${chord}  `;
       if((i + 1) % 8 === 0) output += '<br>';
     });
-    output += '<br><br>💡 לסנכרון מילים צריך AssemblyAI</div>';
+    output += '<br><br>💡 לסנכרון מילים צריך AssemblyAI (עובד אוטומטית עם YouTube)</div>';
     fullSheetEl.innerHTML = output;
     return;
   }
