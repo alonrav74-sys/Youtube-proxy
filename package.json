@@ -1,0 +1,13 @@
+{
+  "name": "youtube-proxy",
+  "version": "1.0.0",
+  "description": "YouTube chord finder with Groq transcription",
+  "type": "module",
+  "dependencies": {
+    "ytdl-core": "^4.11.5",
+    "formdata-node": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
