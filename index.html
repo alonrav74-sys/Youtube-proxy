@@ -1264,7 +1264,7 @@ function refreshSheetTabView(){
   
   let html = '';
   
-  // ✅ הקוד המתוקן - מציג את כל האקורדים והמילים
+  // ✅ הקוד המתוקן - אקורד מעל מילה, אקורד בלי מילה = רווח במילים
   for(const line of lines){
     if(line.length === 0) continue;
     
@@ -1274,50 +1274,87 @@ function refreshSheetTabView(){
     // קבל את כל האקורדים בטווח הזמן של השורה
     const chordsInLine = tl.filter(ch => ch.t >= lineStart && ch.t <= lineEnd);
     
-    // צור timeline משולב של מילים ואקורדים
-    const merged = [];
+    // מיין אקורדים לפי זמן
+    chordsInLine.sort((a, b) => a.t - b.t);
     
-    // הוסף את כל המילים
+    // צור מבנה של מילים עם אקורדים
+    const items = [];
+    
     for(const w of line){
-      merged.push({
-        type: 'word',
-        time: w.start,
-        text: (w.word || w.text || '').trim(),
-        start: w.start,
-        end: w.end ?? (w.start + 0.1)
+      const wordText = (w.word || w.text || '').trim();
+      const wordTime = w.start;
+      
+      // מצא אקורד שמתאים למילה הזו (תוך 50ms)
+      const matchedChord = chordsInLine.find(ch => 
+        Math.abs(ch.t - wordTime) <= 0.05
+      );
+      
+      items.push({
+        word: wordText,
+        chord: matchedChord ? applyCapoToLabel(sanitizeLabel(matchedChord.label), capo) : null,
+        time: wordTime
       });
     }
     
-    // הוסף את כל האקורדים
+    // עכשיו מצא אקורדים שאין להם מילה (בין מילים)
     for(const ch of chordsInLine){
-      const chordLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
-      merged.push({
-        type: 'chord',
-        time: ch.t,
-        text: chordLabel
-      });
-    }
-    
-    // מיין לפי זמן
-    merged.sort((a, b) => a.time - b.time);
-    
-    // בנה שורות אקורדים ומילים
-    let chordLine = '';
-    let lyricLine = '';
-    
-    for(const item of merged){
-      if(item.type === 'chord'){
-        // הוסף אקורד במיקום הנוכחי
-        while(chordLine.length < lyricLine.length) chordLine += ' ';
-        chordLine += item.text;
-      } else {
-        // הוסף מילה
-        lyricLine += item.text + ' ';
+      const hasWord = items.some(it => 
+        Math.abs(it.time - ch.t) <= 0.05
+      );
+      
+      if(!hasWord){
+        // אקורד בלי מילה - צריך להוסיף רווח
+        // מצא את המיקום הנכון בין מילים
+        let insertIndex = items.length;
+        for(let i = 0; i < items.length; i++){
+          if(ch.t < items[i].time){
+            insertIndex = i;
+            break;
+          }
+        }
+        
+        items.splice(insertIndex, 0, {
+          word: null, // אין מילה
+          chord: applyCapoToLabel(sanitizeLabel(ch.label), capo),
+          time: ch.t,
+          isSpacer: true
+        });
       }
     }
     
-    html += `<div class="chord-line">${chordLine || ' '}</div>`;
-    html += `<div class="lyric-line">${lyricLine.trim()}</div>`;
+    // בנה את שתי השורות - alignment מדויק
+    let chordLine = '';
+    let lyricLine = '';
+    
+    for(const item of items){
+      if(item.isSpacer){
+        // אקורד בלי מילה - צריך ליצור רווח בשורת המילים
+        const spacerWidth = item.chord.length + 3;
+        
+        // הוסף רווחים עד שנגיע לאורך הנכון
+        while(chordLine.length < lyricLine.length) {
+          chordLine += ' ';
+        }
+        chordLine += item.chord + '   ';
+        lyricLine += ' '.repeat(spacerWidth);
+        
+      } else {
+        // מילה רגילה (עם או בלי אקורד)
+        if(item.chord){
+          // יש אקורד מעל המילה
+          while(chordLine.length < lyricLine.length) {
+            chordLine += ' ';
+          }
+          chordLine += item.chord;
+        }
+        
+        // הוסף את המילה
+        lyricLine += item.word + ' ';
+      }
+    }
+    
+    html += `<div class="chord-line">${chordLine}</div>`;
+    html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
   }
   
   fullSheetEl.innerHTML = html || '<div style="color:#999">אין תוצאות</div>';
