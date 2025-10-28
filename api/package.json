@@ -1,0 +1,12 @@
+{
+  "name": "youtube-proxy",
+  "version": "1.0.0",
+  "description": "YouTube audio proxy with Groq Whisper transcription",
+  "type": "module",
+  "dependencies": {
+    "formdata-node": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
