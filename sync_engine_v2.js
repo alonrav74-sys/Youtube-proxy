@@ -112,17 +112,28 @@ function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset)
 function renderBeatTimeline(lines, isRTL) {
   console.log(`🎨 Rendering ${lines.length} lines, RTL: ${isRTL}`);
   let html = '';
+  let totalChords = 0;
+  let totalWords = 0;
   
   for(const line of lines) {
     const events = isRTL ? [...line.events].reverse() : line.events;
     
-    console.log(`   Line events: ${events.length}`, events.slice(0, 3)); // Show first 3
+    console.log(`   Line has ${events.length} events`);
+    
+    // Debug first 3 events
+    for(let i = 0; i < Math.min(3, events.length); i++) {
+      const ev = events[i];
+      console.log(`     Event ${i}: chord="${ev.chord}", word="${ev.word}"`);
+    }
     
     // Build chord and lyric lines
     let chordLine = '';
     let lyricLine = '';
     
     for(const ev of events) {
+      if(ev.chord) totalChords++;
+      if(ev.word) totalWords++;
+      
       const chordText = ev.chord || '';
       const wordText = ev.word || '';
       
@@ -146,6 +157,8 @@ function renderBeatTimeline(lines, isRTL) {
   }
   
   console.log(`🎨 Generated HTML length: ${html.length} chars`);
+  console.log(`🎸 Total chords rendered: ${totalChords}`);
+  console.log(`🎤 Total words rendered: ${totalWords}`);
   if(html.length === 0) {
     console.error('❌ No HTML generated!');
   }
