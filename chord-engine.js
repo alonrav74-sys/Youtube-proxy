@@ -321,12 +321,8 @@ class ChordEngine {
    * משתמש ב-Viterbi algorithm למצוא את הרצף המסתבר ביותר
    */
   chordTrackingWithHMM(feats, key) {
-    console.log('🧠 HMM tracking started');
     const { chroma, bassPc, frameE, hop, sr } = feats;
-    console.log(`📊 Frames: ${chroma.length}, Key: ${this.nameSharp(key.root)}${key.minor?'m':''}`);
-    
     const diatonic = (key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE).map(s => this.toPc(key.root + s));
-    console.log(`🎵 Diatonic scale: ${diatonic.map(pc => this.nameSharp(pc)).join(', ')}`);
     
     // בנה מועמדים: כל root דיאטוני + major/minor
     const candidates = [];
@@ -334,7 +330,6 @@ class ChordEngine {
       candidates.push({ root: r, label: this.nameSharp(r) });
       candidates.push({ root: r, label: this.nameSharp(r) + 'm' });
     }
-    console.log(`🎯 Candidates: ${candidates.length} (${candidates.map(c=>c.label).join(', ')})`);
     
     const N = candidates.length;
     const M = chroma.length;
@@ -469,12 +464,6 @@ class ChordEngine {
       confidence: confidence
     });
     
-    console.log(`✅ HMM completed: ${tl.length} chord segments`);
-    if(tl.length > 0) {
-      console.log(`First chord: ${tl[0].label} at ${tl[0].t.toFixed(2)}s`);
-      console.log(`Last chord: ${tl[tl.length-1].label} at ${tl[tl.length-1].t.toFixed(2)}s`);
-    }
-    
     return tl;
   }
 
@@ -489,11 +478,8 @@ class ChordEngine {
     const uncertainChords = timeline.filter(ev => (ev.confidence || 1.0) < 0.6);
     
     if (uncertainChords.length === 0) {
-      console.log('✅ כל האקורדים ברורים (confidence > 0.6)');
       return timeline;
     }
-    
-    console.log(`🔍 מצאתי ${uncertainChords.length} אקורדים לא ברורים, מנסה לשפר...`);
     
     // אם יש Basic Pitch - השתמש בו
     if (window.basicPitch) {
@@ -543,7 +529,6 @@ class ChordEngine {
       const refined = this.detectBestChord(weightedChroma, bassPc[fi]);
       
       if (refined && refined.confidence > chord.confidence) {
-        console.log(`🔧 שיפרתי: ${chord.label} → ${refined.label} (${(refined.confidence * 100).toFixed(0)}%)`);
         chord.label = refined.label;
         chord.confidence = refined.confidence;
         chord.refined = true;
@@ -614,14 +599,21 @@ class ChordEngine {
   }
 
   buildChordsFromBass(feats, key, bpm) {
-    console.log('🎸 buildChordsFromBass started');
+    // נסה HMM קודם
+    let tl = [];
+    try {
+      tl = this.chordTrackingWithHMM(feats, key);
+    } catch (e) {
+      console.warn('⚠️ HMM failed:', e.message);
+    }
     
-    // השתמש ב-HMM לזיהוי רצף חלק
-    const tl = this.chordTrackingWithHMM(feats, key);
-    console.log(`📊 HMM returned ${tl.length} chords`);
+    // 🔥 אם HMM נכשל או החזיר מעט מדי אקורדים - השתמש בשיטה פשוטה!
+    if(tl.length < 3) {
+      tl = this.simpleBassChordDetection(feats, key, bpm);
+    }
     
     if(tl.length === 0) {
-      console.warn('⚠️ HMM returned empty timeline!');
+      console.warn('⚠️ No chords detected!');
       return [];
     }
     
@@ -661,8 +653,100 @@ class ChordEngine {
       out.push(a);
     }
     
-    console.log(`✅ Final timeline: ${out.length} chords after filtering`);
     return out;
+  }
+
+  /**
+   * 🔥 Simple Bass Chord Detection - fallback אם HMM נכשל
+   */
+  simpleBassChordDetection(feats, key, bpm) {
+    const { bassPc, chroma, frameE, hop, sr } = feats;
+    const diatonic = (key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE).map(s => this.toPc(key.root + s));
+    
+    const spb = 60 / Math.max(60, bpm || 120);
+    const minFrames = Math.max(2, Math.floor((spb * 0.3) / (hop / sr)));
+    
+    const timeline = [];
+    let i = 0;
+    
+    while (i < bassPc.length) {
+      // מצא בס שמספיק חזק
+      if (frameE[i] < this.percentileLocal(frameE, 20)) {
+        i++;
+        continue;
+      }
+      
+      const startFrame = i;
+      const startTime = i * (hop / sr);
+      
+      // מצא כמה זמן הבס הזה נמשך
+      const currentBass = bassPc[i];
+      let endFrame = startFrame;
+      
+      while (endFrame < bassPc.length - 1 && endFrame - startFrame < 20) {
+        if (bassPc[endFrame + 1] !== currentBass && bassPc[endFrame + 1] >= 0) break;
+        endFrame++;
+      }
+      
+      if ((endFrame - startFrame) < minFrames) {
+        i = endFrame + 1;
+        continue;
+      }
+      
+      // חשב כרומה ממוצעת
+      const avgChroma = new Float32Array(12);
+      for (let j = startFrame; j <= endFrame && j < chroma.length; j++) {
+        if (chroma[j]) {
+          for (let p = 0; p < 12; p++) {
+            avgChroma[p] += chroma[j][p] || 0;
+          }
+        }
+      }
+      const count = endFrame - startFrame + 1;
+      for (let p = 0; p < 12; p++) avgChroma[p] /= count;
+      
+      // זהה אקורד
+      let bestLabel = null;
+      let bestScore = -1;
+      
+      for (const root of diatonic) {
+        // בדוק major
+        const major3 = avgChroma[this.toPc(root + 4)] || 0;
+        const fifth = avgChroma[this.toPc(root + 7)] || 0;
+        const rootStr = avgChroma[root] || 0;
+        const majorScore = rootStr * 2.0 + major3 * 1.5 + fifth * 1.0;
+        
+        if (majorScore > bestScore) {
+          bestScore = majorScore;
+          bestLabel = this.nameSharp(root);
+        }
+        
+        // בדוק minor
+        const minor3 = avgChroma[this.toPc(root + 3)] || 0;
+        const minorScore = rootStr * 2.0 + minor3 * 1.5 + fifth * 1.0;
+        
+        if (minorScore > bestScore) {
+          bestScore = minorScore;
+          bestLabel = this.nameSharp(root) + 'm';
+        }
+      }
+      
+      if (bestLabel) {
+        timeline.push({
+          t: startTime,
+          label: bestLabel,
+          fi: startFrame,
+          endFrame: endFrame,
+          avgChroma: avgChroma,
+          confidence: Math.min(1.0, bestScore / 3.0),
+          words: []
+        });
+      }
+      
+      i = endFrame + 1;
+    }
+    
+    return timeline;
   }
 
   
