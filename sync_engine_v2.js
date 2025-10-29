@@ -95,6 +95,11 @@ function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset)
   
   console.log(`   Created ${lines.length} lines`);
   
+  // Debug: show first line
+  if(lines.length > 0) {
+    console.log('   First line:', lines[0]);
+  }
+  
   return lines;
 }
 
@@ -105,10 +110,13 @@ function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset)
  * @returns {String} HTML
  */
 function renderBeatTimeline(lines, isRTL) {
+  console.log(`🎨 Rendering ${lines.length} lines, RTL: ${isRTL}`);
   let html = '';
   
   for(const line of lines) {
     const events = isRTL ? [...line.events].reverse() : line.events;
+    
+    console.log(`   Line events: ${events.length}`, events.slice(0, 3)); // Show first 3
     
     // Build chord and lyric lines
     let chordLine = '';
@@ -116,24 +124,30 @@ function renderBeatTimeline(lines, isRTL) {
     
     for(const ev of events) {
       const chordText = ev.chord || '';
-      const wordText = ev.word || (ev.chord ? '___' : '');
+      const wordText = ev.word || '';
       
+      // Skip completely empty events
       if(!chordText && !wordText) continue;
       
+      // For chord-only events, show spacer
+      const displayWord = wordText || (chordText ? '___' : '');
+      
       // Pad to align properly
-      const maxLen = Math.max(chordText.length, wordText.length, 3);
+      const maxLen = Math.max(chordText.length, displayWord.length, 3);
       chordLine += chordText.padEnd(maxLen + 2, ' ');
-      lyricLine += wordText.padEnd(maxLen + 2, ' ');
+      lyricLine += displayWord.padEnd(maxLen + 2, ' ');
     }
     
     // Add to HTML if not empty
-    const chordTrimmed = chordLine.trim();
-    const lyricTrimmed = lyricLine.trim();
-    
-    if(chordTrimmed || lyricTrimmed) {
-      html += `<div class="chord-line">${chordTrimmed}</div>`;
-      html += `<div class="lyric-line">${lyricTrimmed}</div>`;
+    if(chordLine.length > 0 || lyricLine.length > 0) {
+      html += `<div class="chord-line">${chordLine}</div>`;
+      html += `<div class="lyric-line">${lyricLine}</div>`;
     }
+  }
+  
+  console.log(`🎨 Generated HTML length: ${html.length} chars`);
+  if(html.length === 0) {
+    console.error('❌ No HTML generated!');
   }
   
   return html;
