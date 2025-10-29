@@ -419,9 +419,14 @@ function syncChordsWithLyrics(){
   
   const capo = parseInt(capoEl.value || '0', 10);
   
+  // 🎯 CRITICAL: Add gateTime offset to all Whisper timestamps!
+  const gateOffset = window.__STATE.gateTime || 0;
+  
+  debugWrite(`🎯 Gate offset: ${gateOffset.toFixed(2)}s`, '#f0f');
+  
   for(const w of words){
-    const start = w.start;
-    const end = w.end ?? (w.start + 0.1);
+    const start = w.start + gateOffset; // ← ADD OFFSET HERE!
+    const end = (w.end ?? (w.start + 0.1)) + gateOffset;
     const near = tl.find(ch => ch.t >= start-0.05 && ch.t <= end+0.05);
     LIVE_STREAM.push({
       start, 
@@ -433,7 +438,12 @@ function syncChordsWithLyrics(){
   
   for(const ch of tl){
     const t = ch.t;
-    const hasWord = words.some(w => t >= (w.start-0.05) && t <= ((w.end ?? (w.start+0.1)) + 0.05));
+    // Check with offset timestamps
+    const hasWord = words.some(w => {
+      const wStart = w.start + gateOffset;
+      const wEnd = (w.end ?? (w.start + 0.1)) + gateOffset;
+      return t >= (wStart - 0.05) && t <= (wEnd + 0.05);
+    });
     if(!hasWord){
       LIVE_STREAM.push({
         start: t, 
@@ -751,7 +761,11 @@ function hookPlaybackLive(){
     liveChordEl.textContent = shown;
     liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
     
-    const currentWord = WHISPER_WORDS.find(w => t >= w.start && t < (w.end ?? (w.start+0.5)));
+    const currentWord = WHISPER_WORDS.find(w => {
+      const wStart = w.start + (window.__STATE.gateTime || 0);
+      const wEnd = (w.end ?? (w.start + 0.5)) + (window.__STATE.gateTime || 0);
+      return t >= wStart && t < wEnd;
+    });
     if(currentWord) {
       liveLyricEl.textContent = currentWord.word || currentWord.text || '';
     } else {
@@ -838,8 +852,12 @@ function refreshSheetTabView(){
   const words = WHISPER_WORDS;
   const tl = st.timeline;
   
+  // 🎯 CRITICAL: Get gate offset
+  const gateOffset = st.gateTime || 0;
+  
   debugWrite(`🎤 Whisper Words: ${words.length}`, '#ff0');
   debugWrite(`🎸 Chords: ${tl.length}`, '#0ff');
+  debugWrite(`🎯 Gate Offset: ${gateOffset.toFixed(2)}s`, '#f0f');
   debugWrite(`🎯 Sync Window: 200ms`, '#fff');
   showDebug();
   
@@ -850,7 +868,13 @@ function refreshSheetTabView(){
   
   for(let i=0; i<words.length; i++){
     const w = words[i];
-    currentLine.push(w);
+    // Apply gate offset to word timestamps
+    const offsetWord = {
+      ...w,
+      start: w.start + gateOffset,
+      end: w.end ? (w.end + gateOffset) : undefined
+    };
+    currentLine.push(offsetWord);
     
     const text = w.word || w.text || '';
     const isEndOfSentence = /[.!?,؛،־]/.test(text.trim());
