@@ -2,87 +2,95 @@
 // בונה timeline רציף לפי מקצבים (beats)
 
 /**
- * Build beat-based timeline for synced chord sheet
+ * Build simple chronological timeline (no beat grid)
  * @param {Array} words - Whisper words with timestamps
  * @param {Array} chords - Chord timeline with timestamps  
- * @param {Number} bpm - Beats per minute
- * @param {Object} timeSignature - {numerator, denominator}
  * @param {Boolean} isRTL - Right-to-left language
  * @param {Number} gateOffset - Start gate offset in seconds
- * @returns {Array} lines - Array of lines, each with beats
+ * @returns {Array} lines - Array of lines
  */
 function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset) {
-  console.log('🎼 Building beat-based timeline...');
-  console.log(`   BPM: ${bpm}, Time Sig: ${timeSignature.numerator}/${timeSignature.denominator}, RTL: ${isRTL}, Gate: ${gateOffset.toFixed(2)}s`);
-  
-  // Calculate beat duration
-  const beatDuration = 60 / bpm; // seconds per beat
-  const beatsPerLine = timeSignature.numerator * 2; // 2 bars per line
+  console.log('🎼 Building chronological timeline...');
+  console.log(`   Words: ${words.length}, Chords: ${chords.length}, RTL: ${isRTL}, Gate: ${gateOffset.toFixed(2)}s`);
   
   // Apply gate offset to words
   const offsetWords = words.map(w => ({
     ...w,
     start: w.start + gateOffset,
-    end: (w.end || w.start + 0.1) + gateOffset
+    end: (w.end || w.start + 0.1) + gateOffset,
+    text: w.word || w.text || ''
   }));
   
-  // Find song duration
-  const lastChord = chords[chords.length - 1];
-  const lastWord = offsetWords[offsetWords.length - 1];
-  const duration = Math.max(
-    lastChord ? lastChord.t : 0,
-    lastWord ? lastWord.end : 0
-  ) + beatDuration * 4; // Add 4 beats buffer
+  // Merge words and chords into events
+  const events = [];
   
-  // Build beat grid
-  const totalBeats = Math.ceil(duration / beatDuration);
-  const beats = [];
-  const usedWords = new Set(); // Track which words we already placed
-  
-  for(let i = 0; i < totalBeats; i++) {
-    const beatTime = i * beatDuration;
-    
-    // Find chord at this beat (within 200ms window)
-    const chord = chords.find(ch => 
-      Math.abs(ch.t - beatTime) < 0.2
-    );
-    
-    // Find word that STARTS at this beat (not during!)
-    let word = null;
-    for(const w of offsetWords) {
-      if(usedWords.has(w)) continue; // Skip already used words
-      
-      // Word starts within this beat's window
-      if(Math.abs(w.start - beatTime) < beatDuration * 0.5) {
-        word = w;
-        usedWords.add(w); // Mark as used
-        break;
-      }
-    }
-    
-    beats.push({
-      index: i,
-      time: beatTime,
-      chord: chord ? chord.label : null,
-      word: word ? (word.word || word.text) : null
+  // Add all chords
+  for(const ch of chords) {
+    events.push({
+      time: ch.t,
+      type: 'chord',
+      chord: ch.label,
+      word: null
     });
   }
   
-  console.log(`   Created ${beats.length} beats, used ${usedWords.size} words`);
-  
-  // Group beats into lines
-  const lines = [];
-  for(let i = 0; i < beats.length; i += beatsPerLine) {
-    const lineBeats = beats.slice(i, i + beatsPerLine);
-    
-    // Skip empty lines at the end
-    const hasContent = lineBeats.some(b => b.chord || b.word);
-    if(!hasContent && i > 0) continue;
-    
-    lines.push({
-      startBeat: i,
-      beats: lineBeats
+  // Add all words
+  for(const w of offsetWords) {
+    events.push({
+      time: w.start,
+      type: 'word',
+      chord: null,
+      word: w.text
     });
+  }
+  
+  // Sort by time
+  events.sort((a, b) => a.time - b.time);
+  
+  console.log(`   Total events: ${events.length}`);
+  
+  // Merge close events (within 200ms)
+  const merged = [];
+  let i = 0;
+  
+  while(i < events.length) {
+    const current = events[i];
+    const next = events[i + 1];
+    
+    // Check if next event is within 200ms
+    if(next && Math.abs(next.time - current.time) < 0.2) {
+      // Merge them
+      merged.push({
+        time: current.time,
+        chord: current.chord || next.chord,
+        word: current.word || next.word
+      });
+      i += 2; // Skip both
+    } else {
+      // Keep as is
+      merged.push({
+        time: current.time,
+        chord: current.chord,
+        word: current.word
+      });
+      i++;
+    }
+  }
+  
+  console.log(`   Merged to ${merged.length} events`);
+  
+  // Group into lines (6-8 events per line)
+  const lines = [];
+  const eventsPerLine = isRTL ? 6 : 8;
+  
+  for(let i = 0; i < merged.length; i += eventsPerLine) {
+    const lineEvents = merged.slice(i, i + eventsPerLine);
+    if(lineEvents.length > 0) {
+      lines.push({
+        startTime: lineEvents[0].time,
+        events: lineEvents
+      });
+    }
   }
   
   console.log(`   Created ${lines.length} lines`);
@@ -91,8 +99,8 @@ function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset)
 }
 
 /**
- * Render beat timeline to HTML - Compact sheet music style
- * @param {Array} lines - Lines with beats
+ * Render chronological timeline to HTML
+ * @param {Array} lines - Lines with events
  * @param {Boolean} isRTL - Right-to-left language
  * @returns {String} HTML
  */
@@ -100,31 +108,17 @@ function renderBeatTimeline(lines, isRTL) {
   let html = '';
   
   for(const line of lines) {
-    const beats = isRTL ? [...line.beats].reverse() : line.beats;
-    
-    // Collect only non-empty beats
-    const items = [];
-    for(const beat of beats) {
-      if(beat.chord || beat.word) {
-        items.push({
-          chord: beat.chord || '',
-          word: beat.word || '',
-          hasChord: !!beat.chord,
-          hasWord: !!beat.word
-        });
-      }
-    }
-    
-    // Skip completely empty lines
-    if(items.length === 0) continue;
+    const events = isRTL ? [...line.events].reverse() : line.events;
     
     // Build chord and lyric lines
     let chordLine = '';
     let lyricLine = '';
     
-    for(const item of items) {
-      const chordText = item.hasChord ? item.chord : '';
-      const wordText = item.hasWord ? item.word : '___';
+    for(const ev of events) {
+      const chordText = ev.chord || '';
+      const wordText = ev.word || (ev.chord ? '___' : '');
+      
+      if(!chordText && !wordText) continue;
       
       // Pad to align properly
       const maxLen = Math.max(chordText.length, wordText.length, 3);
@@ -133,9 +127,12 @@ function renderBeatTimeline(lines, isRTL) {
     }
     
     // Add to HTML if not empty
-    if(chordLine.trim() || lyricLine.trim()) {
-      html += `<div class="chord-line">${chordLine.trimEnd()}</div>`;
-      html += `<div class="lyric-line">${lyricLine.trimEnd()}</div>`;
+    const chordTrimmed = chordLine.trim();
+    const lyricTrimmed = lyricLine.trim();
+    
+    if(chordTrimmed || lyricTrimmed) {
+      html += `<div class="chord-line">${chordTrimmed}</div>`;
+      html += `<div class="lyric-line">${lyricTrimmed}</div>`;
     }
   }
   
