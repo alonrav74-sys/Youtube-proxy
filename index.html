@@ -253,7 +253,7 @@ if(typeof ChordEngine === 'undefined') {
 
 // Check sync engine
 if(typeof buildBeatTimeline === 'undefined' || typeof renderBeatTimeline === 'undefined') {
-  alert('❌ sync_engine_v3.js לא נטען!');
+  alert('❌ sync_engine_v4.js לא נטען!');
   return;
 }
 
@@ -882,12 +882,12 @@ function refreshSheetTabView(){
   // Check if functions exist
   if(typeof buildBeatTimeline !== 'function') {
     debugWrite('❌ buildBeatTimeline NOT LOADED!', '#f00');
-    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v3.js לא נטען!</div>';
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v4.js לא נטען!</div>';
     return;
   }
   if(typeof renderBeatTimeline !== 'function') {
     debugWrite('❌ renderBeatTimeline NOT LOADED!', '#f00');
-    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v3.js לא נטען!</div>';
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v4.js לא נטען!</div>';
     return;
   }
   
