@@ -62,8 +62,12 @@
     .synced-sheet{background:#fff;color:#000;padding:20px;border-radius:8px;font-family:'Courier New',Courier,monospace;line-height:2.0;overflow-x:auto;max-width:100%}
     .synced-sheet.rtl{direction:rtl;text-align:right}
     .synced-sheet.ltr{direction:ltr;text-align:left}
-    .chord-line{color:#2563eb;font-weight:700;font-size:14px;margin:0;white-space:pre;font-family:'Courier New',Courier,monospace;letter-spacing:0.5px}
-    .lyric-line{color:#000;font-size:16px;margin:0 0 20px 0;white-space:pre;font-family:'Courier New',Courier,monospace}
+    .chord-line{color:#2563eb;font-weight:700;font-size:14px;margin:0;white-space:pre;font-family:'Courier New',Courier,monospace;letter-spacing:0.5px;unicode-bidi:bidi-override}
+    .lyric-line{color:#000;font-size:16px;margin:0 0 20px 0;white-space:pre;font-family:'Courier New',Courier,monospace;unicode-bidi:bidi-override}
+    .synced-sheet.rtl .chord-line{direction:rtl;text-align:right}
+    .synced-sheet.rtl .lyric-line{direction:rtl;text-align:right}
+    .synced-sheet.ltr .chord-line{direction:ltr;text-align:left}
+    .synced-sheet.ltr .lyric-line{direction:ltr;text-align:left}
   </style>
 </head>
 <body>
@@ -965,25 +969,56 @@ function refreshSheetTabView(){
     let chordLine = '';
     let lyricLine = '';
     
-    for(const item of items){
-      if(item.isSpacer){
-        const spacerWidth = item.chord.length + 2;
-        while(chordLine.length < lyricLine.length) chordLine += ' ';
-        chordLine += item.chord + '  ';
-        lyricLine += '_'.repeat(spacerWidth);
-      } else {
-        if(item.chord){
-          while(chordLine.length < lyricLine.length) chordLine += ' ';
-          chordLine += item.chord;
-          
-          const chordLen = item.chord.length;
-          const wordLen = item.word.length;
-          if(chordLen > wordLen){
-            chordLine += ' '.repeat(1);
+    // For RTL, we need to build from right to left
+    if(isRTL){
+      // Build arrays first, then reverse
+      const chordParts = [];
+      const lyricParts = [];
+      
+      for(const item of items){
+        if(item.isSpacer){
+          const spacerWidth = item.chord.length + 2;
+          chordParts.push(item.chord + '  ');
+          lyricParts.push('_'.repeat(spacerWidth));
+        } else {
+          if(item.chord){
+            chordParts.push(item.chord);
+            const chordLen = item.chord.length;
+            const wordLen = item.word.length;
+            if(chordLen > wordLen){
+              chordParts.push(' '.repeat(1));
+            }
+          } else {
+            chordParts.push('');
           }
+          lyricParts.push(item.word + ' ');
         }
-        
-        lyricLine += item.word + ' ';
+      }
+      
+      chordLine = chordParts.join('');
+      lyricLine = lyricParts.join('');
+    } else {
+      // LTR - same as before
+      for(const item of items){
+        if(item.isSpacer){
+          const spacerWidth = item.chord.length + 2;
+          while(chordLine.length < lyricLine.length) chordLine += ' ';
+          chordLine += item.chord + '  ';
+          lyricLine += '_'.repeat(spacerWidth);
+        } else {
+          if(item.chord){
+            while(chordLine.length < lyricLine.length) chordLine += ' ';
+            chordLine += item.chord;
+            
+            const chordLen = item.chord.length;
+            const wordLen = item.word.length;
+            if(chordLen > wordLen){
+              chordLine += ' '.repeat(1);
+            }
+          }
+          
+          lyricLine += item.word + ' ';
+        }
       }
     }
     
