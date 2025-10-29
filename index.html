@@ -871,7 +871,14 @@ function refreshSheetTabView(){
   }));
   
   // Build beat-based timeline
-  const lines = buildBeatTimeline(words, chordsWithCapo, st.bpm, isRTL, gateOffset);
+  const lines = buildBeatTimeline(
+    words, 
+    chordsWithCapo, 
+    st.bpm, 
+    st.timeSignature || {numerator: 4, denominator: 4},
+    isRTL, 
+    gateOffset
+  );
   
   // Render to HTML
   const html = renderBeatTimeline(lines, isRTL);

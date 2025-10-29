@@ -339,6 +339,59 @@ class ChordEngine {
     }
   }
 
+  // ===== TIME SIGNATURE DETECTION =====
+  
+  detectTimeSignature(energy, bpm, hop, sr) {
+    if(!energy || energy.length === 0) return {numerator: 4, denominator: 4};
+    
+    const beatDuration = 60 / bpm;
+    const framesPerBeat = Math.round(beatDuration * sr / hop);
+    
+    // Autocorrelation to find strong beat patterns
+    const maxLag = Math.min(framesPerBeat * 8, Math.floor(energy.length / 2));
+    const acf = new Array(maxLag).fill(0);
+    
+    for(let lag = 1; lag < maxLag; lag++) {
+      let sum = 0, count = 0;
+      for(let i = 0; i < energy.length - lag; i++) {
+        sum += energy[i] * energy[i + lag];
+        count++;
+      }
+      acf[lag] = sum / count;
+    }
+    
+    // Find peaks at different bar lengths
+    const candidates = [
+      {beats: 2, denom: 2, strength: 0},  // 2/2
+      {beats: 3, denom: 4, strength: 0},  // 3/4
+      {beats: 4, denom: 4, strength: 0},  // 4/4
+      {beats: 5, denom: 4, strength: 0},  // 5/4
+      {beats: 6, denom: 8, strength: 0},  // 6/8
+      {beats: 7, denom: 8, strength: 0}   // 7/8
+    ];
+    
+    for(const cand of candidates) {
+      const lag = Math.round(framesPerBeat * cand.beats);
+      if(lag > 0 && lag < acf.length) {
+        const window = 3;
+        let sum = 0;
+        for(let i = Math.max(0, lag - window); i < Math.min(acf.length, lag + window); i++) {
+          sum += acf[i];
+        }
+        cand.strength = sum / (window * 2);
+      }
+    }
+    
+    // Pick strongest
+    candidates.sort((a, b) => b.strength - a.strength);
+    const best = candidates[0];
+    
+    // Default to 4/4 if unclear
+    if(best.strength < 0.05) return {numerator: 4, denominator: 4};
+    
+    return {numerator: best.beats, denominator: best.denom};
+  }
+
   // ===== BUILD CHORDS FROM BASS =====
   
   buildChordsFromBass(bassPc, chroma, frameE, key, bpm, hop, sr) {
@@ -659,6 +712,10 @@ class ChordEngine {
     const mode = this.detectMode(features.chroma, key);
     console.log(`   Mode: ${mode}`);
     
+    // 6.5. Detect time signature
+    const timeSignature = this.detectTimeSignature(features.frameE, bpm, features.hop, features.sr);
+    console.log(`   Time signature: ${timeSignature.numerator}/${timeSignature.denominator}`);
+    
     // 7. Build chords
     let timeline = this.buildChordsFromBass(
       features.bassPc,
@@ -709,6 +766,7 @@ class ChordEngine {
       duration,
       key,
       mode,
+      timeSignature,
       timeline,
       metrics,
       gateTime,

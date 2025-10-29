@@ -6,17 +6,18 @@
  * @param {Array} words - Whisper words with timestamps
  * @param {Array} chords - Chord timeline with timestamps  
  * @param {Number} bpm - Beats per minute
+ * @param {Object} timeSignature - {numerator, denominator}
  * @param {Boolean} isRTL - Right-to-left language
  * @param {Number} gateOffset - Start gate offset in seconds
  * @returns {Array} lines - Array of lines, each with beats
  */
-function buildBeatTimeline(words, chords, bpm, isRTL, gateOffset) {
+function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset) {
   console.log('🎼 Building beat-based timeline...');
-  console.log(`   BPM: ${bpm}, RTL: ${isRTL}, Gate: ${gateOffset.toFixed(2)}s`);
+  console.log(`   BPM: ${bpm}, Time Sig: ${timeSignature.numerator}/${timeSignature.denominator}, RTL: ${isRTL}, Gate: ${gateOffset.toFixed(2)}s`);
   
   // Calculate beat duration
   const beatDuration = 60 / bpm; // seconds per beat
-  const beatsPerLine = 8; // 2 bars of 4/4
+  const beatsPerLine = timeSignature.numerator * 2; // 2 bars per line
   
   // Apply gate offset to words
   const offsetWords = words.map(w => ({
@@ -36,6 +37,7 @@ function buildBeatTimeline(words, chords, bpm, isRTL, gateOffset) {
   // Build beat grid
   const totalBeats = Math.ceil(duration / beatDuration);
   const beats = [];
+  const usedWords = new Set(); // Track which words we already placed
   
   for(let i = 0; i < totalBeats; i++) {
     const beatTime = i * beatDuration;
@@ -45,10 +47,18 @@ function buildBeatTimeline(words, chords, bpm, isRTL, gateOffset) {
       Math.abs(ch.t - beatTime) < 0.2
     );
     
-    // Find word at this beat
-    const word = offsetWords.find(w => 
-      beatTime >= w.start && beatTime < w.end
-    );
+    // Find word that STARTS at this beat (not during!)
+    let word = null;
+    for(const w of offsetWords) {
+      if(usedWords.has(w)) continue; // Skip already used words
+      
+      // Word starts within this beat's window
+      if(Math.abs(w.start - beatTime) < beatDuration * 0.5) {
+        word = w;
+        usedWords.add(w); // Mark as used
+        break;
+      }
+    }
     
     beats.push({
       index: i,
@@ -58,7 +68,7 @@ function buildBeatTimeline(words, chords, bpm, isRTL, gateOffset) {
     });
   }
   
-  console.log(`   Created ${beats.length} beats`);
+  console.log(`   Created ${beats.length} beats, used ${usedWords.size} words`);
   
   // Group beats into lines
   const lines = [];
