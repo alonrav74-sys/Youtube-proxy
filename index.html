@@ -862,6 +862,15 @@ function refreshSheetTabView(){
   debugWrite(`🎸 Chords: ${tl.length}`, '#0ff');
   debugWrite(`🎯 Gate Offset: ${gateOffset.toFixed(2)}s`, '#f0f');
   debugWrite(`🎼 Using Beat-based Timeline`, '#0f0');
+  
+  // Check if functions exist
+  if(typeof buildBeatTimeline !== 'function') {
+    debugWrite('❌ buildBeatTimeline NOT LOADED!', '#f00');
+  }
+  if(typeof renderBeatTimeline !== 'function') {
+    debugWrite('❌ renderBeatTimeline NOT LOADED!', '#f00');
+  }
+  
   showDebug();
   
   // Apply capo to all chords
@@ -880,8 +889,26 @@ function refreshSheetTabView(){
     gateOffset
   );
   
+  // Safety check
+  if(!lines || lines.length === 0) {
+    debugWrite('❌ No lines generated!', '#f00');
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ לא הצלחתי לבנות את הדף. בדוק Debug Info.</div>';
+    return;
+  }
+  
+  debugWrite(`✅ Generated ${lines.length} lines`, '#0f0');
+  
   // Render to HTML
   const html = renderBeatTimeline(lines, isRTL);
+  
+  // Safety check
+  if(!html || html.length === 0) {
+    debugWrite('❌ No HTML generated!', '#f00');
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ הרינדור נכשל. בדוק Debug Info.</div>';
+    return;
+  }
+  
+  debugWrite(`✅ HTML length: ${html.length} chars`, '#0f0');
   
   // Stats
   const totalBeats = lines.reduce((sum, line) => sum + line.beats.length, 0);
