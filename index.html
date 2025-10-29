@@ -991,25 +991,43 @@ function refreshSheetTabView(){
     let chordLine = '';
     let lyricLine = '';
     
-    for(const item of items){
-      if(item.isSpacer){
-        const spacerWidth = item.chord.length + 2;
-        while(chordLine.length < lyricLine.length) chordLine += ' ';
-        chordLine += item.chord + '  ';
-        lyricLine += '_'.repeat(spacerWidth);
-      } else {
-        if(item.chord){
-          while(chordLine.length < lyricLine.length) chordLine += ' ';
-          chordLine += item.chord;
-          
-          const chordLen = item.chord.length;
-          const wordLen = item.word.length;
-          if(chordLen > wordLen){
-            chordLine += ' '.repeat(1);
+    if(isRTL){
+      // RTL: Build chords from right to left
+      const reversedItems = [...items].reverse();
+      for(const item of reversedItems){
+        if(item.isSpacer){
+          const spacerWidth = item.chord.length + 2;
+          chordLine += item.chord + '  ';
+          lyricLine += '_'.repeat(spacerWidth);
+        } else {
+          if(item.chord){
+            chordLine += item.chord + '  ';
           }
+          lyricLine += item.word + ' ';
         }
-        
-        lyricLine += item.word + ' ';
+      }
+    } else {
+      // LTR: Build normally
+      for(const item of items){
+        if(item.isSpacer){
+          const spacerWidth = item.chord.length + 2;
+          while(chordLine.length < lyricLine.length) chordLine += ' ';
+          chordLine += item.chord + '  ';
+          lyricLine += '_'.repeat(spacerWidth);
+        } else {
+          if(item.chord){
+            while(chordLine.length < lyricLine.length) chordLine += ' ';
+            chordLine += item.chord;
+            
+            const chordLen = item.chord.length;
+            const wordLen = item.word.length;
+            if(chordLen > wordLen){
+              chordLine += ' '.repeat(1);
+            }
+          }
+          
+          lyricLine += item.word + ' ';
+        }
       }
     }
     
