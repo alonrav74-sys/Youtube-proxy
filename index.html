@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ChordFinderPro v29 🎸</title>
+  <title>ChordFinderPro v30 🎸</title>
   <meta name="theme-color" content="#0b1022" />
   <style>
     :root{--bg:#0b1022;--panel:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--card:#0a1324;--border:#1b2333;--brand:#22c55e;--accent:#38bdf8;--alert:#f59e0b}
@@ -72,7 +72,7 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>🎵 Chord Finder Pro v29 🎯
+    <h1>🎵 Chord Finder Pro v30 🎯
       <span class="badge pro">Professional</span>
       <span class="badge whisper">Groq Whisper</span>
       <span class="badge sync">סנכרון מדויק</span>
@@ -240,14 +240,20 @@
   </div>
 
 <script src="chord-engine.js"></script>
-<script src="sync_engine_v2.js"></script>
+<script src="sync_engine_v3.js"></script>
 <script>
 window.addEventListener('load', function() {
-console.log('🎸 ChordFinder Pro v29 - Sync Edition');
+console.log('🎸 ChordFinder Pro v30 - Fixed Sync Edition');
 
 // Check ChordEngine
 if(typeof ChordEngine === 'undefined') {
   alert('❌ chord-engine.js לא נטען!');
+  return;
+}
+
+// Check sync engine
+if(typeof buildBeatTimeline === 'undefined' || typeof renderBeatTimeline === 'undefined') {
+  alert('❌ sync_engine_v3.js לא נטען!');
   return;
 }
 
@@ -265,6 +271,7 @@ let DETECTED_LANGUAGE = 'en';
 let LIVE_STREAM = [];
 let LIVE_POINTER = 0;
 let SYNC_STATS = {matched: 0, spacers: 0, total: 0};
+let lastChordLabel = null;
 
 // Elements
 const fileEl = document.getElementById('file');
@@ -745,6 +752,7 @@ function hookPlaybackLive(){
   gateChip.style.display = 'inline-flex';
   LIVE_POINTER = 0; 
   liveSheetEl.innerHTML = '';
+  lastChordLabel = null;
   
   player.ontimeupdate = () => {
     const t = player.currentTime;
@@ -763,7 +771,15 @@ function hookPlaybackLive(){
     
     const capo = parseInt(capoEl.value || '0', 10);
     const shown = engine.sanitizeLabel(applyCapoToLabel(ev.label, capo));
-    liveChordEl.textContent = shown;
+    
+    // 🎯 FIX: Update chord display with animation
+    if(shown !== lastChordLabel) {
+      liveChordEl.textContent = shown;
+      liveChordEl.classList.add('pulse');
+      setTimeout(() => liveChordEl.classList.remove('pulse'), 200);
+      lastChordLabel = shown;
+    }
+    
     liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
     
     const currentWord = WHISPER_WORDS.find(w => {
@@ -866,9 +882,13 @@ function refreshSheetTabView(){
   // Check if functions exist
   if(typeof buildBeatTimeline !== 'function') {
     debugWrite('❌ buildBeatTimeline NOT LOADED!', '#f00');
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v3.js לא נטען!</div>';
+    return;
   }
   if(typeof renderBeatTimeline !== 'function') {
     debugWrite('❌ renderBeatTimeline NOT LOADED!', '#f00');
+    fullSheetEl.innerHTML = '<div style="color:#f00;padding:20px">❌ sync_engine_v3.js לא נטען!</div>';
+    return;
   }
   
   showDebug();
@@ -929,7 +949,7 @@ function refreshSheetTabView(){
   debugWrite(`📊 Lines: ${lines.length}, Beats: ${totalBeats}`, '#0f0');
 }
 
-console.log('✅ ChordFinder Pro v29 loaded!');
+console.log('✅ ChordFinder Pro v30 - FIXED SYNC loaded!');
 
 }); // end window.load
 </script>
