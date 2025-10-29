@@ -12,6 +12,8 @@
 function buildBeatTimeline(words, chords, bpm, timeSignature, isRTL, gateOffset) {
   console.log('🎼 Building chronological timeline...');
   console.log(`   Words: ${words.length}, Chords: ${chords.length}, RTL: ${isRTL}, Gate: ${gateOffset.toFixed(2)}s`);
+  console.log(`   First word:`, words[0]);
+  console.log(`   First chord:`, chords[0]);
   
   // Apply gate offset to words
   const offsetWords = words.map(w => ({
@@ -166,6 +168,15 @@ function renderBeatTimeline(lines, isRTL) {
   console.log(`🎨 Generated HTML length: ${html.length} chars`);
   console.log(`🎸 Total chords rendered: ${totalChords}`);
   console.log(`🎤 Total words rendered: ${totalWords}`);
+  
+  // Add debug info to HTML itself
+  html += `<div style="background:#ffffcc;color:#000;padding:10px;margin-top:20px;border:2px solid #f00">`;
+  html += `<strong>🐛 Render Debug:</strong><br>`;
+  html += `Total chords: ${totalChords}<br>`;
+  html += `Total words: ${totalWords}<br>`;
+  html += `HTML length: ${html.length} chars`;
+  html += `</div>`;
+  
   if(html.length === 0) {
     console.error('❌ No HTML generated!');
   }
