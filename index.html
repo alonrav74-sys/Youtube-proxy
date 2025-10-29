@@ -865,10 +865,10 @@ function refreshSheetTabView(){
   debugWrite(`🎯 Sync Window: 200ms`, '#fff');
   showDebug();
   
-  // קיבוץ מילים לשורות
+  // קיבוץ מילים לשורות - דינמי לפי שפה
   const lines = [];
   let currentLine = [];
-  const WORDS_PER_LINE = 8;
+  const WORDS_PER_LINE = isRTL ? 6 : 8; // עברית: 6, אנגלית: 8
   
   for(let i=0; i<words.length; i++){
     const w = words[i];
@@ -894,7 +894,8 @@ function refreshSheetTabView(){
   let html = '';
   
   // בניית כל שורה
-  for(const line of lines){
+  for(let lineIdx=0; lineIdx<lines.length; lineIdx++){
+    const line = lines[lineIdx];
     if(line.length === 0) continue;
     
     const lineStart = line[0].start;
@@ -902,6 +903,27 @@ function refreshSheetTabView(){
     
     const chordsInLine = tl.filter(ch => ch.t >= lineStart - 0.1 && ch.t <= lineEnd);
     chordsInLine.sort((a, b) => a.t - b.t);
+    
+    // 🎯 Check for interlude: אקורדים לפני המילה הראשונה
+    const firstWordTime = line[0].start;
+    const interludeChords = tl.filter(ch => {
+      // אקורדים שנמצאים לפני השורה הנוכחית ואחרי השורה הקודמת
+      const prevLineEnd = lineIdx > 0 ? (lines[lineIdx-1][lines[lineIdx-1].length-1].end ?? lines[lineIdx-1][lines[lineIdx-1].length-1].start) : 0;
+      return ch.t >= prevLineEnd && ch.t < firstWordTime - 0.2;
+    });
+    
+    // אם יש אינטרלוד - הצג אותו קודם
+    if(interludeChords.length > 0){
+      const interludeHtml = interludeChords.map(ch => applyCapoToLabel(engine.sanitizeLabel(ch.label), capo)).join('  ');
+      if(isRTL){
+        const parts = interludeHtml.split(/\s+/).filter(p => p);
+        html += `<div class="chord-line">${parts.reverse().join('  ')}</div>`;
+      } else {
+        html += `<div class="chord-line">${interludeHtml}</div>`;
+      }
+      html += `<div class="lyric-line">___________________</div>`;
+      debugWrite(`🎼 Interlude: ${interludeChords.length} chords @ ${interludeChords[0].t.toFixed(2)}s`, '#ff0');
+    }
     
     const items = [];
     const usedChords = new Set();
@@ -991,10 +1013,31 @@ function refreshSheetTabView(){
       }
     }
     
-    // For RTL: reverse only the chord order (not the letters!)
+    // For RTL: reverse chord positions properly
     if(isRTL && chordLine.trim()){
-      const chordParts = chordLine.split(/(\S+)/).filter(p => p.trim());
-      chordLine = chordParts.reverse().join('  ');
+      // Build array of chord positions and content
+      const chordPositions = [];
+      let pos = 0;
+      for(const item of items){
+        if(item.chord){
+          chordPositions.push({chord: item.chord, pos: pos});
+        }
+        if(item.isSpacer){
+          pos += item.chord.length + 2;
+        } else {
+          pos += item.word.length + 1;
+        }
+      }
+      
+      // Reverse and rebuild
+      chordPositions.reverse();
+      chordLine = '';
+      let currentPos = 0;
+      for(const cp of chordPositions){
+        while(chordLine.length < currentPos) chordLine += ' ';
+        chordLine += cp.chord + '  ';
+        currentPos += cp.chord.length + 2;
+      }
     }
     
     if(lyricLine.trim().length > 0){
