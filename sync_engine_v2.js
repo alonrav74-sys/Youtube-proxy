@@ -116,6 +116,11 @@ function renderBeatTimeline(lines, isRTL) {
   let totalWords = 0;
   
   for(const line of lines) {
+    if(!line || !line.events) {
+      console.warn('⚠️ Skipping line without events');
+      continue;
+    }
+    
     const events = isRTL ? [...line.events].reverse() : line.events;
     
     console.log(`   Line has ${events.length} events`);
@@ -123,7 +128,7 @@ function renderBeatTimeline(lines, isRTL) {
     // Debug first 3 events
     for(let i = 0; i < Math.min(3, events.length); i++) {
       const ev = events[i];
-      console.log(`     Event ${i}: chord="${ev.chord}", word="${ev.word}"`);
+      console.log(`     Event ${i}: chord="${ev.chord || 'null'}", word="${ev.word || 'null'}"`);
     }
     
     // Build chord and lyric lines
@@ -131,6 +136,8 @@ function renderBeatTimeline(lines, isRTL) {
     let lyricLine = '';
     
     for(const ev of events) {
+      if(!ev) continue; // Skip null/undefined events
+      
       if(ev.chord) totalChords++;
       if(ev.word) totalWords++;
       
