@@ -44,7 +44,7 @@ const SyncEngine = {
     const wordsWithGate = words.map(w => ({
       ...w,
       start: w.start + gateOffset,
-      end: (w.end || w.start + 0.3) + gateOffset
+      end: (w.end || w.start) + gateOffset
     }));
     
     // Build the sheet
@@ -95,7 +95,7 @@ const SyncEngine = {
       currentLine.push({
         text: text,
         time: word.start,
-        end: word.end || (word.start + 0.3)
+        end: word.end || word.start
       });
       
       // Break on punctuation or max words
@@ -124,7 +124,7 @@ const SyncEngine = {
     const lineEnd = words[words.length - 1].end;
     
     const lineChords = allChords.filter(ch => 
-      ch.time >= lineStart - 0.15 && ch.time <= lineEnd + 0.15
+      ch.time >= lineStart && ch.time <= lineEnd
     );
     
     // Build timeline
@@ -158,7 +158,7 @@ const SyncEngine = {
       
       for(let i = 0; i < words.length; i++) {
         const word = words[i];
-        if(chord.time >= word.time - 0.15 && chord.time <= word.end + 0.15) {
+        if(chord.time >= word.time && chord.time <= word.end) {
           const beforeText = words.slice(0, i).map(w => w.text).join(' ');
           position = beforeText.length;
           if(position > 0) position += 1;
