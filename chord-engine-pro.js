@@ -127,15 +127,17 @@ class ChordEnginePro extends ChordEngine {
     // 4️⃣ Initial chord detection (without key constraints)
     console.log('🎸 Initial bass-driven detection...');
     let timeline = super.buildChordsFromBass(feats, { root: 0, minor: false }, bpm);
+    console.log(`   Found ${timeline.length} initial chords: ${timeline.slice(0, 5).map(c => c.label).join(', ')}...`);
     
     // 5️⃣ Key detection - NOW using cadences!
+    console.log('🎹 Detecting key from initial chords...');
     const keyEstimate = this.estimateKey(feats.chroma, timeline);
     const key = {
       root: this.parseRoot(keyEstimate.tonic),
       minor: keyEstimate.mode === 'minor',
       confidence: 0.8
     };
-    console.log(`🎹 Key: ${keyEstimate.tonic} ${keyEstimate.mode}`);
+    console.log(`🎹 Key detected: ${keyEstimate.tonic} ${keyEstimate.mode} (root PC: ${key.root})`);
     
     // Display Circle of Fifths (diatonic chords)
     const diatonicChords = this.getDiatonicChords(keyEstimate.tonic, keyEstimate.mode);
@@ -148,9 +150,39 @@ class ChordEnginePro extends ChordEngine {
     console.log('🎸 Re-detecting with key constraints...');
     timeline = this.buildChordsFromBassConstrained(feats, key, bpm);
     
+    // 🆕 6.5️⃣ RE-ESTIMATE KEY after constrained detection!
+    // The constrained detection might have changed chord qualities
+    console.log('🎹 Re-estimating key after constraint detection...');
+    const refinedKeyEstimate = this.estimateKey(feats.chroma, timeline);
+    
+    // Update key with refined estimate
+    const refinedKey = {
+      root: this.parseRoot(refinedKeyEstimate.tonic),
+      minor: refinedKeyEstimate.mode === 'minor',
+      confidence: 0.9
+    };
+    
+    // Only update if the tonic is similar (within perfect 5th)
+    const oldRoot = key.root;
+    const newRoot = refinedKey.root;
+    const distance = Math.min(Math.abs(newRoot - oldRoot), 12 - Math.abs(newRoot - oldRoot));
+    
+    if (distance <= 1 || distance === 5 || distance === 7) {
+      // Tonic is close - use refined estimate
+      key.root = refinedKey.root;
+      key.minor = refinedKey.minor;
+      console.log(`   ✅ Key refined to: ${refinedKeyEstimate.tonic} ${refinedKeyEstimate.mode}`);
+    } else {
+      console.log(`   ⚠️ Keeping original key (refined was too different): ${keyEstimate.tonic} ${keyEstimate.mode}`);
+    }
+    
+    // Update currentKey
+    this.currentKey = key;
+    
     // Ensure we have tonic
     if(timeline.length === 0 || (timeline.length < 3 && x.length / sr > 30)){
-      const tonicLabel = keyEstimate.tonic + (keyEstimate.mode === 'minor' ? 'm' : '');
+      const tonicName = this.nameSharp(key.root);
+      const tonicLabel = tonicName + (key.minor ? 'm' : '');
       timeline.unshift({
         t: 0,
         label: tonicLabel,
