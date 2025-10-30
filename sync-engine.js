@@ -152,8 +152,11 @@ const SyncEngine = {
     let html = '';
     
     if(isRTL) {
+      // REVERSE for RTL: first item = rightmost on screen!
+      items.reverse();
+      
       // Hebrew: Table with direction:rtl
-      html += `<table style="direction:rtl;border-collapse:collapse;margin-bottom:20px"><tbody>`;
+      html += `<table style="border-collapse:collapse;margin-bottom:20px;direction:ltr"><tbody>`;
       
       // Chord row
       html += `<tr>`;

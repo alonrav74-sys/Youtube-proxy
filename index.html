@@ -1024,88 +1024,126 @@ function buildFullLyricsSheet(isRTL) {
       });
     }
     
-    // Sort by time (chronological)
-    items.sort((a, b) => a.time - b.time);
-    
-    // For English: calculate positions
-    if(!isRTL) {
-      const lyricText = words.map(w => w.text).join(' ');
-      
-      for(const item of items) {
-        if(item.type === 'chord') {
-          let position = 0;
-          let found = false;
-          
-          for(let i = 0; i < words.length; i++) {
-            const word = words[i];
-            if(item.time >= word.time - 0.15 && item.time <= word.end + 0.15) {
-              const beforeText = words.slice(0, i).map(w => w.text).join(' ');
-              position = beforeText.length;
-              if(position > 0) position += 1;
-              found = true;
-              break;
-            }
-          }
-          
-          if(!found) {
-            position = item.time < words[0].time ? 0 : lyricText.length + 1;
-          }
-          
-          item.position = position;
-        }
-      }
-    }
-    
     // Build display
     if(isRTL) {
-      // Hebrew: Use table with direction:rtl to reverse columns
-      html += `<table style="direction:rtl;border-collapse:collapse;margin-bottom:20px"><tbody>`;
+      // HEBREW: Build table from RIGHT to LEFT
+      // Each column = one time slot with chord and/or word
+      
+      const columns = [];
+      
+      // Merge chords and words into columns
+      for(const chord of lineChords) {
+        const chordTimeWithGate = chord.t + gateOffset;
+        const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+        
+        // Find matching word
+        let matchedWord = null;
+        for(const word of words) {
+          if(chordTimeWithGate >= word.time - 0.15 && chordTimeWithGate <= word.end + 0.15) {
+            matchedWord = word.text;
+            break;
+          }
+        }
+        
+        columns.push({
+          time: chordTimeWithGate,
+          chord: chordLabel,
+          chordId: chord.t,
+          word: matchedWord
+        });
+      }
+      
+      // Add words without chords
+      for(const word of words) {
+        const hasChord = columns.some(col => col.word === word.text);
+        if(!hasChord) {
+          columns.push({
+            time: word.time,
+            chord: null,
+            chordId: null,
+            word: word.text
+          });
+        }
+      }
+      
+      // Sort by time (chronological)
+      columns.sort((a, b) => a.time - b.time);
+      
+      // REVERSE for RTL: first column = rightmost on screen!
+      columns.reverse();
+      
+      // Build table - NO BORDERS, just structure
+      html += `<table style="border-collapse:collapse;margin-bottom:20px;direction:ltr"><tbody>`;
       
       // Chord row
       html += `<tr>`;
-      for(const item of items) {
-        if(item.type === 'chord') {
-          html += `<td style="padding:2px 6px;vertical-align:top"><span class="chord-marker" data-time="${item.id}" style="color:#38bdf8;font-weight:700;font-size:16px">${escapeHtml(item.label)}</span></td>`;
-        } else {
-          html += `<td style="padding:2px 6px"></td>`;
+      for(const col of columns) {
+        html += `<td style="padding:2px 8px;vertical-align:top;text-align:center">`;
+        if(col.chord) {
+          html += `<span class="chord-marker" data-time="${col.chordId}" style="color:#38bdf8;font-weight:700;font-size:16px">${escapeHtml(col.chord)}</span>`;
         }
+        html += `</td>`;
       }
       html += `</tr>`;
       
       // Word row
       html += `<tr>`;
-      for(const item of items) {
-        if(item.type === 'word') {
-          html += `<td style="padding:2px 6px;vertical-align:top"><span style="color:#ffffff;font-size:18px">${escapeHtml(item.text)}</span></td>`;
-        } else {
-          html += `<td style="padding:2px 6px"></td>`;
+      for(const col of columns) {
+        html += `<td style="padding:2px 8px;vertical-align:top;text-align:center">`;
+        if(col.word) {
+          html += `<span style="color:#ffffff;font-size:18px">${escapeHtml(col.word)}</span>`;
         }
+        html += `</td>`;
       }
       html += `</tr>`;
       
       html += `</tbody></table>`;
       
     } else {
-      // English: Keep original good style
-      html += `<div style="margin-bottom:25px">`;
-      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">`;
+      // ENGLISH: Original classic style with spaces
+      const lyricText = words.map(w => w.text).join(' ');
       
+      // Calculate chord positions
+      const chordPositions = [];
+      for(const chord of lineChords) {
+        const chordTimeWithGate = chord.t + gateOffset;
+        let position = 0;
+        let found = false;
+        
+        for(let i = 0; i < words.length; i++) {
+          const word = words[i];
+          if(chordTimeWithGate >= word.time - 0.15 && chordTimeWithGate <= word.end + 0.15) {
+            const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+            position = beforeText.length;
+            if(position > 0) position += 1;
+            found = true;
+            break;
+          }
+        }
+        
+        if(!found) {
+          position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
+        }
+        
+        const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+        chordPositions.push({ position, label: chordLabel, id: chord.t });
+      }
+      
+      chordPositions.sort((a, b) => a.position - b.position);
+      
+      // Build chord line with spaces
       let chordLine = '';
       let lastPos = 0;
-      for(const item of items) {
-        if(item.type === 'chord') {
-          const spaces = Math.max(0, item.position - lastPos);
-          chordLine += ' '.repeat(spaces);
-          chordLine += `<span class="chord-marker" data-time="${item.id}">${escapeHtml(item.label)}</span>`;
-          lastPos = item.position + item.label.length;
-        }
+      for(const cp of chordPositions) {
+        const spaces = Math.max(0, cp.position - lastPos);
+        chordLine += ' '.repeat(spaces);
+        chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
+        lastPos = cp.position + cp.label.length;
       }
-      html += chordLine;
-      html += `</div>`;
       
-      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">`;
-      html += escapeHtml(items.filter(i => i.type === 'word').map(i => i.text).join(' '));
-      html += `</div>`;
+      html += `<div style="margin-bottom:25px">`;
+      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${chordLine}</div>`;
+      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
       html += `</div>`;
     }
   }
