@@ -149,34 +149,85 @@ const SyncEngine = {
     // Sort by time
     items.sort((a, b) => a.time - b.time);
     
-    const flexDir = isRTL ? 'row-reverse' : 'row';
-    const justifyContent = isRTL ? 'flex-end' : 'flex-start';
+    let html = '';
     
-    let html = `<div style="margin-bottom:30px">`;
-    
-    // Chords
-    html += `<div style="display:flex;flex-direction:${flexDir};justify-content:${justifyContent};flex-wrap:wrap;min-height:22px">`;
-    for(const item of items) {
-      if(item.type === 'chord') {
-        html += `<span style="color:#38bdf8;font-weight:700;font-size:16px;margin:0 6px">${escapeHtml(item.label)}</span>`;
-      } else {
-        html += `<span style="width:${item.text.length * 10}px;margin:0 6px"></span>`;
+    if(isRTL) {
+      // Hebrew: Table with direction:rtl
+      html += `<table style="direction:rtl;border-collapse:collapse;margin-bottom:20px"><tbody>`;
+      
+      // Chord row
+      html += `<tr>`;
+      for(const item of items) {
+        if(item.type === 'chord') {
+          html += `<td style="padding:2px 6px;vertical-align:top"><span style="color:#38bdf8;font-weight:700;font-size:16px">${escapeHtml(item.label)}</span></td>`;
+        } else {
+          html += `<td style="padding:2px 6px"></td>`;
+        }
       }
-    }
-    html += `</div>`;
-    
-    // Words
-    html += `<div style="display:flex;flex-direction:${flexDir};justify-content:${justifyContent};flex-wrap:wrap;min-height:26px;margin-top:2px">`;
-    for(const item of items) {
-      if(item.type === 'word') {
-        html += `<span style="color:#ffffff;font-size:18px;margin:0 6px">${escapeHtml(item.text)}</span>`;
-      } else {
-        html += `<span style="width:${item.label.length * 10}px;margin:0 6px"></span>`;
+      html += `</tr>`;
+      
+      // Word row
+      html += `<tr>`;
+      for(const item of items) {
+        if(item.type === 'word') {
+          html += `<td style="padding:2px 6px;vertical-align:top"><span style="color:#ffffff;font-size:18px">${escapeHtml(item.text)}</span></td>`;
+        } else {
+          html += `<td style="padding:2px 6px"></td>`;
+        }
       }
+      html += `</tr>`;
+      
+      html += `</tbody></table>`;
+      
+    } else {
+      // English: Classic style with chords above words
+      const lyricText = words.map(w => w.text).join(' ');
+      
+      // Calculate positions
+      for(const item of items) {
+        if(item.type === 'chord') {
+          let position = 0;
+          let found = false;
+          
+          for(let i = 0; i < words.length; i++) {
+            const word = words[i];
+            if(item.time >= word.time - 0.15 && item.time <= word.end + 0.15) {
+              const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+              position = beforeText.length;
+              if(position > 0) position += 1;
+              found = true;
+              break;
+            }
+          }
+          
+          if(!found) {
+            position = item.time < words[0].time ? 0 : lyricText.length + 1;
+          }
+          
+          item.position = position;
+        }
+      }
+      
+      html += `<div style="margin-bottom:25px">`;
+      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">`;
+      
+      let chordLine = '';
+      let lastPos = 0;
+      for(const item of items) {
+        if(item.type === 'chord') {
+          const spaces = Math.max(0, item.position - lastPos);
+          chordLine += ' '.repeat(spaces) + item.label;
+          lastPos = item.position + item.label.length;
+        }
+      }
+      html += escapeHtml(chordLine);
+      html += `</div>`;
+      
+      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">`;
+      html += escapeHtml(lyricText);
+      html += `</div>`;
+      html += `</div>`;
     }
-    html += `</div>`;
-    
-    html += `</div>`;
     
     return html;
   }
