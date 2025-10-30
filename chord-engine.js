@@ -791,7 +791,7 @@ class ChordEngine {
    */
   classifyOrnamentsByDuration(tl, bpm) {
     const spb = 60 / Math.max(60, bpm || 120);
-    const structuralThreshold = spb * 1.0; // תיבה אחת = מבני
+    const structuralThreshold = spb * 0.75; // 3/4 תיבה = מבני (יותר מקל)
     
     return tl.map((ev, i) => {
       const nextEv = tl[i + 1];
@@ -799,10 +799,10 @@ class ChordEngine {
       
       let ornamentType = 'structural';
       
-      // 🔥 אקורדים קצרים מחצי תיבה = רק אם הם חזקים מאוד
-      if (duration < spb * 0.5) {
+      // 🔥 רק אקורדים קצרים מאוד (< 1/4 תיבה) = קישוטים
+      if (duration < spb * 0.25) {
         if (ev.confidence && ev.confidence < 70) {
-          ornamentType = 'passing'; // אקורד חלש וקצר = passing
+          ornamentType = 'passing'; // אקורד חלש וקצר מאוד = passing
         } else {
           ornamentType = 'ornament';
         }
