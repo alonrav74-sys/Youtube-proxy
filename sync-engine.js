@@ -131,29 +131,29 @@ const SyncEngine = {
     // Build using absolute positioning based on TIME
     const dirClass = isRTL ? 'rtl' : 'ltr';
     
-    let html = `<div style="position:relative;height:60px;margin-bottom:10px" class="${dirClass}">`;
+    let html = `<div style="position:relative;min-height:70px;margin-bottom:20px;border-left:2px solid #1e293b;padding-left:10px" class="${dirClass}">`;
     
-    // Chord layer (absolute positioned)
-    html += `<div style="position:absolute;top:0;left:0;right:0;height:20px">`;
+    // Chord layer (at TOP)
+    html += `<div style="position:relative;height:25px;margin-bottom:5px">`;
     for(const chord of lineChords) {
       const timeProportion = (chord.time - lineStart) / lineDuration;
       const positionPercent = timeProportion * 100;
       
       const leftStyle = isRTL ? `right:${positionPercent}%` : `left:${positionPercent}%`;
       
-      html += `<span style="position:absolute;${leftStyle};color:#38bdf8;font-weight:700;font-size:15px;white-space:nowrap">${escapeHtml(chord.label)}</span>`;
+      html += `<span style="position:absolute;top:0;${leftStyle};color:#38bdf8;font-weight:700;font-size:16px;white-space:nowrap">${escapeHtml(chord.label)}</span>`;
     }
     html += `</div>`;
     
-    // Lyrics layer (absolute positioned)
-    html += `<div style="position:absolute;top:25px;left:0;right:0;height:30px">`;
+    // Lyrics layer (BELOW chords)
+    html += `<div style="position:relative;min-height:30px">`;
     for(const word of words) {
       const wordTimeProportion = (word.time - lineStart) / lineDuration;
       const wordPositionPercent = wordTimeProportion * 100;
       
       const leftStyle = isRTL ? `right:${wordPositionPercent}%` : `left:${wordPositionPercent}%`;
       
-      html += `<span style="position:absolute;${leftStyle};color:#ffffff;font-size:16px;white-space:nowrap">${escapeHtml(word.text)}</span>`;
+      html += `<span style="position:absolute;top:0;${leftStyle};color:#ffffff;font-size:18px;white-space:nowrap">${escapeHtml(word.text)}</span>`;
     }
     html += `</div>`;
     
