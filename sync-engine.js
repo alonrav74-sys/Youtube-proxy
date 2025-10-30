@@ -122,41 +122,55 @@ const SyncEngine = {
     const words = lineWords;
     const lineStart = words[0].time;
     const lineEnd = words[words.length - 1].end;
-    const lineDuration = lineEnd - lineStart;
     
     const lineChords = allChords.filter(ch => 
       ch.time >= lineStart - 0.15 && ch.time <= lineEnd + 0.15
     );
     
-    // Build using absolute positioning based on TIME
-    const dirClass = isRTL ? 'rtl' : 'ltr';
+    const lyricText = words.map(w => w.text).join(' ');
     
-    let html = `<div style="position:relative;min-height:70px;margin-bottom:20px;border-left:2px solid #1e293b;padding-left:10px" class="${dirClass}">`;
-    
-    // Chord layer (at TOP)
-    html += `<div style="position:relative;height:25px;margin-bottom:5px">`;
+    // Calculate chord positions
+    const chordPositions = [];
     for(const chord of lineChords) {
-      const timeProportion = (chord.time - lineStart) / lineDuration;
-      const positionPercent = timeProportion * 100;
+      let position = 0;
+      let found = false;
       
-      const leftStyle = isRTL ? `right:${positionPercent}%` : `left:${positionPercent}%`;
+      for(let i = 0; i < words.length; i++) {
+        const word = words[i];
+        
+        if(chord.time >= word.time - 0.15 && chord.time <= word.end + 0.15) {
+          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+          position = beforeText.length;
+          if(position > 0) position += 1;
+          
+          found = true;
+          break;
+        }
+      }
       
-      html += `<span style="position:absolute;top:0;${leftStyle};color:#38bdf8;font-weight:700;font-size:16px;white-space:nowrap">${escapeHtml(chord.label)}</span>`;
+      if(!found) {
+        position = chord.time < words[0].time ? 0 : lyricText.length + 1;
+      }
+      
+      chordPositions.push({ position, label: chord.label });
     }
-    html += `</div>`;
     
-    // Lyrics layer (BELOW chords)
-    html += `<div style="position:relative;min-height:30px">`;
-    for(const word of words) {
-      const wordTimeProportion = (word.time - lineStart) / lineDuration;
-      const wordPositionPercent = wordTimeProportion * 100;
-      
-      const leftStyle = isRTL ? `right:${wordPositionPercent}%` : `left:${wordPositionPercent}%`;
-      
-      html += `<span style="position:absolute;top:0;${leftStyle};color:#ffffff;font-size:18px;white-space:nowrap">${escapeHtml(word.text)}</span>`;
+    chordPositions.sort((a, b) => a.position - b.position);
+    
+    // Build chord line
+    let chordLine = '';
+    let lastPos = 0;
+    for(const cp of chordPositions) {
+      const spaces = Math.max(0, cp.position - lastPos);
+      chordLine += ' '.repeat(spaces) + cp.label;
+      lastPos = cp.position + cp.label.length;
     }
-    html += `</div>`;
     
+    const dirStyle = isRTL ? 'direction:rtl' : 'direction:ltr';
+    
+    let html = `<div style="margin-bottom:25px;${dirStyle}">`;
+    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${escapeHtml(chordLine)}</div>`;
+    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
     html += `</div>`;
     
     return html;
