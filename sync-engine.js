@@ -180,20 +180,29 @@ const SyncEngine = {
     let chordLine = '';
     
     if (isRTL) {
-      // RTL: Mirror the chord positions
-      const totalLength = lyricText.length;
-      const chordArray = new Array(totalLength + 50).fill(' ');
+      // RTL: Build chords from RIGHT to LEFT
+      const lineLength = lyricText.length;
+      const reversedChords = [...chordPositions].reverse();
       
-      for (let i = chordPositions.length - 1; i >= 0; i--) {
-        const cp = chordPositions[i];
-        const rtlPosition = totalLength - cp.position - cp.label.length;
+      for (let i = 0; i < reversedChords.length; i++) {
+        const cp = reversedChords[i];
+        const positionFromRight = lineLength - cp.position;
         
-        if (rtlPosition >= 0 && rtlPosition < chordArray.length) {
-          chordArray[rtlPosition] = cp.label;
+        let spacesBefore = 0;
+        if (i === 0) {
+          spacesBefore = positionFromRight - cp.label.length;
+        } else {
+          const prevChord = reversedChords[i - 1];
+          const prevPosFromRight = lineLength - prevChord.position;
+          spacesBefore = prevPosFromRight - positionFromRight - cp.label.length;
         }
+        
+        if (spacesBefore > 0) {
+          chordLine += '\u00A0'.repeat(spacesBefore);
+        }
+        
+        chordLine += cp.label;
       }
-      
-      chordLine = chordArray.join('');
     } else {
       // LTR: Build normally
       let lastPos = 0;
@@ -204,8 +213,8 @@ const SyncEngine = {
       }
     }
     
-    // Add direction styling
-    const dirStyle = isRTL ? ' style="direction:rtl;text-align:right"' : '';
+    // Add text alignment
+    const dirStyle = isRTL ? ' style="text-align:right"' : '';
     
     // Build HTML
     return `<div class="chord-line"${dirStyle}>${escapeHtml(chordLine)}</div>\n<div class="lyric-line"${dirStyle}>${escapeHtml(lyricText)}</div>\n`;
