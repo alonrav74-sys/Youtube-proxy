@@ -1020,21 +1020,15 @@ function buildFullLyricsSheet(isRTL) {
           // Position at start of this word
           const beforeText = words.slice(0, i).map(w => w.text).join(' ');
           position = beforeText.length;
-          if(position > 0) position += 1; // space before word
+          if(position > 0) position += 1;
           
           found = true;
           break;
         }
       }
       
-      // Chord in space between words
       if(!found) {
-        if(chordTimeWithGate < words[0].time) {
-          position = 0; // Before first word
-        } else {
-          // After last word
-          position = lyricText.length + 1;
-        }
+        position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
       }
       
       const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
@@ -1044,7 +1038,7 @@ function buildFullLyricsSheet(isRTL) {
     // Sort by position (chronological)
     chordPositions.sort((a, b) => a.position - b.position);
     
-    // Build chord line with spaces
+    // Build chord line with spaces (SAME for both RTL and LTR)
     let chordLine = '';
     let lastPos = 0;
     for(const cp of chordPositions) {
@@ -1054,7 +1048,7 @@ function buildFullLyricsSheet(isRTL) {
       lastPos = cp.position + cp.label.length;
     }
     
-    // Direction - just direction, no bidi-override!
+    // Direction - let CSS handle the visual flip
     const dirStyle = isRTL ? 'direction:rtl' : 'direction:ltr';
     
     html += `<div style="margin-bottom:25px;${dirStyle}">`;

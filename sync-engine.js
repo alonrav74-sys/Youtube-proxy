@@ -157,7 +157,7 @@ const SyncEngine = {
     
     chordPositions.sort((a, b) => a.position - b.position);
     
-    // Build chord line
+    // Build chord line (SAME for both RTL and LTR)
     let chordLine = '';
     let lastPos = 0;
     for(const cp of chordPositions) {
@@ -166,6 +166,7 @@ const SyncEngine = {
       lastPos = cp.position + cp.label.length;
     }
     
+    // Direction - let CSS handle it
     const dirStyle = isRTL ? 'direction:rtl' : 'direction:ltr';
     
     let html = `<div style="margin-bottom:25px;${dirStyle}">`;
