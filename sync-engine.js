@@ -146,91 +146,51 @@ const SyncEngine = {
       });
     }
     
-    // Sort by time
     items.sort((a, b) => a.time - b.time);
     
-    let html = '';
+    // Calculate positions (SAME for both languages)
+    const lyricText = words.map(w => w.text).join(' ');
     
-    if(isRTL) {
-      // REVERSE for RTL: first item = rightmost on screen!
-      items.reverse();
+    const chordPositions = [];
+    for(const chord of lineChords) {
+      let position = 0;
+      let found = false;
       
-      // Hebrew: Table with direction:rtl
-      html += `<table style="border-collapse:collapse;margin-bottom:20px;direction:ltr"><tbody>`;
-      
-      // Chord row
-      html += `<tr>`;
-      for(const item of items) {
-        if(item.type === 'chord') {
-          html += `<td style="padding:2px 6px;vertical-align:top"><span style="color:#38bdf8;font-weight:700;font-size:16px">${escapeHtml(item.label)}</span></td>`;
-        } else {
-          html += `<td style="padding:2px 6px"></td>`;
-        }
-      }
-      html += `</tr>`;
-      
-      // Word row
-      html += `<tr>`;
-      for(const item of items) {
-        if(item.type === 'word') {
-          html += `<td style="padding:2px 6px;vertical-align:top"><span style="color:#ffffff;font-size:18px">${escapeHtml(item.text)}</span></td>`;
-        } else {
-          html += `<td style="padding:2px 6px"></td>`;
-        }
-      }
-      html += `</tr>`;
-      
-      html += `</tbody></table>`;
-      
-    } else {
-      // English: Classic style with chords above words
-      const lyricText = words.map(w => w.text).join(' ');
-      
-      // Calculate positions
-      for(const item of items) {
-        if(item.type === 'chord') {
-          let position = 0;
-          let found = false;
-          
-          for(let i = 0; i < words.length; i++) {
-            const word = words[i];
-            if(item.time >= word.time - 0.15 && item.time <= word.end + 0.15) {
-              const beforeText = words.slice(0, i).map(w => w.text).join(' ');
-              position = beforeText.length;
-              if(position > 0) position += 1;
-              found = true;
-              break;
-            }
-          }
-          
-          if(!found) {
-            position = item.time < words[0].time ? 0 : lyricText.length + 1;
-          }
-          
-          item.position = position;
+      for(let i = 0; i < words.length; i++) {
+        const word = words[i];
+        if(chord.time >= word.time - 0.15 && chord.time <= word.end + 0.15) {
+          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+          position = beforeText.length;
+          if(position > 0) position += 1;
+          found = true;
+          break;
         }
       }
       
-      html += `<div style="margin-bottom:25px">`;
-      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">`;
-      
-      let chordLine = '';
-      let lastPos = 0;
-      for(const item of items) {
-        if(item.type === 'chord') {
-          const spaces = Math.max(0, item.position - lastPos);
-          chordLine += ' '.repeat(spaces) + item.label;
-          lastPos = item.position + item.label.length;
-        }
+      if(!found) {
+        position = chord.time < words[0].time ? 0 : lyricText.length + 1;
       }
-      html += escapeHtml(chordLine);
-      html += `</div>`;
       
-      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">`;
-      html += escapeHtml(lyricText);
-      html += `</div>`;
-      html += `</div>`;
+      chordPositions.push({ position, label: chord.label });
     }
+    
+    chordPositions.sort((a, b) => a.position - b.position);
+    
+    // Build chord line
+    let chordLine = '';
+    let lastPos = 0;
+    for(const cp of chordPositions) {
+      const spaces = Math.max(0, cp.position - lastPos);
+      chordLine += ' '.repeat(spaces) + cp.label;
+      lastPos = cp.position + cp.label.length;
+    }
+    
+    const dirAttr = isRTL ? 'dir="rtl"' : 'dir="ltr"';
+    
+    let html = `<div style="margin-bottom:25px" ${dirAttr}>`;
+    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${escapeHtml(chordLine)}</div>`;
+    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
+    html += `</div>`;
     
     return html;
   }
