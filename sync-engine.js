@@ -125,7 +125,7 @@ const SyncEngine = {
     const lineDuration = lineEnd - lineStart;
     
     const lineChords = allChords.filter(ch => 
-      ch.time >= lineStart - 0.5 && ch.time <= lineEnd + 0.5
+      ch.time >= lineStart - 0.15 && ch.time <= lineEnd + 0.15
     );
     
     const lyricText = words.map(w => w.text).join(' ');

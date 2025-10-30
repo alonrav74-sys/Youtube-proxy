@@ -905,9 +905,11 @@ function hookPlaybackLive(){
     }
     if(gateChip.style.display!=='none') gateChip.style.display='none';
 
-    let chordIdx=st.timeline.findIndex(x=>x.t>t);
-    if(chordIdx===-1) chordIdx=st.timeline.length;
-    const ev=st.timeline[chordIdx-1]||st.timeline[0];
+    // Find current chord - account for gateOffset!
+    const gateOffset = st.gateTime || 0;
+    let chordIdx = st.timeline.findIndex(x => (x.t + gateOffset) > t);
+    if(chordIdx === -1) chordIdx = st.timeline.length;
+    const ev = st.timeline[chordIdx - 1] || st.timeline[0];
     if(!ev) return;
     
     const capo=parseInt(capoEl.value||'0',10);
@@ -915,7 +917,11 @@ function hookPlaybackLive(){
     liveChordEl.textContent = shown;
     liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
     
-    const currentWord = WHISPER_WORDS.find(w => t >= w.start && t < (w.end ?? (w.start+0.5)));
+    const currentWord = WHISPER_WORDS.find(w => {
+      const wordStart = w.start + gateOffset;
+      const wordEnd = (w.end || w.start + 0.5) + gateOffset;
+      return t >= wordStart && t < wordEnd;
+    });
     if(currentWord) {
       liveLyricEl.textContent = currentWord.word || currentWord.text || '';
     } else {
@@ -990,10 +996,10 @@ function buildFullLyricsSheet(isRTL) {
     const lineEnd = words[words.length - 1].end;
     const lineDuration = lineEnd - lineStart;
     
-    // Find chords for this line
+    // Find chords for this line (with tighter tolerance)
     const lineChords = st.timeline.filter(ch => {
       const chordTimeWithGate = ch.t + gateOffset;
-      return chordTimeWithGate >= lineStart - 0.5 && chordTimeWithGate <= lineEnd + 0.5;
+      return chordTimeWithGate >= lineStart - 0.15 && chordTimeWithGate <= lineEnd + 0.15;
     });
     
     // Build lyric text
@@ -1050,6 +1056,8 @@ function highlightCurrentChord(currentTime) {
   const st = window.__STATE;
   if(!st) return;
   
+  const gateOffset = st.gateTime || 0;
+  
   // Remove all previous highlights
   liveSheetEl.querySelectorAll('.chord-marker').forEach(el => {
     el.style.background = 'transparent';
@@ -1058,10 +1066,12 @@ function highlightCurrentChord(currentTime) {
     el.style.borderRadius = '0';
   });
   
-  // Find current chord
+  // Find current chord - compare with gateOffset included!
   const currentChord = st.timeline.find((ch, idx) => {
     const nextChord = st.timeline[idx + 1];
-    return ch.t <= currentTime && (!nextChord || currentTime < nextChord.t);
+    const chordTime = ch.t + gateOffset;
+    const nextChordTime = nextChord ? (nextChord.t + gateOffset) : Infinity;
+    return chordTime <= currentTime && currentTime < nextChordTime;
   });
   
   if(currentChord) {
