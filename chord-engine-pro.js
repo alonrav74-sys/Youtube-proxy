@@ -145,25 +145,16 @@ class ChordEnginePro extends ChordEngine {
     // 6️⃣ Decoration (your harmonic analysis)
     const decorated = this.decorateQualitiesBassFirst(timeline, feats, key, harmonyMode, 1.0);
     
-    // 7️⃣ Confidence Boosting
-    console.log('✨ Boosting confidence...');
-    const boosted = this.boostConfidence(decorated, key, feats);
+    // 7️⃣ Confidence Boosting (only in Accurate mode)
+    let final = decorated;
     
-    // 8️⃣ Temporal Smoothing
-    console.log('🔧 Temporal smoothing...');
-    const smoothed = this.temporalSmoothing(boosted, key);
-    
-    // 9️⃣ Validation
-    const validated = this.validateChords(smoothed, key, feats);
-    
-    // 🔟 Classification
-    const classified = this.classifyOrnamentsByDuration(validated, bpm);
-    
-    // 1️⃣1️⃣ Quantize
-    const quantized = this.quantizeToGrid(classified, bpm, 4);
-    
-    // 1️⃣2️⃣ Remove redundancy
-    const final = this.removeRedundantChords(quantized, bpm);
+    if (mode === this.MODE.ACCURATE) {
+      console.log('✨ Boosting confidence...');
+      final = this.boostConfidence(final, key, feats);
+      
+      console.log('🔧 Temporal smoothing...');
+      final = this.temporalSmoothing(final, key);
+    }
     
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     

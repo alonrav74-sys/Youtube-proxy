@@ -119,104 +119,44 @@ const SyncEngine = {
   buildLine(lineWords, allChords, isRTL) {
     if (!lineWords || lineWords.length === 0) return '';
     
-    // Work with original word order for positioning
     const words = lineWords;
-    
-    // Find chords that belong to this line
     const lineStart = words[0].time;
     const lineEnd = words[words.length - 1].end;
+    const lineDuration = lineEnd - lineStart;
     
-    // Note: allChords[].time already includes gateOffset (added in calling function)
     const lineChords = allChords.filter(ch => 
       ch.time >= lineStart - 0.5 && ch.time <= lineEnd + 0.5
     );
     
-    // Build chord positioning
-    const chordPositions = [];
     const lyricText = words.map(w => w.text).join(' ');
+    const lineLength = lyricText.length;
     
+    // Calculate positions based on TIME PROPORTION
+    const chordPositions = [];
     for (const chord of lineChords) {
-      // Find which word this chord belongs to
-      let position = 0;
-      let foundWord = false;
+      const timeProportion = (chord.time - lineStart) / lineDuration;
+      const position = Math.floor(timeProportion * lineLength);
       
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        
-        // Chord happens during or near this word (150ms tolerance)
-        if (chord.time >= word.time - 0.15 && chord.time <= word.end + 0.15) {
-          // Calculate position in the line text
-          const wordsBeforeText = words.slice(0, i).map(w => w.text).join(' ');
-          position = wordsBeforeText.length;
-          if (position > 0) position += 1; // Add space
-          
-          // Fine-tune position based on timing within word
-          const wordProgress = (chord.time - word.time) / (word.end - word.time);
-          if (wordProgress > 0.3 && wordProgress < 0.9) {
-            position += Math.floor(word.text.length * wordProgress);
-          }
-          
-          foundWord = true;
-          break;
-        }
-      }
-      
-      // If chord is before first word or after last word
-      if (!foundWord) {
-        if (chord.time < words[0].time) {
-          position = 0;
-        } else {
-          position = lyricText.length;
-        }
-      }
-      
-      chordPositions.push({ position, label: chord.label });
+      chordPositions.push({ 
+        position: Math.max(0, Math.min(position, lineLength)), 
+        label: chord.label 
+      });
     }
     
-    // Sort by position
     chordPositions.sort((a, b) => a.position - b.position);
     
     // Build chord line
     let chordLine = '';
-    
-    if (isRTL) {
-      // RTL: Build chords from RIGHT to LEFT
-      const lineLength = lyricText.length;
-      const reversedChords = [...chordPositions].reverse();
-      
-      for (let i = 0; i < reversedChords.length; i++) {
-        const cp = reversedChords[i];
-        const positionFromRight = lineLength - cp.position;
-        
-        let spacesBefore = 0;
-        if (i === 0) {
-          spacesBefore = positionFromRight - cp.label.length;
-        } else {
-          const prevChord = reversedChords[i - 1];
-          const prevPosFromRight = lineLength - prevChord.position;
-          spacesBefore = prevPosFromRight - positionFromRight - cp.label.length;
-        }
-        
-        if (spacesBefore > 0) {
-          chordLine += '\u00A0'.repeat(spacesBefore);
-        }
-        
-        chordLine += cp.label;
-      }
-    } else {
-      // LTR: Build normally
-      let lastPos = 0;
-      for (const cp of chordPositions) {
-        const spacesNeeded = Math.max(0, cp.position - lastPos);
-        chordLine += ' '.repeat(spacesNeeded) + cp.label;
-        lastPos = cp.position + cp.label.length;
-      }
+    let lastPos = 0;
+    for (const cp of chordPositions) {
+      const spacesNeeded = Math.max(0, cp.position - lastPos);
+      chordLine += ' '.repeat(spacesNeeded) + cp.label;
+      lastPos = cp.position + cp.label.length;
     }
     
-    // Add text alignment
-    const dirStyle = isRTL ? ' style="text-align:right"' : '';
+    // CSS direction flips display
+    const dirStyle = isRTL ? ' style="direction:rtl;unicode-bidi:embed"' : '';
     
-    // Build HTML
     return `<div class="chord-line"${dirStyle}>${escapeHtml(chordLine)}</div>\n<div class="lyric-line"${dirStyle}>${escapeHtml(lyricText)}</div>\n`;
   }
 };
