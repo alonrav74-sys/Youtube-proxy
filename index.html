@@ -996,53 +996,43 @@ function buildFullLyricsSheet(isRTL) {
     const lineEnd = words[words.length - 1].end;
     const lineDuration = lineEnd - lineStart;
     
-    // Find chords for this line (with tighter tolerance)
+    // Find chords for this line
     const lineChords = st.timeline.filter(ch => {
       const chordTimeWithGate = ch.t + gateOffset;
       return chordTimeWithGate >= lineStart - 0.15 && chordTimeWithGate <= lineEnd + 0.15;
     });
     
-    // Build lyric text
-    const lyricText = words.map(w => w.text).join(' ');
-    const lineLength = lyricText.length;
+    // Build using absolute positioning based on TIME
+    const dirClass = isRTL ? 'rtl' : 'ltr';
     
-    // Calculate chord positions based on TIME PROPORTION
-    const chordPositions = [];
+    html += `<div style="position:relative;height:60px;margin-bottom:10px" class="${dirClass}">`;
+    
+    // Chord layer (absolute positioned)
+    html += `<div style="position:absolute;top:0;left:0;right:0;height:20px">`;
     for(const chord of lineChords) {
       const chordTimeWithGate = chord.t + gateOffset;
-      
-      // Position = proportion of time through the line
       const timeProportion = (chordTimeWithGate - lineStart) / lineDuration;
-      const position = Math.floor(timeProportion * lineLength);
+      const positionPercent = timeProportion * 100;
       
       const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
-      chordPositions.push({ 
-        position: Math.max(0, Math.min(position, lineLength)), 
-        label: chordLabel, 
-        id: chord.t,
-        time: chordTimeWithGate
-      });
+      const leftStyle = isRTL ? `right:${positionPercent}%` : `left:${positionPercent}%`;
+      
+      html += `<span class="chord-marker" data-time="${chord.t}" style="position:absolute;${leftStyle};color:#38bdf8;font-weight:700;font-size:15px;white-space:nowrap">${escapeHtml(chordLabel)}</span>`;
     }
+    html += `</div>`;
     
-    // Sort by position
-    chordPositions.sort((a, b) => a.position - b.position);
-    
-    // Build chord line
-    let chordLine = '';
-    let lastPos = 0;
-    for(const cp of chordPositions) {
-      const spaces = Math.max(0, cp.position - lastPos);
-      chordLine += '\u00A0'.repeat(spaces);
-      chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
-      lastPos = cp.position + cp.label.length;
+    // Lyrics layer (absolute positioned)
+    html += `<div style="position:absolute;top:25px;left:0;right:0;height:30px">`;
+    for(const word of words) {
+      const wordTimeProportion = (word.time - lineStart) / lineDuration;
+      const wordPositionPercent = wordTimeProportion * 100;
+      
+      const leftStyle = isRTL ? `right:${wordPositionPercent}%` : `left:${wordPositionPercent}%`;
+      
+      html += `<span style="position:absolute;${leftStyle};color:#ffffff;font-size:16px;white-space:nowrap">${escapeHtml(word.text)}</span>`;
     }
+    html += `</div>`;
     
-    // CSS direction flips the visual display
-    const dirStyle = isRTL ? 'direction:rtl;unicode-bidi:embed' : 'direction:ltr';
-    
-    html += `<div style="margin-bottom:20px;${dirStyle}">`;
-    html += `<div style="color:#38bdf8;font-weight:700;font-size:15px;line-height:1.3;letter-spacing:0.5px;white-space:pre">${chordLine}</div>`;
-    html += `<div style="color:#ffffff;font-size:16px;line-height:1.3;letter-spacing:0.3px;white-space:pre">${escapeHtml(lyricText)}</div>`;
     html += `</div>`;
   }
   

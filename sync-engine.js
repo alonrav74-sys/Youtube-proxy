@@ -128,36 +128,38 @@ const SyncEngine = {
       ch.time >= lineStart - 0.15 && ch.time <= lineEnd + 0.15
     );
     
-    const lyricText = words.map(w => w.text).join(' ');
-    const lineLength = lyricText.length;
+    // Build using absolute positioning based on TIME
+    const dirClass = isRTL ? 'rtl' : 'ltr';
     
-    // Calculate positions based on TIME PROPORTION
-    const chordPositions = [];
-    for (const chord of lineChords) {
+    let html = `<div style="position:relative;height:60px;margin-bottom:10px" class="${dirClass}">`;
+    
+    // Chord layer (absolute positioned)
+    html += `<div style="position:absolute;top:0;left:0;right:0;height:20px">`;
+    for(const chord of lineChords) {
       const timeProportion = (chord.time - lineStart) / lineDuration;
-      const position = Math.floor(timeProportion * lineLength);
+      const positionPercent = timeProportion * 100;
       
-      chordPositions.push({ 
-        position: Math.max(0, Math.min(position, lineLength)), 
-        label: chord.label 
-      });
+      const leftStyle = isRTL ? `right:${positionPercent}%` : `left:${positionPercent}%`;
+      
+      html += `<span style="position:absolute;${leftStyle};color:#38bdf8;font-weight:700;font-size:15px;white-space:nowrap">${escapeHtml(chord.label)}</span>`;
     }
+    html += `</div>`;
     
-    chordPositions.sort((a, b) => a.position - b.position);
-    
-    // Build chord line
-    let chordLine = '';
-    let lastPos = 0;
-    for (const cp of chordPositions) {
-      const spacesNeeded = Math.max(0, cp.position - lastPos);
-      chordLine += ' '.repeat(spacesNeeded) + cp.label;
-      lastPos = cp.position + cp.label.length;
+    // Lyrics layer (absolute positioned)
+    html += `<div style="position:absolute;top:25px;left:0;right:0;height:30px">`;
+    for(const word of words) {
+      const wordTimeProportion = (word.time - lineStart) / lineDuration;
+      const wordPositionPercent = wordTimeProportion * 100;
+      
+      const leftStyle = isRTL ? `right:${wordPositionPercent}%` : `left:${wordPositionPercent}%`;
+      
+      html += `<span style="position:absolute;${leftStyle};color:#ffffff;font-size:16px;white-space:nowrap">${escapeHtml(word.text)}</span>`;
     }
+    html += `</div>`;
     
-    // CSS direction flips display
-    const dirStyle = isRTL ? ' style="direction:rtl;unicode-bidi:embed"' : '';
+    html += `</div>`;
     
-    return `<div class="chord-line"${dirStyle}>${escapeHtml(chordLine)}</div>\n<div class="lyric-line"${dirStyle}>${escapeHtml(lyricText)}</div>\n`;
+    return html;
   }
 };
 
