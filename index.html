@@ -1001,59 +1001,64 @@ function buildFullLyricsSheet(isRTL) {
       return chordTimeWithGate >= lineStart - 0.15 && chordTimeWithGate <= lineEnd + 0.15;
     });
     
-    // Build lyric text (chronological order)
-    const lyricText = words.map(w => w.text).join(' ');
+    // Build timeline items (chords + words)
+    const items = [];
     
-    // Calculate chord positions above words
-    const chordPositions = [];
     for(const chord of lineChords) {
-      let position = 0;
-      let found = false;
-      
       const chordTimeWithGate = chord.t + gateOffset;
-      
-      // Find which word this chord belongs to
-      for(let i = 0; i < words.length; i++) {
-        const word = words[i];
-        
-        if(chordTimeWithGate >= word.time - 0.15 && chordTimeWithGate <= word.end + 0.15) {
-          // Position at start of this word
-          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
-          position = beforeText.length;
-          if(position > 0) position += 1;
-          
-          found = true;
-          break;
-        }
-      }
-      
-      if(!found) {
-        position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
-      }
-      
       const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
-      chordPositions.push({ position, label: chordLabel, id: chord.t });
+      
+      items.push({
+        time: chordTimeWithGate,
+        type: 'chord',
+        label: chordLabel,
+        id: chord.t
+      });
     }
     
-    // Sort by position (chronological)
-    chordPositions.sort((a, b) => a.position - b.position);
-    
-    // Build chord line with spaces (SAME for both RTL and LTR)
-    let chordLine = '';
-    let lastPos = 0;
-    for(const cp of chordPositions) {
-      const spaces = Math.max(0, cp.position - lastPos);
-      chordLine += ' '.repeat(spaces);
-      chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
-      lastPos = cp.position + cp.label.length;
+    for(const word of words) {
+      items.push({
+        time: word.time,
+        type: 'word',
+        text: word.text
+      });
     }
     
-    // Direction - let CSS handle the visual flip
-    const dirStyle = isRTL ? 'direction:rtl' : 'direction:ltr';
+    // Sort by time (chronological)
+    items.sort((a, b) => a.time - b.time);
     
-    html += `<div style="margin-bottom:25px;${dirStyle}">`;
-    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${chordLine}</div>`;
-    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
+    // For RTL: REVERSE the array
+    if(isRTL) {
+      items.reverse();
+    }
+    
+    // Build display
+    html += `<div style="margin-bottom:30px">`;
+    
+    // Chords line
+    html += `<div style="line-height:1.3">`;
+    for(const item of items) {
+      if(item.type === 'chord') {
+        html += `<span class="chord-marker" data-time="${item.id}" style="display:inline-block;color:#38bdf8;font-weight:700;font-size:16px;margin:0 6px;vertical-align:top">${escapeHtml(item.label)}</span>`;
+      } else {
+        // Empty space for word
+        html += `<span style="display:inline-block;width:${item.text.length * 10}px;height:20px;margin:0 6px"></span>`;
+      }
+    }
+    html += `</div>`;
+    
+    // Words line
+    html += `<div style="line-height:1.3;margin-top:2px">`;
+    for(const item of items) {
+      if(item.type === 'word') {
+        html += `<span style="display:inline-block;color:#ffffff;font-size:18px;margin:0 6px;vertical-align:top">${escapeHtml(item.text)}</span>`;
+      } else {
+        // Empty space for chord
+        html += `<span style="display:inline-block;width:${item.label.length * 10}px;height:24px;margin:0 6px"></span>`;
+      }
+    }
+    html += `</div>`;
+    
     html += `</div>`;
   }
   

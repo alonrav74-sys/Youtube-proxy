@@ -127,51 +127,55 @@ const SyncEngine = {
       ch.time >= lineStart - 0.15 && ch.time <= lineEnd + 0.15
     );
     
-    const lyricText = words.map(w => w.text).join(' ');
+    // Build timeline
+    const items = [];
     
-    // Calculate chord positions
-    const chordPositions = [];
     for(const chord of lineChords) {
-      let position = 0;
-      let found = false;
-      
-      for(let i = 0; i < words.length; i++) {
-        const word = words[i];
-        
-        if(chord.time >= word.time - 0.15 && chord.time <= word.end + 0.15) {
-          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
-          position = beforeText.length;
-          if(position > 0) position += 1;
-          
-          found = true;
-          break;
-        }
-      }
-      
-      if(!found) {
-        position = chord.time < words[0].time ? 0 : lyricText.length + 1;
-      }
-      
-      chordPositions.push({ position, label: chord.label });
+      items.push({
+        time: chord.time,
+        type: 'chord',
+        label: chord.label
+      });
     }
     
-    chordPositions.sort((a, b) => a.position - b.position);
-    
-    // Build chord line (SAME for both RTL and LTR)
-    let chordLine = '';
-    let lastPos = 0;
-    for(const cp of chordPositions) {
-      const spaces = Math.max(0, cp.position - lastPos);
-      chordLine += ' '.repeat(spaces) + cp.label;
-      lastPos = cp.position + cp.label.length;
+    for(const word of words) {
+      items.push({
+        time: word.time,
+        type: 'word',
+        text: word.text
+      });
     }
     
-    // Direction - let CSS handle it
-    const dirStyle = isRTL ? 'direction:rtl' : 'direction:ltr';
+    items.sort((a, b) => a.time - b.time);
     
-    let html = `<div style="margin-bottom:25px;${dirStyle}">`;
-    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${escapeHtml(chordLine)}</div>`;
-    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
+    if(isRTL) {
+      items.reverse();
+    }
+    
+    let html = `<div style="margin-bottom:30px">`;
+    
+    // Chords
+    html += `<div style="line-height:1.3">`;
+    for(const item of items) {
+      if(item.type === 'chord') {
+        html += `<span style="display:inline-block;color:#38bdf8;font-weight:700;font-size:16px;margin:0 6px;vertical-align:top">${escapeHtml(item.label)}</span>`;
+      } else {
+        html += `<span style="display:inline-block;width:${item.text.length * 10}px;height:20px;margin:0 6px"></span>`;
+      }
+    }
+    html += `</div>`;
+    
+    // Words
+    html += `<div style="line-height:1.3;margin-top:2px">`;
+    for(const item of items) {
+      if(item.type === 'word') {
+        html += `<span style="display:inline-block;color:#ffffff;font-size:18px;margin:0 6px;vertical-align:top">${escapeHtml(item.text)}</span>`;
+      } else {
+        html += `<span style="display:inline-block;width:${item.label.length * 10}px;height:24px;margin:0 6px"></span>`;
+      }
+    }
+    html += `</div>`;
+    
     html += `</div>`;
     
     return html;
