@@ -146,32 +146,32 @@ const SyncEngine = {
       });
     }
     
+    // Sort by time
     items.sort((a, b) => a.time - b.time);
     
-    if(isRTL) {
-      items.reverse();
-    }
+    const flexDir = isRTL ? 'row-reverse' : 'row';
+    const justifyContent = isRTL ? 'flex-end' : 'flex-start';
     
     let html = `<div style="margin-bottom:30px">`;
     
     // Chords
-    html += `<div style="line-height:1.3">`;
+    html += `<div style="display:flex;flex-direction:${flexDir};justify-content:${justifyContent};flex-wrap:wrap;min-height:22px">`;
     for(const item of items) {
       if(item.type === 'chord') {
-        html += `<span style="display:inline-block;color:#38bdf8;font-weight:700;font-size:16px;margin:0 6px;vertical-align:top">${escapeHtml(item.label)}</span>`;
+        html += `<span style="color:#38bdf8;font-weight:700;font-size:16px;margin:0 6px">${escapeHtml(item.label)}</span>`;
       } else {
-        html += `<span style="display:inline-block;width:${item.text.length * 10}px;height:20px;margin:0 6px"></span>`;
+        html += `<span style="width:${item.text.length * 10}px;margin:0 6px"></span>`;
       }
     }
     html += `</div>`;
     
     // Words
-    html += `<div style="line-height:1.3;margin-top:2px">`;
+    html += `<div style="display:flex;flex-direction:${flexDir};justify-content:${justifyContent};flex-wrap:wrap;min-height:26px;margin-top:2px">`;
     for(const item of items) {
       if(item.type === 'word') {
-        html += `<span style="display:inline-block;color:#ffffff;font-size:18px;margin:0 6px;vertical-align:top">${escapeHtml(item.text)}</span>`;
+        html += `<span style="color:#ffffff;font-size:18px;margin:0 6px">${escapeHtml(item.text)}</span>`;
       } else {
-        html += `<span style="display:inline-block;width:${item.label.length * 10}px;height:24px;margin:0 6px"></span>`;
+        html += `<span style="width:${item.label.length * 10}px;margin:0 6px"></span>`;
       }
     }
     html += `</div>`;
