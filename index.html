@@ -897,7 +897,7 @@ function hookPlaybackLive(){
 
   player.ontimeupdate=()=>{
     const t=player.currentTime;
-    if(t < (st.gateTime || 0) + 0.3){ 
+    if(t < (st.gateTime || 0)){ 
       liveChordEl.textContent='—'; 
       liveFunctionEl.textContent='—';
       liveLyricEl.textContent='—';
@@ -919,7 +919,7 @@ function hookPlaybackLive(){
     
     const currentWord = WHISPER_WORDS.find(w => {
       const wordStart = w.start + gateOffset;
-      const wordEnd = (w.end || w.start + 0.5) + gateOffset;
+      const wordEnd = (w.end || w.start) + gateOffset;
       return t >= wordStart && t < wordEnd;
     });
     if(currentWord) {
@@ -974,7 +974,7 @@ function buildFullLyricsSheet(isRTL) {
     currentLine.push({
       text: text,
       time: w.start + gateOffset,
-      end: (w.end || w.start + 0.3) + gateOffset,
+      end: (w.end || w.start) + gateOffset,
       id: `word-${idx}`
     });
     
@@ -998,7 +998,7 @@ function buildFullLyricsSheet(isRTL) {
     // Find chords for this line
     const lineChords = st.timeline.filter(ch => {
       const chordTimeWithGate = ch.t + gateOffset;
-      return chordTimeWithGate >= lineStart - 0.15 && chordTimeWithGate <= lineEnd + 0.15;
+      return chordTimeWithGate >= lineStart && chordTimeWithGate <= lineEnd;
     });
     
     // Build timeline items (chords + words)
@@ -1036,7 +1036,7 @@ function buildFullLyricsSheet(isRTL) {
       
       for(let i = 0; i < words.length; i++) {
         const word = words[i];
-        if(chordTimeWithGate >= word.time - 0.15 && chordTimeWithGate <= word.end + 0.15) {
+        if(chordTimeWithGate >= word.time && chordTimeWithGate <= word.end) {
           const beforeText = words.slice(0, i).map(w => w.text).join(' ');
           position = beforeText.length;
           if(position > 0) position += 1;
