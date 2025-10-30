@@ -458,8 +458,10 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 function initTabs() {
+  console.log('🔧 initTabs called');
   const tabs = document.querySelectorAll('.tab');
   const tabContents = document.querySelectorAll('.tab-content');
+  console.log('🔧 Found tabs:', tabs.length, 'contents:', tabContents.length);
   tabs.forEach(tab => {
     tab.addEventListener('click', function() {
       const tabName = this.getAttribute('data-tab');
@@ -749,8 +751,8 @@ analyzeBtn.onclick=async()=>{
 
     // Circle of Fifths - show diatonic chords
     const tonic = engine.nameSharp(key.root);
-    const mode = key.minor ? 'minor' : 'major';
-    const diatonicChords = engine.getDiatonicChords(tonic, mode);
+    const keyMode = key.minor ? 'minor' : 'major';
+    const diatonicChords = engine.getDiatonicChords(tonic, keyMode);
     
     const circleEl = document.getElementById('circleOfFifths');
     circleEl.innerHTML = diatonicChords.map(name => {
