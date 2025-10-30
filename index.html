@@ -314,19 +314,6 @@ if(typeof ChordEngine === 'undefined') {
 const engine = new ChordEngine();
 const SERVER = window.location.origin;
 
-// 🔧 Global wrapper functions (for compatibility)
-function extractFeatures(st1, bpm) {
-  return engine.extractFeatures(st1, bpm || st1.bpm);
-}
-
-function detectMode(feats, key) {
-  return engine.detectMode(feats, key);
-}
-
-function buildChordsFromBass(feats, key, bpm) {
-  return engine.buildChordsFromBass(feats, key, bpm);
-}
-
 let selectedYouTubeVideo = null;
 let currentTab = 'file';
 let currentAIMode = 'balanced';
@@ -619,14 +606,14 @@ analyzeBtn.onclick=async()=>{
     if(st1.url) player.src = st1.url;
 
     showAnalyzing('שלב 2/6: מיצוי תכונות');
-    const feats = extractFeatures(st1, st1.bpm);
+    const feats = engine.extractFeatures(st1, st1.bpm);
 
     showAnalyzing('שלב 3/6: זיהוי סולם');
     const key = engine.estimateKey(feats.chroma);
-    const mode = detectMode(feats, key);
+    const mode = engine.detectMode(feats, key);
 
     showAnalyzing('שלב 4/6: בנייה מבוססת בס');
-    let timeline = buildChordsFromBass(feats, key, st1.bpm);
+    let timeline = engine.buildChordsFromBass(feats, key, st1.bpm);
       
       if(timeline.length === 0 || (timeline.length < 3 && st1.duration > 30)){
         const tonicLabel = engine.nameSharp(key.root) + (key.minor ? 'm' : '');
