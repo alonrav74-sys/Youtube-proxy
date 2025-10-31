@@ -409,11 +409,13 @@ class ChordEnginePro extends ChordEngine {
    * 🎹 Check if chord is modal borrowing
    */
   isModalBorrowing(chordLabel, key) {
+    if (!chordLabel || typeof chordLabel !== 'string') return false;
+    
     const root = this.parseRoot(chordLabel);
     if (root < 0) return false;
     
     const interval = this.toPc(root - key.root);
-    const isMinor = chordLabel.match(/m(?!aj)/); // 'm' but not 'maj'
+    const isMinor = chordLabel && typeof chordLabel === 'string' && chordLabel.match(/m(?!aj)/); // 'm' but not 'maj'
     
     // Common borrowed chords
     if (key.minor) {
@@ -754,7 +756,7 @@ class ChordEnginePro extends ChordEngine {
     });
     
     const newRoot = this.toPc(key.root + closest);
-    const quality = curr.label.match(/^[A-G](#|b)?(.*)$/);
+    const quality = curr.label && typeof curr.label === 'string' ? curr.label.match(/^[A-G](#|b)?(.*)$/) : null;
     const newLabel = this.nameSharp(newRoot) + (quality ? quality[2] : '');
     
     return newLabel;
@@ -764,6 +766,7 @@ class ChordEnginePro extends ChordEngine {
    * 🔧 Parse root note from chord label
    */
   parseRoot(label) {
+    if (!label || typeof label !== 'string') return -1;
     const m = label.match(/^([A-G])(#|b)?/);
     if (!m) return -1;
     
@@ -1270,7 +1273,7 @@ class ChordEnginePro extends ChordEngine {
    * 🎵 Normalize chord to root note only
    */
   normalizeChordRoot(chordLabel) {
-    if (!chordLabel) return 'C';
+    if (!chordLabel || typeof chordLabel !== 'string') return 'C';
     const match = chordLabel.match(/^([A-G][b#]?)/);
     return match ? match[1] : 'C';
   }
