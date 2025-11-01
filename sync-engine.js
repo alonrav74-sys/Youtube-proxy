@@ -185,12 +185,18 @@ const SyncEngine = {
         lastPos = cp.position + cp.label.length;
       }
 
-      // Hebrew: dir="rtl", English: dir="ltr"
-      const dirAttr = isRTL ? 'dir="rtl"' : 'dir="ltr"';
-
-      html += `<div style="margin-bottom:25px" ${dirAttr}>`;
-      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${this.escapeHtml(chordLine)}</div>`;
-      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${this.escapeHtml(lyricText)}</div>`;
+      html += `<div style="margin-bottom:25px">`;
+      
+      if (isRTL) {
+        // RTL (Hebrew): chords LTR right-aligned, lyrics RTL right-aligned
+        html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace;direction:ltr;text-align:right">${this.escapeHtml(chordLine)}</div>`;
+        html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre;direction:rtl;text-align:right">${this.escapeHtml(lyricText)}</div>`;
+      } else {
+        // LTR (English): keep original - UNCHANGED
+        html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${this.escapeHtml(chordLine)}</div>`;
+        html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${this.escapeHtml(lyricText)}</div>`;
+      }
+      
       html += `</div>`;
     }
 
