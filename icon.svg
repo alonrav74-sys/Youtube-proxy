@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#1e3a8a" rx="64"/>
+  
+  <!-- Musical Note -->
+  <g fill="#38bdf8">
+    <!-- Note stem -->
+    <rect x="200" y="120" width="40" height="220" rx="8"/>
+    
+    <!-- Note head -->
+    <ellipse cx="220" cy="340" rx="60" ry="45" transform="rotate(-20 220 340)"/>
+    
+    <!-- Sharp symbol (#) -->
+    <g transform="translate(280, 180)">
+      <!-- Vertical lines -->
+      <rect x="10" y="0" width="12" height="120" rx="4"/>
+      <rect x="50" y="0" width="12" height="120" rx="4"/>
+      
+      <!-- Horizontal lines -->
+      <rect x="0" y="30" width="72" height="12" rx="4"/>
+      <rect x="0" y="70" width="72" height="12" rx="4"/>
+    </g>
+  </g>
+  
+  <!-- Text -->
+  <text x="256" y="450" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#38bdf8" text-anchor="middle">ChordFinder</text>
+</svg>
