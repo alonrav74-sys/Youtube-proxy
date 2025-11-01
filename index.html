@@ -237,10 +237,6 @@
       <div style="margin-top:16px">
         <h3 style="margin:0 0 8px 0;font-size:14px;color:#38bdf8">🤖 מצב זיהוי AI</h3>
         <div class="mode-selector">
-          <button class="mode-btn" data-mode="fast">
-            ⚡ Fast
-            <small>בסיסי<br>~2-5 שניות</small>
-          </button>
           <button class="mode-btn active" data-mode="balanced">
             ⚖️ Balanced
             <small>+ Key Constraint<br>~5-10 שניות</small>
@@ -289,14 +285,9 @@
       <div id="error" class="pill err" style="display:none"></div>
 
       <div class="sliderRow">
-        <span class="tag">×<span id="bassMulTxt">1.25</span></span>
-        <input id="bassSens" type="range" min="0.5" max="2.0" step="0.05" value="1.25" />
-        <span style="color:#94a3b8;font-size:12px">רגישות בס</span>
-      </div>
-      <div class="sliderRow">
         <span class="tag">×<span id="decMulTxt">1.00</span></span>
         <input id="decSens" type="range" min="0.5" max="2.0" step="0.05" value="1.00" />
-        <span style="color:#94a3b8;font-size:12px">רגישות הרחבות</span>
+        <span style="color:#94a3b8;font-size:12px">רגישות לקישוטים (7th/9th/11th/13th)</span>
       </div>
 
       <div class="row">
@@ -431,9 +422,7 @@ const resetSheetBtn=document.getElementById('resetSheet');
 const exportBtn=document.getElementById('exportBtn');
 const copyBtn=document.getElementById('copyBtn');
 const aiBadge=document.getElementById('aiBadge');
-const bassSensEl=document.getElementById('bassSens');
 const decSensEl=document.getElementById('decSens');
-const bassMulTxt=document.getElementById('bassMulTxt');
 const decMulTxt=document.getElementById('decMulTxt');
 const structuralCountEl=document.getElementById('structuralCount');
 const ornamentCountEl=document.getElementById('ornamentCount');
@@ -448,7 +437,6 @@ const ytStatusEl=document.getElementById('ytStatus');
 const ytUrlEl=document.getElementById('ytUrl');
 const ytUrlBtn=document.getElementById('ytUrlBtn');
 
-bassSensEl.oninput=()=>bassMulTxt.textContent=Number(bassSensEl.value).toFixed(2);
 decSensEl.oninput=()=>decMulTxt.textContent=Number(decSensEl.value).toFixed(2);
 
 // 🆕 AI Mode Selection
@@ -718,7 +706,8 @@ analyzeBtn.onclick=async()=>{
     const result = await engine.detect(audioData.audioBuffer, {
       mode: currentAIMode,
       bpm: audioData.bpm,
-      harmonyMode: document.getElementById('extMode').value
+      harmonyMode: document.getElementById('extMode').value,
+      decorationSensitivity: Number(decSensEl.value) || 1.0  // 🎚️ Extension sensitivity
     });
     
     console.log('🎼 Detection result:', result);
