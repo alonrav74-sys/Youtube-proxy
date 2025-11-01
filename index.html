@@ -163,6 +163,70 @@
     .mode-btn.active{border-color:#22c55e;background:#0d2e1f;color:#d7ffe6}
     .mode-btn small{display:block;font-size:11px;margin-top:4px;opacity:0.8;font-weight:400}
   </style>
+
+<!-- Robust audio decode patch (non-intrusive) -->
+<script>
+(function(){
+  function ensureResumed(ctx){
+    if (ctx && ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch(e){} }
+  }
+  async function processArrayBufferToAudioBuffer(arrayBuffer, preferredSampleRate){
+    if (!arrayBuffer || arrayBuffer.byteLength < 1024) throw new Error('EMPTY_OR_TINY_AUDIO_BUFFER');
+    const AC = window.AudioContext || window.webkitAudioContext;
+    // attempt #1
+    let ctx = new AC(preferredSampleRate ? { sampleRate: preferredSampleRate } : undefined);
+    ensureResumed(ctx);
+    try {
+      const copy = arrayBuffer.slice ? arrayBuffer.slice(0) : arrayBuffer;
+      const buf = await ctx.decodeAudioData(copy);
+      window.__lastAudioCtx = ctx;
+      return buf;
+    } catch (e1) {
+      try { ctx.close && ctx.close(); } catch(e){}
+      // attempt #2 with default SR
+      ctx = new AC();
+      ensureResumed(ctx);
+      const copy2 = arrayBuffer.slice ? arrayBuffer.slice(0) : arrayBuffer;
+      const buf2 = await ctx.decodeAudioData(copy2);
+      window.__lastAudioCtx = ctx;
+      return buf2;
+    }
+  }
+  window.processArrayBufferToAudioBuffer = processArrayBufferToAudioBuffer;
+
+  // Promise-style monkey patch for decodeAudioData (keeps callback form intact)
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (AC && !AC.__patchedDecode) {
+    const proto = AC.prototype;
+    const _orig = proto.decodeAudioData;
+    proto.decodeAudioData = function(buffer, success, failure){
+      // If callbacks provided, keep native behavior (more risky to patch)
+      if (typeof success === 'function' || typeof failure === 'function') {
+        const copy = buffer && buffer.slice ? buffer.slice(0) : buffer;
+        return _orig.call(this, copy, success, failure);
+      }
+      const self = this;
+      const copy = buffer && buffer.slice ? buffer.slice(0) : buffer;
+      return _orig.call(self, copy).catch(async function(){
+        // Retry with a fresh context (handles odd codecs/sample-rates)
+        const Alt = window.AudioContext || window.webkitAudioContext;
+        const alt = new Alt();
+        try {
+          const copy2 = buffer && buffer.slice ? buffer.slice(0) : buffer;
+          const out = await alt.decodeAudioData(copy2);
+          try { alt.close && alt.close(); } catch(e){}
+          return out;
+        } catch (e2) {
+          try { alt.close && alt.close(); } catch(e){}
+          throw e2;
+        }
+      });
+    };
+    AC.__patchedDecode = true;
+  }
+})();
+</script>
+
 </head>
 <body>
   <div class="wrap">
