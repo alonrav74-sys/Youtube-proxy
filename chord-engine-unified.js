@@ -1269,7 +1269,7 @@ class ChordEngine {
   }
 
   addInversionsIfNeeded(tl, feats, bassSens = 1.25) {
-    // 🔥 Always check for inversions (removed sensitivity gate)
+    // 🔥 Conservative inversion detection
     
     return tl.map(ev => {
       const root = this.parseRoot(ev.label);
@@ -1279,7 +1279,7 @@ class ChordEngine {
       const i0 = Math.max(0, ev.fi);
       const i1 = Math.min(bassPc.length - 1, ev.endFrame || ev.fi + 3);
       
-      // Vote for dominant bass note
+      // Vote for bass notes
       const bassVotes = new Array(12).fill(0);
       for (let i = i0; i <= i1; i++) {
         if (bassPc[i] >= 0) bassVotes[bassPc[i]]++;
@@ -1287,6 +1287,16 @@ class ChordEngine {
       
       const dominantBass = bassVotes.indexOf(Math.max(...bassVotes));
       if (dominantBass < 0 || dominantBass === root) return ev;
+      
+      const rootVotes = bassVotes[root] || 0;
+      const bassNotVotes = bassVotes[dominantBass] || 0;
+      
+      // 🎯 CONSERVATIVE: Require bass to be MUCH stronger than root
+      // If B has F# bass, but B also appears in bass → don't invert
+      if (bassNotVotes < rootVotes * 1.5) {
+        console.log(`   ⚠️ Inversion rejected: bass not dominant enough (${bassNotVotes} vs ${rootVotes})`);
+        return ev;
+      }
       
       // Check if bass is a chord tone
       const isMinor = /m(?!aj)/.test(ev.label);
@@ -1302,7 +1312,7 @@ class ChordEngine {
       // Only add inversion if bass is actually a chord tone
       if (chordTones.includes(bassInterval)) {
         const bassNote = this.nameSharp(dominantBass);
-        console.log(`   🎸 Inversion detected: ${ev.label} → ${ev.label}/${bassNote}`);
+        console.log(`   🎸 Inversion: ${ev.label} → ${ev.label}/${bassNote} (votes: ${bassNotVotes} vs ${rootVotes})`);
         return { ...ev, label: ev.label + '/' + bassNote };
       }
       
