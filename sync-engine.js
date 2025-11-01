@@ -14,7 +14,7 @@ const SyncEngine = {
 
     const capo = parseInt(capoValue || '0', 10);
     const gateOffset = state.gateTime || 0;
-    const isRTL = detectedLanguage === 'he' || detectedLanguage === 'ar';
+    const isRTL = detectedLanguage === 'he' || detectedLanguage === 'Hebrew' || detectedLanguage === 'ar';
 
     // If no lyrics, show chords only
     if (!whisperWords || whisperWords.length === 0) {
@@ -171,8 +171,7 @@ const SyncEngine = {
         chordPositions.push({ position, label: chord.label, id: chord.originalTime });
       }
 
-      // Sort chord positions - ALWAYS ascending (0→10)
-      // The position calculation already handles RTL correctly
+      // Sort chord positions - always ascending
       chordPositions.sort((a, b) => a.position - b.position);
 
       // Build chord line with spaces
@@ -188,11 +187,11 @@ const SyncEngine = {
       html += `<div style="margin-bottom:25px">`;
       
       if (isRTL) {
-        // RTL (Hebrew): chords LTR right-aligned, lyrics RTL right-aligned
+        // RTL: chords stay LTR (right-aligned), lyrics RTL
         html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace;direction:ltr;text-align:right">${this.escapeHtml(chordLine)}</div>`;
         html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre;direction:rtl;text-align:right">${this.escapeHtml(lyricText)}</div>`;
       } else {
-        // LTR (English): keep original - UNCHANGED
+        // LTR: both LTR
         html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${this.escapeHtml(chordLine)}</div>`;
         html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${this.escapeHtml(lyricText)}</div>`;
       }

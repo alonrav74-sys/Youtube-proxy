@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chordfinder-pro-v1.4.0';
+const CACHE_NAME = 'chordfinder-pro-v2.4.0';
 const urlsToCache = [
   './',
   './index.html',
