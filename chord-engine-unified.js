@@ -29,6 +29,12 @@ class ChordEngine {
       aug: { intervals: [0, 4, 8], weights: [1.0, 0.9, 0.8], label: 'aug' },
       sus2: { intervals: [0, 2, 7], weights: [1.0, 0.85, 0.8], label: 'sus2' },
       sus4: { intervals: [0, 5, 7], weights: [1.0, 0.85, 0.8], label: 'sus4' },
+      
+      // 🔥 Add chords (no 7th required)
+      add9: { intervals: [0, 4, 7, 14], weights: [1.0, 0.9, 0.8, 0.6], label: 'add9' },
+      madd9: { intervals: [0, 3, 7, 14], weights: [1.0, 0.9, 0.8, 0.6], label: 'madd9' },
+      add11: { intervals: [0, 4, 7, 17], weights: [1.0, 0.9, 0.8, 0.5], label: 'add11' },
+      
       maj7: { intervals: [0, 4, 7, 11], weights: [1.0, 0.9, 0.8, 0.75], label: 'maj7' },
       dom7: { intervals: [0, 4, 7, 10], weights: [1.0, 0.9, 0.8, 0.75], label: '7' },
       m7: { intervals: [0, 3, 7, 10], weights: [1.0, 0.9, 0.8, 0.75], label: 'm7' },
@@ -45,16 +51,232 @@ class ChordEngine {
   }
 
   // ============================================
+  // 🔥 HMM CHORD TRACKING (from old working code)
+  // ============================================
+  
+  /**
+   * 🔥 HYBRID: HMM + Bass Detection
+   * HMM determines root chord, then we check bass for inversions
+   */
+  chordTrackingWithHMM(feats, key) {
+    const { chroma, bassPc, hop, sr, frameE } = feats;
+    
+    // Build candidate chords (diatonic + common borrowed)
+    const diatonic = (key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE).map(s => this.toPc(key.root + s));
+    
+    // Add borrowed chords for minor/major
+    const borrowed = [];
+    if (key.minor) {
+      borrowed.push(this.toPc(key.root + 7));  // V (major in minor)
+      borrowed.push(this.toPc(key.root + 11)); // VII (major in minor)
+    } else {
+      borrowed.push(this.toPc(key.root + 5));  // iv (minor in major)
+      borrowed.push(this.toPc(key.root + 10)); // bVII
+    }
+    
+    const allRoots = [...new Set([...diatonic, ...borrowed])];
+    const candidates = [];
+    
+    for (const r of allRoots) {
+      candidates.push({ root: r, label: this.nameSharp(r) });
+      candidates.push({ root: r, label: this.nameSharp(r) + 'm' });
+    }
+    
+    console.log(`🎯 HMM tracking with ${candidates.length} candidates`);
+    
+    // Emission score: chroma similarity + STRONG BASS BOOST
+    const emitScore = (i, cand) => {
+      const c = chroma[i];
+      if (!c) return -Infinity;
+      
+      const isMinor = /m$/.test(cand.label);
+      const intervals = isMinor ? [0, 3, 7] : [0, 4, 7];
+      
+      // Build mask vector
+      const mask = new Array(12).fill(0);
+      for (const iv of intervals) {
+        mask[this.toPc(cand.root + iv)] = 1;
+      }
+      
+      // Cosine similarity
+      let dot = 0, normC = 0, normM = 0;
+      for (let p = 0; p < 12; p++) {
+        dot += c[p] * mask[p];
+        normC += c[p] * c[p];
+        normM += mask[p] * mask[p];
+      }
+      let score = dot / (Math.sqrt(normC) * Math.sqrt(normM) + 1e-9);
+      
+      // 🔥 STRONG BASS BOOST - if bass matches root, big bonus!
+      if (bassPc[i] >= 0 && cand.root === bassPc[i]) {
+        score += 0.25; // Increased from 0.15!
+      }
+      
+      // Check if bass matches any chord tone (not just root)
+      if (bassPc[i] >= 0 && cand.root !== bassPc[i]) {
+        const bassInterval = this.toPc(bassPc[i] - cand.root);
+        if (intervals.includes(bassInterval)) {
+          score += 0.10; // Small bonus for bass matching chord tone
+        }
+      }
+      
+      // Energy penalty for weak frames
+      if (frameE[i] < this.percentileLocal(frameE, 30)) {
+        score -= 0.10;
+      }
+      
+      return score;
+    };
+    
+    // Transition penalty: penalize jumps
+    const transitionPenalty = (candA, candB) => {
+      if (candA.label === candB.label) return 0.0;
+      
+      const dist = Math.min((candB.root - candA.root + 12) % 12, (candA.root - candB.root + 12) % 12);
+      const sameQual = /m$/.test(candA.label) === /m$/.test(candB.label);
+      
+      // Penalize large jumps more
+      let penalty = 0.5 + 0.15 * dist + (sameQual ? 0.0 : 0.08);
+      
+      // Circle of fifths bonus (common progressions)
+      if (dist === 7 || dist === 5) { // Fifth up or down
+        penalty -= 0.15;
+      }
+      
+      return penalty;
+    };
+    
+    // Viterbi DP
+    const N = candidates.length;
+    const M = chroma.length;
+    const dp = new Array(N).fill(0);
+    const backptr = Array.from({ length: M }, () => new Array(N).fill(-1));
+    
+    // Initialize
+    for (let s = 0; s < N; s++) {
+      dp[s] = emitScore(0, candidates[s]);
+    }
+    
+    // Forward pass
+    for (let i = 1; i < M; i++) {
+      const newdp = new Array(N).fill(-Infinity);
+      
+      for (let s = 0; s < N; s++) {
+        let bestVal = -Infinity, bestJ = -1;
+        
+        for (let j = 0; j < N; j++) {
+          const val = dp[j] - transitionPenalty(candidates[j], candidates[s]);
+          if (val > bestVal) {
+            bestVal = val;
+            bestJ = j;
+          }
+        }
+        
+        newdp[s] = bestVal + emitScore(i, candidates[s]);
+        backptr[i][s] = bestJ;
+      }
+      
+      for (let s = 0; s < N; s++) dp[s] = newdp[s];
+    }
+    
+    // Backtrack
+    let bestS = 0, bestVal = -Infinity;
+    for (let s = 0; s < N; s++) {
+      if (dp[s] > bestVal) {
+        bestVal = dp[s];
+        bestS = s;
+      }
+    }
+    
+    const states = new Array(M);
+    states[M - 1] = bestS;
+    for (let i = M - 1; i > 0; i--) {
+      states[i - 1] = backptr[i][states[i]];
+    }
+    
+    // Convert states to timeline WITH BASS INFO
+    const tl = [];
+    const secPerHop = hop / sr;
+    let cur = states[0], start = 0;
+    
+    for (let i = 1; i < M; i++) {
+      if (states[i] !== cur) {
+        tl.push({
+          t: start * secPerHop,
+          label: candidates[cur].label,
+          fi: start,
+          endFrame: i - 1  // Store end frame for bass analysis
+        });
+        cur = states[i];
+        start = i;
+      }
+    }
+    tl.push({
+      t: start * secPerHop,
+      label: candidates[cur].label,
+      fi: start,
+      endFrame: M - 1
+    });
+    
+    console.log(`🎵 HMM produced ${tl.length} chord segments`);
+    return tl;
+  }
+  
+  /**
+   * Finalize timeline: merge short chords, snap to grid
+   */
+  finalizeTimeline(tl, key, bpm, feats) {
+    const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
+    const minDur = Math.max(0.5, 0.45 * spb);
+    const out = [];
+    
+    for (let i = 0; i < tl.length; i++) {
+      const a = tl[i];
+      const b = tl[i + 1];
+      const dur = (b ? b.t : a.t + 4 * spb) - a.t;
+      
+      if (dur < minDur && out.length) {
+        const fiA = a.fi, fiB = (b ? b.fi : fiA + 1);
+        const bpA = feats.bassPc[fiA] ?? -1;
+        const bpB = feats.bassPc[Math.min(feats.bassPc.length - 1, fiB)] ?? -1;
+        const bassChanged = (bpA >= 0 && bpB >= 0 && bpA !== bpB);
+        
+        if (!bassChanged) {
+          const prev = out[out.length - 1];
+          const r = this.parseRoot(a.label), pr = this.parseRoot(prev.label);
+          const inA = this.isDiatonic(a.label, key), inP = this.isDiatonic(prev.label, key);
+          if (!inA || inP) { continue; }
+        }
+      }
+      out.push(a);
+    }
+    
+    // Snap to grid
+    const snapped = [];
+    for (const ev of out) {
+      const q = Math.max(0, Math.round(ev.t / spb) * spb);
+      if (!snapped.length || snapped.at(-1).label !== ev.label) {
+        snapped.push({ t: q, label: ev.label, fi: ev.fi });
+      }
+    }
+    
+    return snapped;
+  }
+
+  // ============================================
   // MAIN DETECTION METHOD
   // ============================================
   
   async detect(audioBuffer, options = {}) {
     const startTime = performance.now();
-    console.log('🎸 Starting unified chord detection...');
+    console.log('🎸 Starting UNIFIED chord detection with HMM...');
     
     const mode = options.mode || 'balanced';
     const harmonyMode = options.harmonyMode || 'jazz';
+    const decorationSensitivity = options.decorationSensitivity || 1.0;
     let bpm = options.bpm;
+    
+    console.log(`🎚️ Decoration sensitivity: ${decorationSensitivity.toFixed(2)}`);
     
     const mono = (audioBuffer.numberOfChannels === 1) ? 
       audioBuffer.getChannelData(0) : this.mixStereo(audioBuffer);
@@ -77,7 +299,7 @@ class ChordEngine {
     // Enhanced key detection integration
     if (typeof EnhancedKeyDetection !== 'undefined') {
       try {
-        const rawTimeline = this.buildChordsFromBass(feats, key, bpm);
+        const rawTimeline = this.chordTrackingWithHMM(feats, key);
         const enhancedResult = EnhancedKeyDetection.detectKey(rawTimeline, key);
         if (enhancedResult && enhancedResult.key) {
           console.log(`🎼 Enhanced key: ${this.nameSharp(enhancedResult.key.root)}${enhancedResult.key.minor ? 'm' : ''} (confidence: ${enhancedResult.confidence}%)`);
@@ -91,13 +313,22 @@ class ChordEngine {
     
     const detectedMode = this.detectMode(feats, key);
     
-    let timeline = this.buildChordsFromBass(feats, key, bpm);
-    timeline = this.decorateQualitiesBassFirst(timeline, feats, key, harmonyMode, 1.0);
-    timeline = this.addInversionsIfNeeded(timeline, feats, 1.25);
-    timeline = this.validateChords(timeline, key, feats);
+    // 🔥 Use HMM tracking (much better than buildChordsFromBass!)
+    let timeline = this.chordTrackingWithHMM(feats, key);
     
-    // 🔥 CRITICAL: Filter fast chromatic chords
+    // Post-processing
+    timeline = this.finalizeTimeline(timeline, key, bpm, feats);
+    
+    // Add chromatic filtering BEFORE decorations
     timeline = this.filterFastChromaticChords(timeline, key);
+    
+    timeline = this.decorateQualitiesBassFirst(timeline, feats, key, harmonyMode, decorationSensitivity);
+    timeline = this.addInversionsIfNeeded(timeline, feats, 1.25);
+    
+    // Validation and refinement (only in accurate mode)
+    if (mode === 'accurate') {
+      timeline = this.validateChords(timeline, key, feats);
+    }
     
     timeline = this.classifyOrnamentsByDuration(timeline, bpm);
     
@@ -380,87 +611,130 @@ class ChordEngine {
     };
     
     const hz = (b, N) => b * sr / N;
-    const chroma = [], bassPc = [], bassEnergy = [], frameE = [];
-    const arpeggioWindow = Math.max(4, Math.min(8, Math.round(60 / bpm * sr / hop)));
+    const chroma = [], bassCand = [], frameE = [];
+    const spectralCentroids = []; // 🔥 QUICK WIN #3
     
     for (let i = 0; i < frames.length; i++) {
       const y = new Float32Array(win);
       for (let k = 0; k < win; k++) y[k] = frames[i][k] * hann[k];
+      
       let en = 0;
       for (let k = 0; k < win; k++) en += y[k] * y[k];
       frameE.push(en);
       
-      const accumulated = new Float32Array(12);
-      const startIdx = Math.max(0, i - arpeggioWindow + 1);
+      const { mags, N } = fft(y);
       
-      for (let j = startIdx; j <= i; j++) {
-        const frame = frames[j];
-        const tempY = new Float32Array(win);
-        for (let k = 0; k < win; k++) tempY[k] = frame[k] * hann[k];
-        const { mags, N } = fft(tempY);
-        const weight = Math.pow(0.7, i - j);
-        
-        for (let b = 1; b < mags.length; b++) {
-          const f = hz(b, N);
-          if (f < 80 || f > 5000) continue;
-          const midi = 69 + 12 * Math.log2(f / 440);
-          const pc = this.toPc(Math.round(midi));
-          const freqWeight = f < 300 ? 2.5 : 1.0;
-          accumulated[pc] += mags[b] * freqWeight * weight;
+      // 🔥 QUICK WIN #3: Calculate spectral centroid
+      let centroidNum = 0, centroidDen = 0;
+      for (let b = 1; b < mags.length; b++) {
+        const f = hz(b, N);
+        if (f >= 80 && f <= 5000) {
+          centroidNum += f * mags[b];
+          centroidDen += mags[b];
         }
       }
+      const centroid = centroidDen > 0 ? centroidNum / centroidDen : 2000;
+      spectralCentroids.push(centroid);
       
+      // Chroma
+      const c = new Float32Array(12);
+      for (let b = 1; b < mags.length; b++) {
+        const f = hz(b, N);
+        if (f < 80 || f > 5000) continue;
+        const midi = 69 + 12 * Math.log2(f / 440);
+        const pc = this.toPc(Math.round(midi));
+        c[pc] += mags[b];
+      }
       let s = 0;
-      for (let k = 0; k < 12; k++) s += accumulated[k];
-      if (s > 0) { for (let k = 0; k < 12; k++) accumulated[k] /= s; }
-      chroma.push(accumulated);
+      for (let k = 0; k < 12; k++) s += c[k];
+      if (s > 0) { for (let k = 0; k < 12; k++) c[k] /= s; }
+      chroma.push(c);
       
-      const bassChroma = new Float32Array(12);
-      let bassEn = 0;
+      // 🔥 OLD WORKING BASS DETECTION - ACF on LPF signal
+      const magsLP = new Float32Array(mags.length);
+      const fmax = 250;
+      for (let b = 1; b < mags.length; b++) {
+        const f = hz(b, N);
+        if (f <= fmax) magsLP[b] = mags[b];
+      }
       
-      for (let j = startIdx; j <= i; j++) {
-        const frame = frames[j];
-        const tempY = new Float32Array(win);
-        for (let k = 0; k < win; k++) tempY[k] = frame[k] * hann[k];
-        const { mags, N } = fft(tempY);
-        const weight = Math.pow(0.8, i - j);
-        
-        for (let b = 1; b < mags.length; b++) {
-          const f = hz(b, N);
-          if (f >= 50 && f <= 200) {
-            const midi = 69 + 12 * Math.log2(f / 440);
-            const pc = this.toPc(Math.round(midi));
-            const fundamental = f < 100 ? 10.0 : (f < 150 ? 5.0 : 2.0);
-            bassChroma[pc] += mags[b] * fundamental * weight * 1.8;
-            bassEn += mags[b] * weight;
+      // Reconstruct time-domain LPF signal
+      const yLP = new Float32Array(win);
+      for (let b = 1; b < magsLP.length; b++) {
+        const f = hz(b, N);
+        if (f <= fmax) {
+          const omega = 2 * Math.PI * f / sr;
+          for (let n = 0; n < win; n++) {
+            yLP[n] += magsLP[b] * Math.cos(omega * n);
           }
         }
       }
       
-      let maxBass = -1, maxVal = 0;
-      for (let pc = 0; pc < 12; pc++) {
-        const score = bassChroma[pc];
-        if (score > maxVal) { maxVal = score; maxBass = pc; }
+      // ACF for F0 detection
+      const fmin = 40, f0minLag = Math.floor(sr / fmax), f0maxLag = Math.floor(sr / Math.max(1, fmin));
+      let bestLag = -1, bestR = -1;
+      const mean = yLP.reduce((s, v) => s + v, 0) / win;
+      let denom = 0;
+      for (let n = 0; n < win; n++) {
+        const d = yLP[n] - mean;
+        denom += d * d;
+      }
+      denom = Math.max(denom, 1e-9);
+      
+      for (let lag = f0minLag; lag <= f0maxLag; lag++) {
+        let r = 0;
+        for (let n = 0; n < win - lag; n++) {
+          const a = yLP[n] - mean, b = yLP[n + lag] - mean;
+          r += a * b;
+        }
+        r /= denom;
+        if (r > bestR) { bestR = r; bestLag = lag; }
       }
       
-      const threshold = bassEn * 0.20;
-      bassPc.push(bassChroma[maxBass] > threshold ? maxBass : -1);
-      bassEnergy.push(bassEn);
+      let pcBass = -1;
+      if (bestLag > 0) {
+        const f0 = sr / bestLag;
+        if (f0 >= fmin && f0 <= fmax) {
+          const midiF0 = 69 + 12 * Math.log2(f0 / 440);
+          pcBass = this.toPc(Math.round(midiF0));
+        }
+      }
+      bassCand.push(pcBass);
     }
     
-    const thrE = this.percentileLocal(frameE, 15);
-    const bassPcFinal = new Array(bassPc.length).fill(-1);
-    for (let i = 3; i < bassPc.length - 3; i++) {
+    // 🔥 OLD WORKING TEMPORAL SMOOTHING
+    const thrE = this.percentileLocal(frameE, 40);
+    const bassPc = new Array(bassCand.length).fill(-1);
+    
+    // First pass: require agreement with neighbors
+    for (let i = 1; i < bassCand.length - 1; i++) {
+      const v = bassCand[i];
+      if (v < 0) continue;
+      if (frameE[i] < thrE) continue;
+      if ((bassCand[i - 1] === v) || (bassCand[i + 1] === v)) {
+        bassPc[i] = v;
+      }
+    }
+    
+    // Second pass: close short runs
+    let runStart = -1, runVal = -2;
+    for (let i = 0; i < bassPc.length; i++) {
       const v = bassPc[i];
-      if (v < 0 || frameE[i] < thrE || bassEnergy[i] < this.percentileLocal(bassEnergy, 10)) continue;
-      const window = [bassPc[i - 3], bassPc[i - 2], bassPc[i - 1], v, bassPc[i + 1], bassPc[i + 2], bassPc[i + 3]];
-      const votes = window.filter(x => x === v).length;
-      if (votes >= 3) bassPcFinal[i] = v;
+      if (v >= 0 && runStart < 0) { runStart = i; runVal = v; }
+      const end = (i === bassPc.length - 1) || (bassPc[i + 1] !== v);
+      if (runStart >= 0 && end) {
+        if (i - runStart + 1 >= 2) {
+          for (let k = runStart; k <= i; k++) bassPc[k] = runVal;
+        } else {
+          for (let k = runStart; k <= i; k++) bassPc[k] = -1;
+        }
+        runStart = -1; runVal = -2;
+      }
     }
     
     const onsets = this.detectOnsets(frameE, hop, sr);
     
-    return { chroma, bassPc: bassPcFinal, frameE, onsets, hop, sr };
+    return { chroma, bassPc, frameE, onsets, hop, sr, spectralCentroids };
   }
 
   // ============================================
@@ -725,26 +999,44 @@ class ChordEngine {
       
       let isMinor = false;
       
-      // 🔥 NEW: If scores are close, use diatonic expectation!
-      const scoreDiff = Math.abs(majorScore - minorScore);
+      // 🔥 SPECIAL CASE: V chord in minor key (Harmonic minor)
+      // Check if this is degree V (5th) in a minor key
+      const degreeInScale = allowed.diatonic.indexOf(finalRoot);
+      const isVinMinor = key.minor && degreeInScale === 4; // v/V in minor
       
-      if (scoreDiff < 0.15) {
-        // Ambiguous - use key signature!
-        const expectedQuality = this.getExpectedQuality(finalRoot, key);
-        console.log(`   🎯 Ambiguous ${this.nameSharp(finalRoot)}: using diatonic quality (${expectedQuality})`);
-        isMinor = expectedQuality === 'minor';
-      } else if(majorScore > minorScore * 1.3) {
-        isMinor = false;
-      } else if(minorScore > majorScore * 1.3) {
-        isMinor = true;
-      } else {
-        // Still close - prefer diatonic
-        const expectedQuality = this.getExpectedQuality(finalRoot, key);
-        if (expectedQuality) {
-          isMinor = expectedQuality === 'minor';
-          console.log(`   🎯 Close call for ${this.nameSharp(finalRoot)}: using diatonic (${expectedQuality})`);
+      if (isVinMinor) {
+        // Check for leading tone (D# in Em = raised 7th)
+        const leadingTone = this.toPc(key.root + 11); // Major 7th
+        const leadingTonePresent = avgChroma[leadingTone] > 0.10;
+        
+        if (leadingTonePresent) {
+          console.log(`   🎼 Detected harmonic minor: V chord is MAJOR (leading tone present)`);
+          isMinor = false; // Force major V
         } else {
-          isMinor = minorScore >= majorScore * 0.9;
+          isMinor = minorScore > majorScore; // Natural minor → could be minor
+        }
+      } else {
+        // Normal logic
+        const scoreDiff = Math.abs(majorScore - minorScore);
+        
+        if (scoreDiff < 0.15) {
+          // Ambiguous - use diatonic expectation!
+          const expectedQuality = this.getExpectedQuality(finalRoot, key);
+          console.log(`   🎯 Ambiguous ${this.nameSharp(finalRoot)}: using diatonic quality (${expectedQuality})`);
+          isMinor = expectedQuality === 'minor';
+        } else if(majorScore > minorScore * 1.3) {
+          isMinor = false;
+        } else if(minorScore > majorScore * 1.3) {
+          isMinor = true;
+        } else {
+          // Still close - prefer diatonic
+          const expectedQuality = this.getExpectedQuality(finalRoot, key);
+          if (expectedQuality) {
+            isMinor = expectedQuality === 'minor';
+            console.log(`   🎯 Close call for ${this.nameSharp(finalRoot)}: using diatonic (${expectedQuality})`);
+          } else {
+            isMinor = minorScore >= majorScore * 0.9;
+          }
         }
       }
       
@@ -782,6 +1074,13 @@ class ChordEngine {
     const fifth = avgChroma[this.toPc(root + 7)] || 0;
     const rootStrength = avgChroma[root] || 0;
     
+    // 🔥 QUICK WIN #2: Power Chord Detection
+    // If both 3rds are very weak but 5th is strong → power chord
+    if (fifth > 0.15 && major3rd < 0.06 && minor3rd < 0.06 && rootStrength > 0.10) {
+      console.log(`   🎸 Power chord detected (R+5, no 3rd)`);
+      return 'power'; // Special marker for power chord
+    }
+    
     if (minor3rd < 0.05 && major3rd < 0.05) {
       return fifth > 0.2;
     }
@@ -798,7 +1097,7 @@ class ChordEngine {
     return minor3rd >= major3rd * 0.85;
   }
 
-  detectChordQuality(root, avgChroma, mode = 'balanced') {
+  detectChordQuality(root, avgChroma, mode = 'balanced', sensitivity = 1.0) {
     const results = [];
     
     for (const [templateName, template] of Object.entries(this.CHORD_TEMPLATES)) {
@@ -812,7 +1111,8 @@ class ChordEngine {
         const weight = template.weights[i];
         
         score += strength * weight;
-        if (strength > 0.12) present++;
+        // 🎚️ Lower threshold = easier to detect extensions
+        if (strength > (0.12 / sensitivity)) present++;
       }
       
       const maxScore = template.weights.reduce((sum, w) => sum + w, 0);
@@ -832,7 +1132,10 @@ class ChordEngine {
     
     results.sort((a, b) => b.score - a.score);
     
-    if (results.length > 0 && results[0].score > 0.4) {
+    // 🎚️ Apply sensitivity to acceptance threshold
+    const acceptanceThreshold = 0.4 / sensitivity;
+    
+    if (results.length > 0 && results[0].score > acceptanceThreshold) {
       return {
         label: results[0].label,
         confidence: results[0].score,
@@ -840,9 +1143,20 @@ class ChordEngine {
       };
     }
     
-    const isMinor = this.decideMajorMinorFromChroma(root, avgChroma);
+    // Fallback to simple major/minor/power
+    const quality = this.decideMajorMinorFromChroma(root, avgChroma);
+    
+    // Handle power chord
+    if (quality === 'power') {
+      return {
+        label: '5',
+        confidence: 0.8,
+        alternatives: []
+      };
+    }
+    
     return {
-      label: isMinor ? 'm' : '',
+      label: quality ? 'm' : '',
       confidence: 0.5,
       alternatives: []
     };
@@ -882,9 +1196,69 @@ class ChordEngine {
         continue;
       }
       
-      const quality = this.detectChordQuality(root, avg, mode);
+      // 🔥 QUICK WIN #3: Adaptive Threshold
+      // Calculate average spectral centroid for this chord
+      const startFi = ev.fi;
+      const endFi = ev.endFrame || Math.min(startFi + 10, feats.spectralCentroids.length - 1);
+      let avgCentroid = 0, count = 0;
+      
+      for (let i = startFi; i <= endFi && i < feats.spectralCentroids.length; i++) {
+        avgCentroid += feats.spectralCentroids[i];
+        count++;
+      }
+      avgCentroid = count > 0 ? avgCentroid / count : 2000;
+      
+      // Adapt sensitivity based on spectral content
+      // Bright sound (high centroid) → increase sensitivity (easier to detect extensions)
+      // Dark sound (low centroid) → decrease sensitivity (harder to hear extensions)
+      let adaptedSensitivity = decMul;
+      if (avgCentroid < 1500) {
+        adaptedSensitivity *= 0.8; // Dark → less sensitive
+        console.log(`   🎚️ Dark timbre (${avgCentroid.toFixed(0)}Hz) → sensitivity ×0.8`);
+      } else if (avgCentroid > 3000) {
+        adaptedSensitivity *= 1.2; // Bright → more sensitive
+        console.log(`   🎚️ Bright timbre (${avgCentroid.toFixed(0)}Hz) → sensitivity ×1.2`);
+      }
+      
+      const quality = this.detectChordQuality(root, avg, mode, adaptedSensitivity);
       const rootName = this.nameSharp(root);
       let label = rootName + quality.label;
+      
+      // 🔥 QUICK WIN #1: Extension Validation
+      // 9th requires 7th, otherwise it's add9
+      if (label.includes('9') && !label.includes('7') && !label.includes('maj')) {
+        label = label.replace('9', 'add9');
+        console.log(`   ✓ Corrected: 9 → add9 (no 7th present)`);
+      }
+      
+      // 13th should have 7th
+      if (label.includes('13') && !label.includes('7') && !label.includes('maj')) {
+        label = label.replace('13', 'add13');
+        console.log(`   ✓ Corrected: 13 → add13 (no 7th present)`);
+      }
+      
+      // 11th should have 7th (and ideally 9th)
+      if (label.includes('11') && !label.includes('7') && !label.includes('maj')) {
+        label = label.replace('11', 'add11');
+        console.log(`   ✓ Corrected: 11 → add11 (no 7th present)`);
+      }
+      
+      // 🔥 DISAMBIGUATION: dim7 vs m7b5
+      // dim7: symmetrical (all minor 3rds) - very rare
+      // m7b5: more common in jazz (ii° in minor)
+      if (label.includes('dim7')) {
+        const bb7 = this.toPc(root + 9);  // dim7 (bb7)
+        const b7 = this.toPc(root + 10);   // m7b5 (b7)
+        
+        const bb7Strength = avg[bb7] || 0;
+        const b7Strength = avg[b7] || 0;
+        
+        // If b7 is stronger than bb7, it's m7b5
+        if (b7Strength > bb7Strength * 1.2) {
+          label = label.replace('dim7', 'm7b5');
+          console.log(`   ✓ Disambiguated: dim7 → m7b5 (b7 stronger)`);
+        }
+      }
       
       ev.qualityConfidence = quality.confidence;
       
@@ -895,7 +1269,7 @@ class ChordEngine {
   }
 
   addInversionsIfNeeded(tl, feats, bassSens = 1.25) {
-    if (bassSens < 1.6) return tl;
+    // 🔥 Always check for inversions (removed sensitivity gate)
     
     return tl.map(ev => {
       const root = this.parseRoot(ev.label);
@@ -905,6 +1279,7 @@ class ChordEngine {
       const i0 = Math.max(0, ev.fi);
       const i1 = Math.min(bassPc.length - 1, ev.endFrame || ev.fi + 3);
       
+      // Vote for dominant bass note
       const bassVotes = new Array(12).fill(0);
       for (let i = i0; i <= i1; i++) {
         if (bassPc[i] >= 0) bassVotes[bassPc[i]]++;
@@ -913,11 +1288,21 @@ class ChordEngine {
       const dominantBass = bassVotes.indexOf(Math.max(...bassVotes));
       if (dominantBass < 0 || dominantBass === root) return ev;
       
-      const intervals = [0, 3, 4, 7, 10, 11];
+      // Check if bass is a chord tone
+      const isMinor = /m(?!aj)/.test(ev.label);
+      const has7 = /7/.test(ev.label);
+      const hasMaj7 = /maj7/.test(ev.label);
+      
+      let chordTones = isMinor ? [0, 3, 7] : [0, 4, 7];
+      if (has7 && !hasMaj7) chordTones.push(10);
+      if (hasMaj7) chordTones.push(11);
+      
       const bassInterval = this.toPc(dominantBass - root);
       
-      if (intervals.includes(bassInterval)) {
+      // Only add inversion if bass is actually a chord tone
+      if (chordTones.includes(bassInterval)) {
         const bassNote = this.nameSharp(dominantBass);
+        console.log(`   🎸 Inversion detected: ${ev.label} → ${ev.label}/${bassNote}`);
         return { ...ev, label: ev.label + '/' + bassNote };
       }
       
