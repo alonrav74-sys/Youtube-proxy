@@ -966,16 +966,45 @@ function buildFullLyricsSheet(isRTL) {
   const gateOffset = st.gateTime || 0;
   
   if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
-    // 🎸 Show chords only (no lyrics) - one per line
-    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;max-height:500px;scroll-behavior:smooth">';
+    // 🎸 Show chords only - use gaps in timeline for line breaks
+    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;overflow-y:auto;max-height:500px;scroll-behavior:smooth">';
     
-    for(const chord of st.timeline) {
+    const lines = [];
+    let currentLine = [];
+    const gapThreshold = 3.0; // seconds - break to new line if gap > 3s
+    
+    for(let i = 0; i < st.timeline.length; i++) {
+      const chord = st.timeline[i];
+      const nextChord = st.timeline[i + 1];
       const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
-      const timeStr = formatTime(chord.t);
-      html += `<div style="margin-bottom:12px;display:flex;align-items:baseline;gap:15px">`;
-      html += `<span class="chord-marker" data-time="${chord.t}" style="color:#38bdf8;font-weight:700;font-size:18px;cursor:pointer">${escapeHtml(chordLabel)}</span>`;
-      html += `<span style="color:#64748b;font-size:13px">${timeStr}</span>`;
-      html += `</div>`;
+      
+      currentLine.push({
+        label: chordLabel,
+        time: chord.t
+      });
+      
+      // Check if there's a gap to next chord
+      if(nextChord) {
+        const gap = nextChord.t - chord.t;
+        if(gap > gapThreshold) {
+          lines.push([...currentLine]);
+          currentLine = [];
+        }
+      }
+    }
+    
+    // Add last line
+    if(currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    
+    // Build HTML - one line per paragraph
+    for(const line of lines) {
+      html += '<div style="margin-bottom:20px;font-size:18px;line-height:1.5">';
+      for(const ch of line) {
+        html += `<span class="chord-marker" data-time="${ch.time}" style="color:#38bdf8;font-weight:700;cursor:pointer;margin-right:15px">${escapeHtml(ch.label)}</span>`;
+      }
+      html += '</div>';
     }
     
     html += '</div>';
