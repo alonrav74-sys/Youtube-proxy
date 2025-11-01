@@ -652,7 +652,7 @@ class ChordEngine {
       
       // 🔥 OLD WORKING BASS DETECTION - ACF on LPF signal
       const magsLP = new Float32Array(mags.length);
-      const fmax = 250;
+      const fmax = 150; // Changed from 250 to 150Hz for better bass detection
       for (let b = 1; b < mags.length; b++) {
         const f = hz(b, N);
         if (f <= fmax) magsLP[b] = mags[b];
@@ -670,8 +670,8 @@ class ChordEngine {
         }
       }
       
-      // ACF for F0 detection (LOWERED fmax for better bass detection)
-      const fmin = 40, fmax = 150; // Changed from 250 to 150Hz
+      // ACF for F0 detection
+      const fmin = 40;
       const f0minLag = Math.floor(sr / fmax), f0maxLag = Math.floor(sr / Math.max(1, fmin));
       let bestLag = -1, bestR = -1;
       const mean = yLP.reduce((s, v) => s + v, 0) / win;
