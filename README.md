@@ -1,157 +1,91 @@
-# 🎸 ChordFinder Pro v2.0 - AI Enhanced Edition
+# ChordFinder Pro - ULTIMATE Edition
 
-**גרסה 2.0 - אוקטובר 2025**  
-**דיוק 88-95% - שיפור של +33-47%!**
+🎸 **אקורדים מעל מילים בזמן אמת + דף נגינה מלא**
 
-## 🆕 חדש בגרסה 2.0
+## תכונות
 
-### 🎯 3 שיפורים מרכזיים:
+✅ **זיהוי אקורדים חכם** - HMM + Bass Detection  
+✅ **תמלול מילים** - YouTube (Groq Whisper)  
+✅ **סנכרון מדויק** - אקורד על מילה/בין מילים  
+✅ **דף חי** - אקורדים בשורות (gaps = line breaks)  
+✅ **RTL/LTR** - תמיכה מלאה בעברית  
+✅ **PWA** - התקנה ועבודה offline  
+✅ **Key-Constrained Detection** - זיהוי לפי סולם  
+✅ **Conservative Inversions** - threshold ×2.5  
+✅ **7th Detection** - בדיקה חכמה (אם A חזק → B7)  
 
-1. **🔍 זיהוי מפתח חכם (+15-20%)**
-   - 4 אלגוריתמים עם הצבעה משוקללת
-   - Template matching, peak analysis, progression analysis
-   - דיוק 85-90% בזיהוי מפתח
+## התקנה
 
-2. **🎸 תבניות הרמוניות (+8-12%)**
-   - 15 תבניות לאקורדים (triads, 7ths, extensions)
-   - זיהוי מדויק של sus, dim, aug
-   - Template matching לאיכות אקורד
+### שרת (Vercel/Netlify/GitHub Pages)
 
-3. **🥁 Beat Tracking (+10-15%)**
-   - זיהוי אוטומטי של onsets
-   - הערכת BPM וייצור beat grid
-   - Quantization לתזמון מושלם
+1. העלה את כל הקבצים:
+   - `index.html`
+   - `chord-engine-unified.js`
+   - `enhanced-key-detection.js`
+   - `manifest.json`
+   - `service-worker.js`
+   - `icons/` (כל התיקייה)
+
+2. פתח ב-HTTPS (חובה ל-PWA)
+
+3. בדפדפן mobile:
+   - Chrome: "Add to Home Screen"
+   - Safari: "Add to Home Screen"
+
+### מקומי (לפיתוח)
+
+```bash
+# התקן Python HTTP server
+python3 -m http.server 8000
+
+# או Node.js
+npx http-server -p 8000
+
+# פתח: http://localhost:8000
+```
+
+## איקונים
+
+כרגע יש SVG placeholder בתיקיית `icons/`.
+
+**ליצירת אייקונים ממשיים:**
+
+1. צור אייקון 512×512 PNG
+2. השתמש ב-[PWA Asset Generator](https://www.pwabuilder.com/imageGenerator):
+   - העלה את האייקון
+   - הורד את כל הגדלים
+   - החלף את הקבצים ב-`icons/`
+
+## דרישות מינימליות
+
+- דפדפן מודרני (Chrome 90+, Safari 14+, Firefox 88+)
+- HTTPS (חובה ל-PWA ו-Service Worker)
+- JavaScript מופעל
+
+## מבנה הפרויקט
+
+```
+chordfinder-pwa/
+├── index.html                  # עמוד ראשי
+├── chord-engine-unified.js     # מנוע זיהוי אקורדים
+├── enhanced-key-detection.js   # זיהוי סולם משופר
+├── manifest.json               # PWA manifest
+├── service-worker.js           # Service worker (offline)
+├── icons/                      # אייקונים
+│   ├── icon.svg               # SVG מקור
+│   └── icon-*.png             # (צריך ליצור)
+└── README.md                   # זה
+```
+
+## בנוי על ידי Alon
+
+**Powered by:**
+- Groq Whisper (transcription)
+- Harmonic Theory
+- Modulation Detection
+- HMM Tracking (Viterbi)
+- ACF Bass Detection
 
 ---
 
-## ✨ תכונות עיקריות
-
-### 🎯 זיהוי אקורדים מתקדם
-- **3 מצבי AI**: Fast / Balanced / Accurate
-- **Key-Constrained Detection** - זיהוי מוגבל למפתח
-- **סיווג אוטומטי**: אקורדים מבניים vs קישוטים
-- **ניתוח הרמוני**: דומיננטות משניות, השאלות מודאליות
-
-### 🎤 תמלול AI (Groq Whisper)
-- תמיכה בעברית ואנגלית
-- סנכרון מדויק מילה-אקורד
-- זיהוי RTL/LTR אוטומטי
-
-### 🎼 דף נגינה מקצועי
-- **אקורדים מעל מילים** - כמו Ultimate Guitar
-- **אקורדים בין מילים** - ברווחים
-- **קטעי מעבר** - שורות נפרדות [Instrumental]
-- תמיכה ב-Capo
-- Transpose (העלה/הורד חצי טון)
-
-### 🔄 אינטגרציה עם YouTube
-- חיפוש שירים
-- הורדה אוטומטית
-- תמלול ברקע
-
-## 📦 קבצים
-
-```
-ChordFinderPro-Final/
-├── index.html           → הממשק הראשי
-├── chord-engine.js      → מנוע זיהוי בסיסי
-├── chord-engine-pro.js  → מנוע AI מתקדם
-└── sync-engine.js       → סנכרון מילים-אקורדים
-```
-
-## 🚀 התקנה
-
-1. פתח את `index.html` בדפדפן
-2. בחר קובץ אודיו או הדבק קישור YouTube
-3. בחר מצב AI (Fast/Balanced/Accurate)
-4. לחץ "נתח"
-
-זהו! 🎉
-
-## 🎨 מצבי AI
-
-| מצב | מהירות | דיוק | מתאים ל |
-|-----|--------|------|---------|
-| **Fast** | ~2-5s | בסיסי | חזרות מהירות |
-| **Balanced** | ~5-10s | טוב | שימוש יומיומי ✅ |
-| **Accurate** | ~10-15s | מצוין | הקלטות מקצועיות |
-
-## 📊 סטטיסטיקות
-
-האפליקציה מציגה:
-- **High Confidence** - אחוז האקורדים בביטחון גבוה
-- **Structural vs Ornaments** - חלוקה לפי סוג
-- **Secondary Dominants** - דומיננטות משניות
-- **Modal Borrowings** - השאלות מודאליות
-- **Key Fixes** - אקורדים שתוקנו ע"י Key Constraint
-
-## 🎹 Circle of Fifths
-
-מציג את ה-7 אקורדים הדיאטוניים בסולם:
-- **Major**: I, ii, iii, IV, V, vi, vii°
-- **Minor**: i, ii°, III, iv, v, VI, VII
-
-## 🔧 טיפים
-
-### זיהוי איכותי:
-1. השתמש ב-**Balanced mode** כברירת מחדל
-2. אם יש רעש - נסה **Accurate mode**
-3. התאם את **רגישות הבס** (1.0-2.0)
-
-### דף נגינה:
-1. השתמש ב-**Capo** להתאמת סולם
-2. **Transpose** לשינוי מפתח
-3. לחץ על **הסולם** להחלפת Major/Minor
-
-### YouTube:
-1. חפש שיר או הדבק קישור
-2. ההורדה והתמלול מתבצעים ברקע
-3. המתן ל-✓ ירוק
-
-## 🐛 פתרון בעיות
-
-**אקורדים לא מדויקים?**
-- העלה את מצב ה-AI ל-Accurate
-- התאם רגישות בס/הרחבות
-
-**אין תמלול?**
-- וודא חיבור אינטרנט
-- בדוק שהשרת פעיל
-- חפש בקונסול (F12) שגיאות
-
-**אקורדים לא מופיעים בדף?**
-- רענן דפדפן (Ctrl+Shift+R)
-- בדוק טאב "דף נגינה"
-
-## 💡 תכונות מתקדמות
-
-### Harmonic Analysis:
-- זיהוי אקורדים ממוקד-מפתח
-- סיווג קישוטים (passing, neighbor)
-- זיהוי V7/X (דומיננטות משניות)
-- זיהוי iv, bVII, bVI (השאלות מודאליות)
-
-### Chord Display:
-- אקורדים **מעל** מילים
-- רווחים דינמיים בין מילים
-- שורות נפרדות למעברים
-- תמיכה מלאה ב-RTL (עברית)
-
-## 📜 שינויים בגרסה זו
-
-### v1.0 - אוקטובר 2025
-- ✅ Key-Constrained Detection
-- ✅ סיווג אקורדים (structural/ornament)
-- ✅ אקורדים בין מילים ברווחים
-- ✅ קטעי מעבר בשורות נפרדות
-- ✅ 3 מצבי AI (Fast/Balanced/Accurate)
-- ✅ תיקון Circle of Fifths
-- ✅ סטטיסטיקות מתקדמות
-
-## 👨‍💻 פותח על ידי
-
-**Alon** - באהבה עם Claude.ai 🤖
-
----
-
-**תהנה מהנגינה!** 🎸✨
+**Built with ❤️ by Claude & Alon**
