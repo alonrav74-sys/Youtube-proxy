@@ -35,9 +35,9 @@ class ChordEngine {
       madd9: { intervals: [0, 3, 7, 14], weights: [1.0, 0.9, 0.8, 0.6], label: 'madd9' },
       add11: { intervals: [0, 4, 7, 17], weights: [1.0, 0.9, 0.8, 0.5], label: 'add11' },
       
-      maj7: { intervals: [0, 4, 7, 11], weights: [1.0, 0.9, 0.8, 0.75], label: 'maj7' },
-      dom7: { intervals: [0, 4, 7, 10], weights: [1.0, 0.9, 0.8, 0.75], label: '7' },
-      m7: { intervals: [0, 3, 7, 10], weights: [1.0, 0.9, 0.8, 0.75], label: 'm7' },
+      maj7: { intervals: [0, 4, 7, 11], weights: [1.0, 0.9, 0.8, 0.85], label: 'maj7' },
+      dom7: { intervals: [0, 4, 7, 10], weights: [1.0, 0.9, 0.8, 0.85], label: '7' },
+      m7: { intervals: [0, 3, 7, 10], weights: [1.0, 0.9, 0.8, 0.85], label: 'm7' },
       dim7: { intervals: [0, 3, 6, 9], weights: [1.0, 0.9, 0.8, 0.75], label: 'dim7' },
       m7b5: { intervals: [0, 3, 6, 10], weights: [1.0, 0.9, 0.8, 0.75], label: 'm7b5' },
       dom9: { intervals: [0, 4, 7, 10, 14], weights: [1.0, 0.9, 0.8, 0.7, 0.6], label: '9' },
@@ -670,8 +670,9 @@ class ChordEngine {
         }
       }
       
-      // ACF for F0 detection
-      const fmin = 40, f0minLag = Math.floor(sr / fmax), f0maxLag = Math.floor(sr / Math.max(1, fmin));
+      // ACF for F0 detection (LOWERED fmax for better bass detection)
+      const fmin = 40, fmax = 150; // Changed from 250 to 150Hz
+      const f0minLag = Math.floor(sr / fmax), f0maxLag = Math.floor(sr / Math.max(1, fmin));
       let bestLag = -1, bestR = -1;
       const mean = yLP.reduce((s, v) => s + v, 0) / win;
       let denom = 0;
@@ -1134,6 +1135,33 @@ class ChordEngine {
     
     // 🎚️ Apply sensitivity to acceptance threshold
     const acceptanceThreshold = 0.4 / sensitivity;
+    
+    // 🔥 EXPLICIT 7th CHECK: If triad wins but 7th is strong, prefer 7th chord
+    if (results.length >= 2) {
+      const best = results[0];
+      const second = results[1];
+      
+      // Check if best is triad and second is 7th version
+      const isBestTriad = !best.label.includes('7') && !best.label.includes('9');
+      const isSecond7th = second.label.includes('7') && !second.label.includes('9');
+      
+      if (isBestTriad && isSecond7th && second.score > acceptanceThreshold * 0.8) {
+        // Check if 7th note is STRONG in chroma
+        const seventh = isSecond7th && second.label.includes('maj7') ? 11 : 10;
+        const seventhPc = this.toPc(root + seventh);
+        const seventhStrength = avgChroma[seventhPc] || 0;
+        
+        // If 7th is strong (> 0.15), prefer 7th chord over triad
+        if (seventhStrength > 0.15 / sensitivity) {
+          console.log(`   🎵 Prefer 7th: ${best.label || 'major'} → ${second.label} (7th strength: ${seventhStrength.toFixed(3)})`);
+          return {
+            label: second.label,
+            confidence: second.score,
+            alternatives: [best, ...results.slice(2, 3)]
+          };
+        }
+      }
+    }
     
     if (results.length > 0 && results[0].score > acceptanceThreshold) {
       return {
