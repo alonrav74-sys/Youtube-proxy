@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChordFinderPro 🎸 AI Enhanced</title>
+  <meta name="theme-color" content="#0b1022" />
+  <style>
+    :root{--bg:#0b1022;--panel:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--card:#0a1324;--border:#1b2333;--brand:#22c55e;--accent:#38bdf8;--alert:#f59e0b}
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(160deg,var(--bg),#0a0f1c);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);direction:rtl}
+    .wrap{max-width:1200px;margin:auto;padding:18px}
+    h1{margin:6px 0 10px;font-size:24px}
+    .muted{color:var(--muted);font-size:14px}
+    .panel{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:14px;margin-top:12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    input[type="file"], select, button, input[type="number"], input[type="text"]{padding:10px 14px;border-radius:12px;border:1px solid #223;background:#0b1221;color:#cfe3ff;appearance:none;font-weight:700;cursor:pointer}
+    input[type="text"]{width:100%;max-width:500px;font-weight:400}
+    .badge{display:inline-flex;gap:6px;align-items:center;background:#0b1221;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px}
+    .badge.ai{border-color:#23664d;background:#0d2e1f;color:#d7ffe6}
+    .badge.pro{border-color:#664d23;background:#2e1f0d;color:#ffd7a3}
+    .badge.whisper{border-color:#38bdf8;background:#0a1f2e;color:#bae6fd}
+    .badge.ensemble{border-color:#8b5cf6;background:#1e1b4b;color:#ddd6fe}
+    .badge.ultimate{border-color:#f59e0b;background:#2e1f0d;color:#fbbf24}
+    .live{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:18px;margin-top:10px}
+    .live .title{color:#a9b4c8;font-size:13px}
+    .live .ch{font-weight:800;font-size:42px}
+    .live .func{font-size:14px;color:#38bdf8;margin-top:4px}
+    .live .lyric{font-size:18px;color:#cbd5e1;margin-top:12px;font-style:italic;direction:rtl;line-height:1.6;background:#0a1324;padding:10px;border-radius:8px}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #2a3d55;margin:2px 4px;background:#0b1221}
+    .ok{border-color:#1f5f3f;color:#d7ffe6;background:#0d2e1f}
+    .err{border-color:#5f2323;color:#ffe0e0;background:#3f1d1d}
+    .warn{border-color:#8a6a1f;color:#fff0d9;background:#3a2a0c}
+    .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:sp 1s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:#0b1221;border:1px solid #1f2a40;font-size:12px}
+    .chip .dot{width:6px;height:6px;border-radius:50%;background:#22c55e}
+    .chip.ornament{border-color:#8a6a1f;background:#2a2010}
+    .chip.structural{border-color:#1f5f3f;background:#0d2e1f}
+    .sliderRow{display:flex;align-items:center;gap:10px;margin-top:8px}
+    input[type="range"]{width:220px}
+    .tag{font-size:12px;color:#cbd5e1;border:1px solid #1f2a40;padding:4px 8px;border-radius:999px;background:#0b1221}
+    .analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:12px}
+    .analysis-card{background:#0b1221;border:1px solid #1f2a40;border-radius:12px;padding:12px}
+    .analysis-card h3{margin:0 0 8px 0;font-size:14px;color:#38bdf8}
+    .analysis-card .value{font-size:20px;font-weight:700;color:#22c55e}
+    .yt-result{display:flex;gap:10px;padding:10px;border:1px solid #1f2a40;border-radius:10px;margin-top:8px;align-items:center;cursor:pointer;transition:all 0.2s}
+    .yt-result:hover{background:#12203a;border-color:#38bdf8}
+    .yt-result.selected{background:#164e3a;border-color:#22c55e}
+    .yt-result img.thumb{width:120px;height:68px;object-fit:cover;border-radius:8px;flex-shrink:0}
+    .yt-result .info{flex:1;min-width:0}
+    .yt-result .title{font-weight:700;margin-bottom:4px;color:#e5e7eb;word-wrap:break-word;white-space:normal;line-height:1.3}
+    .yt-result .channel{font-size:12px;color:#94a3b8}
+    .yt-results{max-height:400px;overflow-y:auto}
+    .tabs{display:flex;gap:4px;margin-bottom:12px}
+    .tab{padding:8px 16px;border-radius:8px;background:#0b1221;border:1px solid #1f2a40;cursor:pointer;transition:all 0.2s}
+    .tab.active{background:#0d2e1f;border-color:#22c55e;color:#d7ffe6}
+    .tab:hover{border-color:#38bdf8}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    .info-box{background:#1f2a40;padding:10px;border-radius:8px;margin-top:8px;font-size:13px;color:#cbd5e1}
+    .info-box.success{background:#0d2e1f;border:1px solid #22c55e}
+    /* 🎸 Ultimate Guitar Style - Dark Mode */
+    .synced-sheet{
+      background:#0a1324;
+      color:#e5e7eb;
+      padding:24px;
+      border-radius:12px;
+      font-family:'Courier New',Courier,monospace;
+      line-height:1.8;
+      overflow-x:auto;
+      max-width:100%;
+      white-space:pre;
+      border:1px solid #1f2a40;
+    }
+    .synced-sheet.rtl{direction:rtl;text-align:right}
+    .synced-sheet.ltr{direction:ltr;text-align:left}
+    
+    /* Chord line - light blue like Ultimate Guitar */
+    .chord-line{
+      color:#38bdf8;
+      font-weight:700;
+      font-size:15px;
+      margin:0;
+      padding:0;
+      white-space:pre;
+      font-family:'Courier New',Courier,monospace;
+      line-height:1.3;
+      letter-spacing:0.5px;
+    }
+    
+    /* Lyric line - white text */
+    .lyric-line{
+      color:#ffffff;
+      font-size:16px;
+      margin:0 0 20px 0;
+      padding:0;
+      white-space:pre;
+      font-family:'Courier New',Courier,monospace;
+      line-height:1.3;
+      letter-spacing:0.3px;
+    }
+    
+    /* 🎸 Live Sheet - Ultimate Guitar Style */
+    .lyrics-container{
+      display:block;
+      width:100%;
+      background:#0a1324;
+      padding:20px;
+      border-radius:12px;
+      border:1px solid #1f2a40;
+      max-height:500px;
+      overflow-y:auto;
+      overflow-x:auto;
+      scroll-behavior:smooth;
+    }
+    .lyric-line-container{display:block;margin-bottom:20px;white-space:pre;font-family:'Courier New',Courier,monospace}
+    
+    /* Chord positioning slots */
+    .word-slot{display:inline-block;position:relative;vertical-align:top;margin:0;white-space:pre;font-family:'Courier New',Courier,monospace}
+    
+    /* Chords - light blue */
+    .chord-slot{
+      display:block;
+      color:#38bdf8;
+      font-weight:700;
+      font-size:15px;
+      line-height:1.3;
+      min-height:20px;
+      text-align:left;
+      transition:all 0.3s;
+      letter-spacing:0.5px;
+    }
+    .chord-slot.active{
+      background:#1e3a5f;
+      color:#60d5fd;
+      border-radius:4px;
+      padding:2px 6px;
+      transform:scale(1.1);
+      animation:chordPop 0.3s ease-out;
+    }
+    
+    /* Words - white */
+    .word-text{
+      display:block;
+      color:#ffffff;
+      font-size:16px;
+      line-height:1.3;
+      text-align:left;
+      letter-spacing:0.3px;
+    }
+    .word-slot.spacer .word-text{color:#94a3b8;font-size:15px}
+    
+    @keyframes chordPop{
+      0%{transform:scale(0.8);opacity:0}
+      50%{transform:scale(1.2)}
+      100%{transform:scale(1);opacity:1}
+    }
+    
+    .mode-selector{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .mode-btn{flex:1;min-width:120px;padding:10px 12px;border-radius:10px;border:2px solid #2a3d55;background:#0b1221;color:#cbd5e1;cursor:pointer;transition:all 0.3s;text-align:center;font-size:13px;font-weight:700}
+    .mode-btn:hover{border-color:#38bdf8;transform:translateY(-2px)}
+    .mode-btn.active{border-color:#22c55e;background:#0d2e1f;color:#d7ffe6}
+    .mode-btn small{display:block;font-size:11px;margin-top:4px;opacity:0.8;font-weight:400}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎵 Chord Finder Pro 🎯
+      <span class="badge pro">Professional</span>
+      <span class="badge whisper">Groq Whisper</span>
+      <span class="badge ultimate">ULTIMATE Edition</span>
+    </h1>
+    <div class="muted">
+      אקורדים מעל מילים בזמן אמת + דף נגינה מלא. RTL/LTR אוטומטי. 🎼 Key-Constrained Detection<br>
+      <small style="opacity:0.7;font-size:11px">
+        Powered by <strong>Groq Whisper</strong> • 
+        Harmonic Theory • 
+        Modulation Detection •
+        Built by <strong>Alon</strong>
+      </small>
+    </div>
+
+    <section class="panel">
+      <div class="tabs">
+        <div class="tab active" data-tab="file">📁 קובץ מקומי</div>
+        <div class="tab" data-tab="youtube">🎬 יוטיוב</div>
+        <div class="tab" data-tab="sheet">📝 דף נגינה</div>
+      </div>
+
+      <div id="fileTab" class="tab-content active">
+        <div class="row">
+          <input id="file" type="file" accept="audio/*,video/*" />
+        </div>
+      </div>
+
+      <div id="youtubeTab" class="tab-content">
+        <div class="info-box success">
+          ⚡ סנכרון מדויק: אקורד על מילה/בין מילים לפי הזמן המדויק.
+        </div>
+        
+        <div class="row" style="margin-top:12px">
+          <input id="ytSearch" type="text" placeholder='חפש שיר (למשל: "Leonard Cohen Hallelujah")' />
+          <button id="ytSearchBtn">🔍 חפש</button>
+        </div>
+        
+        <div id="ytResults" class="yt-results" style="display:none"></div>
+        
+        <div style="margin-top:12px">
+          <div style="margin-bottom:8px;font-weight:700">או הדבק קישור יוטיוב:</div>
+          <div class="row">
+            <input id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." style="flex:1" />
+            <button id="ytUrlBtn">✓ השתמש</button>
+          </div>
+        </div>
+        
+        <div id="ytStatus" class="pill" style="display:none;margin-top:8px"></div>
+        <div id="whisperStatus" class="pill warn" style="display:none;margin-top:8px">
+          <span class="spin"></span> 🎤 Groq Whisper עובד ברקע...
+        </div>
+      </div>
+
+      <div id="sheetTab" class="tab-content">
+        <h3>📋 דף נגינה מקצועי</h3>
+        <div id="fullSheet" class="synced-sheet">—</div>
+        
+        <h3 style="margin-top:16px">🎤 תמלול מלא</h3>
+        <div id="fullTranscript" style="max-height:300px;overflow:auto;background:#0b1221;padding:12px;border-radius:8px;white-space:pre-wrap;font-family:Arial">—</div>
+        
+        <div class="row" style="margin-top:12px">
+          <button id="exportBtn">💾 ייצא ל-ChordPro</button>
+          <button id="copyBtn">📋 העתק דף</button>
+        </div>
+      </div>
+
+      <!-- 🆕 AI Mode Selector -->
+      <div style="margin-top:16px">
+        <h3 style="margin:0 0 8px 0;font-size:14px;color:#38bdf8">🤖 מצב זיהוי AI</h3>
+        <div class="mode-selector">
+          <button class="mode-btn active" data-mode="balanced">
+            ⚖️ Balanced
+            <small>+ Key Constraint<br>~5-10 שניות</small>
+          </button>
+          <button class="mode-btn" data-mode="accurate">
+            🎯 Accurate
+            <small>+ Harmonic Logic<br>~10-15 שניות</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <label>מצב זיהוי:
+          <select id="extMode">
+            <option value="basic">בסיסי</option>
+            <option value="jazz" selected>ג'אז (7/9/11/13)</option>
+            <option value="pro">מקצועי</option>
+          </select>
+        </label>
+        <label>קוואנטה:
+          <select id="quant">
+            <option value="4" selected>1/4</option>
+            <option value="8">1/8</option>
+          </select>
+        </label>
+        <label>🎸 קאפו:
+          <input id="capo" type="number" value="0" min="0" max="11" style="width:80px" />
+        </label>
+        <button id="analyzeBtn">נתח</button>
+        <button id="playBtn" disabled>🎧 הפעל</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <span class="badge">BPM: <b id="bpm">—</b></span>
+        <span class="badge">משך: <b id="dur">—</b></span>
+        <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
+          סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
+        </span>
+        <button onclick="transposeDown()" style="padding:4px 10px;font-size:12px" title="הורד חצי טון">🎵↓</button>
+        <button onclick="transposeUp()" style="padding:4px 10px;font-size:12px" title="העלה חצי טון">↑🎵</button>
+        <span class="badge">מצב: <b id="modeBadge">—</b></span>
+        <span id="aiBadge" class="badge ai" style="display:none">🎼 Key-Constrained</span>
+      </div>
+
+      <div id="status" class="pill ok" style="display:none"></div>
+      <div id="error" class="pill err" style="display:none"></div>
+
+      <div class="sliderRow">
+        <span class="tag">×<span id="decMulTxt">1.00</span></span>
+        <input id="decSens" type="range" min="0.5" max="2.0" step="0.05" value="1.00" />
+        <span style="color:#94a3b8;font-size:12px">רגישות לקישוטים (7th/9th/11th/13th)</span>
+      </div>
+
+      <div class="row">
+        <span id="gateChip" class="chip warn" style="display:none"><span class="dot"></span>מחכה לפריטה...</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ניתוח הרמוני מתקדם</h2>
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <h3>אקורדים מבניים</h3>
+          <div class="value" id="structuralCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>קישוטים</h3>
+          <div class="value" id="ornamentCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>דומיננט משני</h3>
+          <div class="value" id="secDomCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>השאלות מודאליות</h3>
+          <div class="value" id="modalBorrowCount">—</div>
+        </div>
+      </div>
+      
+      <!-- 🆕 Confidence Booster Stats -->
+      <div id="confidenceStats" style="display:none;margin-top:16px">
+        <h3 style="margin:0 0 8px 0;font-size:14px;color:#f59e0b">🔥 ULTIMATE Stats</h3>
+        <div class="analysis-grid">
+          <div class="analysis-card" style="border-color:#f59e0b">
+            <h3>Extensions</h3>
+            <div class="value" style="font-size:16px"><span id="highConfRate">—</span></div>
+          </div>
+          <div class="analysis-card" style="border-color:#f59e0b">
+            <h3>Inversions</h3>
+            <div class="value" style="font-size:16px"><span id="ornamentCountAdv">—</span></div>
+          </div>
+          <div class="analysis-card" style="border-color:#f59e0b">
+            <h3>Modulations</h3>
+            <div class="value" style="font-size:16px"><span id="keyFixCount">—</span></div>
+          </div>
+          <div class="analysis-card" style="border-color:#f59e0b">
+            <h3>High Confidence</h3>
+            <div class="value" style="font-size:16px"><span id="secDomDetected">—</span></div>
+          </div>
+        </div>
+      </div>
+      
+      <h3 style="margin-top:16px">🎯 אקורדים טבעיים בסולם (Circle of Fifths)</h3>
+      <div id="circleOfFifths" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">—</div>
+    </section>
+
+    <section class="panel">
+      <h2>תצוגה חיה</h2>
+      <audio id="player" controls preload="auto" crossorigin="anonymous" style="width:100%"></audio>
+      <div class="live">
+        <div style="flex:1">
+          <div class="title">האקורד כרגע</div>
+          <div class="ch" id="liveChord">—</div>
+          <div class="func" id="liveFunction">—</div>
+          <div class="lyric" id="liveLyric">—</div>
+        </div>
+        <div style="text-align:left">
+          <span id="ornamentChip" class="chip ornament" style="display:none">קישוט</span>
+          <span id="structuralChip" class="chip structural" style="display:none">מבני</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>📝 דף נגינה — זמן אמת</h2>
+      <div id="liveSheet" class="synced-sheet">—</div>
+      <div class="row" style="margin-top:8px">
+        <button id="resetSheet">אפס דף</button>
+      </div>
+    </section>
+  </div>
+
+<!-- ✅ Load engines - UNIFIED Edition -->
+<script src="chord-engine-unified.js?v=1762034738794600981"></script>
+<script src="sync-engine.js?v=1762032033216172320"></script>
+
+<!-- Main application code - IDENTICAL to original -->
+<script>
+console.log('🎸 ChordFinder Pro loading...');
+
+// Check engines loaded
+if(typeof ChordEngine === 'undefined') {
+  alert('❌ שגיאה: chord-engine.js לא נטען!\n\nוודא שהקובץ באותה תיקייה.');
+}
+
+// Use unified ChordEngine (includes Pro filtering)
+const engine = new ChordEngine();
+const SERVER = window.location.origin;
+
+let selectedYouTubeVideo = null;
+let currentTab = 'file';
+let currentAIMode = 'balanced';
+let WHISPER_SEGMENTS = [];
+let WHISPER_WORDS = [];
+let WHISPER_TEXT = '';
+let WHISPER_RUNNING = false;
+let DETECTED_LANGUAGE = 'en';
+let LIVE_STREAM = [];
+let LIVE_POINTER = 0;
+
+const fileEl=document.getElementById('file');
+const analyzeBtn=document.getElementById('analyzeBtn');
+const playBtn=document.getElementById('playBtn');
+const statusEl=document.getElementById('status');
+const errorEl=document.getElementById('error');
+const whisperStatusEl=document.getElementById('whisperStatus');
+const fullTranscriptEl=document.getElementById('fullTranscript');
+const fullSheetEl=document.getElementById('fullSheet');
+const gateChip=document.getElementById('gateChip');
+const player=document.getElementById('player');
+const bpmEl=document.getElementById('bpm');
+const durEl=document.getElementById('dur');
+const capoEl=document.getElementById('capo');
+const keyBadge=document.getElementById('keyBadge');
+const modeBadge=document.getElementById('modeBadge');
+const liveChordEl=document.getElementById('liveChord');
+const liveFunctionEl=document.getElementById('liveLyric');
+const liveLyricEl=document.getElementById('liveLyric');
+const liveSheetEl=document.getElementById('liveSheet');
+const resetSheetBtn=document.getElementById('resetSheet');
+const exportBtn=document.getElementById('exportBtn');
+const copyBtn=document.getElementById('copyBtn');
+const aiBadge=document.getElementById('aiBadge');
+const decSensEl=document.getElementById('decSens');
+const decMulTxt=document.getElementById('decMulTxt');
+const structuralCountEl=document.getElementById('structuralCount');
+const ornamentCountEl=document.getElementById('ornamentCount');
+const secDomCountEl=document.getElementById('secDomCount');
+const modalBorrowCountEl=document.getElementById('modalBorrowCount');
+const ornamentChip=document.getElementById('ornamentChip');
+const structuralChip=document.getElementById('structuralChip');
+const ytSearchEl=document.getElementById('ytSearch');
+const ytSearchBtn=document.getElementById('ytSearchBtn');
+const ytResultsEl=document.getElementById('ytResults');
+const ytStatusEl=document.getElementById('ytStatus');
+const ytUrlEl=document.getElementById('ytUrl');
+const ytUrlBtn=document.getElementById('ytUrlBtn');
+
+decSensEl.oninput=()=>decMulTxt.textContent=Number(decSensEl.value).toFixed(2);
+
+// 🆕 AI Mode Selection
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentAIMode = this.dataset.mode;
+    console.log(`🤖 AI Mode set to: ${currentAIMode}`);
+  });
+});
+
+function initTabs() {
+  console.log('🔧 initTabs called');
+  const tabs = document.querySelectorAll('.tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+  console.log('🔧 Found tabs:', tabs.length, 'contents:', tabContents.length);
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      const tabName = this.getAttribute('data-tab');
+      currentTab = tabName;
+      tabs.forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      tabContents.forEach(content => content.classList.remove('active'));
+      const targetContent = document.getElementById(tabName + 'Tab');
+      if(targetContent) targetContent.classList.add('active');
+      if(tabName === 'sheet') refreshSheetTabView();
+    });
+  });
+}
+initTabs();
+
+async function runWhisperInBackground(videoId) {
+  if(WHISPER_RUNNING) return;
+  WHISPER_RUNNING = true;
+  whisperStatusEl.style.display = 'inline-flex';
+  whisperStatusEl.textContent = '⏳ Groq Whisper...';
+  try {
+    const r = await fetch(`${SERVER}/api/groq-transcribe`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ videoId: videoId })
+    });
+    if(!r.ok) throw new Error(`Failed: ${r.status}`);
+    const data = await r.json();
+    if(data.success) {
+      WHISPER_SEGMENTS = data.segments || [];
+      WHISPER_WORDS = data.words || [];
+      WHISPER_TEXT = data.text || '';
+      DETECTED_LANGUAGE = data.language || 'en';
+      whisperStatusEl.textContent = '✓ Groq Whisper';
+      whisperStatusEl.classList.remove('warn');
+      whisperStatusEl.classList.add('ok');
+      
+      // 🔥 Rebuild live sheet with new lyrics!
+      if(window.__STATE && window.__STATE.timeline) {
+        syncChordsWithLyrics();
+        displayWhisperResult();
+        refreshSheetTabView();
+        
+        const isRTL = DETECTED_LANGUAGE === 'he' || DETECTED_LANGUAGE === 'Hebrew';
+        buildFullLyricsSheet(isRTL);
+      }
+      
+      setTimeout(() => whisperStatusEl.style.display = 'none', 2500);
+    } else {
+      throw new Error(data.error || 'Failed');
+    }
+  } catch(e) {
+    console.error('Error:', e);
+    whisperStatusEl.textContent = '❌ שגיאה';
+    whisperStatusEl.classList.add('err');
+    setTimeout(() => whisperStatusEl.style.display = 'none', 4000);
+  } finally {
+    WHISPER_RUNNING = false;
+  }
+}
+
+function syncChordsWithLyrics(){
+  // Legacy function - no longer needed
+  // buildFullLyricsSheet() handles karaoke now
+  LIVE_POINTER = 0;
+}
+
+function displayWhisperResult() {
+  if(!WHISPER_TEXT || WHISPER_TEXT.trim() === '') {
+    fullTranscriptEl.textContent = '💬 תמלול לא זמין';
+    return;
+  }
+  const lang = DETECTED_LANGUAGE === 'he' ? 'עברית' : (DETECTED_LANGUAGE === 'en' ? 'English' : DETECTED_LANGUAGE);
+  fullTranscriptEl.textContent = `🎤 [Groq Whisper - ${lang}]\n\n${WHISPER_TEXT}`;
+}
+
+ytSearchBtn.onclick = async () => {
+  const query = ytSearchEl.value.trim();
+  if (!query) return showYtStatus('הזן שם שיר', 'warn');
+  showYtStatus('מחפש...', 'warn');
+  ytResultsEl.style.display = 'none';
+  try {
+    const r = await fetch(`${SERVER}/api/yt?q=${encodeURIComponent(query)}`);
+    const data = await r.json();
+    if (!data || !data.length) return showYtStatus('לא נמצא', 'warn');
+    displayYouTubeResults(data.map(v => ({
+      videoId: v.id, title: v.title, author: v.author || v.channel, thumbnail: v.thumbnail
+    })));
+    ytStatusEl.style.display = 'none';
+    ytResultsEl.style.display = 'block';
+  } catch (e) {
+    showYtStatus('שגיאה בחיפוש', 'err');
+  }
+};
+ytSearchEl.onkeydown = (e) => { if(e.key === 'Enter') ytSearchBtn.click(); };
+
+ytUrlBtn.onclick = async () => {
+  const url = ytUrlEl.value.trim();
+  if(!url) return showYtStatus('הזן קישור', 'warn');
+  const videoId = extractYouTubeId(url);
+  if(!videoId) return showYtStatus('קישור לא תקין', 'err');
+  selectedYouTubeVideo = { id: videoId, title: 'YouTube Video', url: `https://www.youtube.com/watch?v=${videoId}` };
+  showYtStatus('✓ נבחר', 'ok');
+  ytResultsEl.style.display = 'none';
+};
+
+function extractYouTubeId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for(const pattern of patterns) {
+    const match = url.match(pattern);
+    if(match) return match[1];
+  }
+  return null;
+}
+
+function showYtStatus(msg, type) {
+  ytStatusEl.textContent = msg;
+  ytStatusEl.className = `pill ${type}`;
+  ytStatusEl.style.display = 'inline-flex';
+}
+
+function displayYouTubeResults(results) {
+  ytResultsEl.innerHTML = '';
+  results.forEach((video) => {
+    if(!video.videoId) return;
+    const div = document.createElement('div');
+    div.className = 'yt-result';
+    div.innerHTML = `
+      <img class="thumb" src="${video.thumbnail}" alt="" />
+      <div class="info">
+        <div class="title">${escapeHtml(video.title || 'Unknown')}</div>
+        <div class="channel">${escapeHtml(video.author || 'Unknown')}</div>
+      </div>
+    `;
+    div.onclick = () => {
+      document.querySelectorAll('.yt-result').forEach(r => r.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedYouTubeVideo = { id: video.videoId, title: video.title, url: `https://www.youtube.com/watch?v=${video.videoId}` };
+      ytUrlEl.value = selectedYouTubeVideo.url;
+      showYtStatus('✓ נבחר', 'ok');
+    };
+    ytResultsEl.appendChild(div);
+  });
+}
+
+function escapeHtml(text) { 
+  const div = document.createElement('div'); 
+  div.textContent = text; 
+  return div.innerHTML; 
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function showAnalyzing(stepText){ 
+  statusEl.innerHTML='<span class="spin"></span> '+stepText; 
+  statusEl.className='pill warn'; 
+  statusEl.style.display='inline-flex'; 
+}
+function ok(msg){ 
+  statusEl.textContent=msg; 
+  statusEl.className='pill ok'; 
+  statusEl.style.display='inline-flex'; 
+}
+function err(msg){ 
+  errorEl.textContent=msg; 
+  errorEl.style.display='inline-flex'; 
+}
+function hideAlerts(){ 
+  statusEl.style.display='none'; 
+  errorEl.style.display='none'; 
+  gateChip.style.display='none'; 
+}
+
+function parseRoot(label){ 
+  const m=label?.match?.(/^([A-G](?:#|b)?)/); 
+  if(!m) return -1; 
+  const nm=m[1].replace('b','#'); 
+  return engine.NOTES_SHARP.indexOf(nm); 
+}
+
+function applyCapoToLabel(label, capo){
+  capo = parseInt(capo);
+  if(!capo || capo===0) return label;
+  const m=label.match(/^([A-G](?:#|b)?)(.*)$/); 
+  if(!m) return label;
+  const idx=engine.NOTES_SHARP.indexOf(m[1].replace('b','#')); 
+  if(idx<0) return label;
+  return engine.nameFlat(engine.toPc(idx - capo))+(m[2]||'');
+}
+
+function sanitizeLabel(lbl){ 
+  if(!lbl) return lbl; 
+  return lbl.replace(/[^A-Ga-g#bm79sus246()/\s+altdim]/g,'').trim(); 
+}
+
+// 🆕 Use ChordEnginePro.detect() with AI mode!
+analyzeBtn.onclick=async()=>{
+  hideAlerts(); 
+  aiBadge.style.display='none';
+  document.getElementById('confidenceStats').style.display='none';
+  
+  // 🔥 CLEAR EVERYTHING COMPLETELY!
+  liveChordEl.textContent='—'; 
+  liveFunctionEl.textContent='—'; 
+  liveLyricEl.textContent='—';
+  liveSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">⏳ מנתח...</div>';
+  fullSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">⏳ מנתח...</div>';
+  fullTranscriptEl.textContent='⏳ ממתין...';
+  
+  // Clear old state
+  LIVE_STREAM=[]; 
+  LIVE_POINTER=0;
+  WHISPER_SEGMENTS = [];
+  WHISPER_WORDS = [];
+  WHISPER_TEXT = '';
+  DETECTED_LANGUAGE = 'en';
+  window.__STATE = null;
+  
+  playBtn.disabled=true; 
+  keyBadge.textContent='—'; 
+  modeBadge.textContent='—';
+  structuralCountEl.textContent='—'; 
+  ornamentCountEl.textContent='—'; 
+  secDomCountEl.textContent='—'; 
+  modalBorrowCountEl.textContent='—';
+  
+  if(!WHISPER_TEXT) fullTranscriptEl.textContent = '⏳ ממתין...';
+
+  let audioSource = null;
+  if(currentTab === 'file') {
+    const f=fileEl.files?.[0]; 
+    if(!f){ err('בחר קובץ'); return; }
+    audioSource = { type: 'file', data: f };
+  } else {
+    if(!selectedYouTubeVideo) { err('בחר סרטון'); return; }
+    audioSource = { type: 'youtube', data: selectedYouTubeVideo };
+  }
+
+  try{
+    showAnalyzing('שלב 1/3: טעינת אודיו');
+    const audioData = await decodeAudio(audioSource);
+    
+    bpmEl.textContent = audioData.bpm; 
+    durEl.textContent = audioData.duration.toFixed(1)+'s';
+    if(audioData.url) player.src = audioData.url;
+
+    showAnalyzing('שלב 2/3: זיהוי אקורדים (AI)');
+    
+    // 🎯 Use ChordEnginePro.detect() with current AI mode!
+    const result = await engine.detect(audioData.audioBuffer, {
+      mode: currentAIMode,
+      bpm: audioData.bpm,
+      harmonyMode: document.getElementById('extMode').value,
+      decorationSensitivity: Number(decSensEl.value) || 1.0  // 🎚️ Extension sensitivity
+    });
+    
+    console.log('🎼 Detection result:', result);
+    
+    const timeline = result.chords;
+    const key = result.key;
+    const mode = result.mode;
+    
+    showAnalyzing('שלב 3/3: עיבוד...');
+    
+    // Sanitize labels
+    timeline.forEach(ev => {
+      ev.label = sanitizeLabel(ev.label);
+      ev.words = ev.words || [];
+    });
+
+    window.__STATE = { 
+      bpm: audioData.bpm, 
+      duration: audioData.duration, 
+      timeline: timeline, 
+      key, 
+      mode,
+      gateTime: 0,
+      stats: result.stats
+    };
+
+    const capo=parseInt(capoEl.value||'0',10);
+    keyBadge.textContent = applyCapoToLabel(engine.nameSharp(key.root)+(key.minor?'m':''), capo);
+    modeBadge.textContent = mode;
+    
+    // 🔍 Debug: log chord timeline
+    console.log('🎸 Chord Timeline:', timeline.map(ch => `${ch.t.toFixed(1)}s: ${ch.label}`).join(', '));
+    console.log(`📊 Total chords: ${timeline.length}, Duration: ${audioData.duration.toFixed(1)}s, Average: ${(audioData.duration/timeline.length).toFixed(1)}s per chord`);
+
+    // Circle of Fifths - show diatonic chords
+    const tonic = engine.nameSharp(key.root);
+    const keyMode = key.minor ? 'minor' : 'major';
+    const diatonicChords = engine.getDiatonicChords(tonic, keyMode);
+    
+    const circleEl = document.getElementById('circleOfFifths');
+    circleEl.innerHTML = diatonicChords.map(name => {
+      const displayLabel = applyCapoToLabel(name, capo);
+      return `<span class="tag" style="background:#1a2332;border-color:#38bdf8">${displayLabel}</span>`;
+    }).join('');
+
+    // Analysis counts
+    const structural = timeline.filter(e=>e.ornamentType==='structural').length;
+    const ornaments = timeline.filter(e=>e.ornamentType!=='structural').length;
+    
+    // 🆕 Use ChordEnginePro stats if available
+    let secDom = 0;
+    let modalBorrow = 0;
+    
+    if (result.stats && result.stats.secondaryDominants !== undefined) {
+      // Use stats from ChordEnginePro
+      secDom = result.stats.secondaryDominants;
+      modalBorrow = result.stats.modalBorrowings || 0;
+    } else {
+      // Fallback: count manually
+      for(let i=0; i<timeline.length; i++){
+        if(timeline[i].isSecondaryDominant) secDom++;
+        if(timeline[i].isModalBorrowing) modalBorrow++;
+      }
+    }
+    
+    structuralCountEl.textContent = structural;
+    ornamentCountEl.textContent = ornaments;
+    secDomCountEl.textContent = secDom;
+    modalBorrowCountEl.textContent = modalBorrow;
+    
+    // 🆕 Show advanced stats for ULTIMATE
+    if(result.stats) {
+      document.getElementById('confidenceStats').style.display = 'block';
+      document.getElementById('highConfRate').textContent = result.stats.extensionsDetected || 0;
+      document.getElementById('ornamentCountAdv').textContent = result.stats.inversionsDetected || 0;
+      document.getElementById('keyFixCount').textContent = result.stats.modulationsDetected || 0;
+      document.getElementById('secDomDetected').textContent = result.stats.highConfidenceRate || '—';
+    }
+
+    if(WHISPER_WORDS && WHISPER_WORDS.length > 0) {
+      syncChordsWithLyrics();
+      displayWhisperResult();
+      refreshSheetTabView();
+    } else {
+      // Build live sheet even without lyrics (chords only)
+      const isRTL = DETECTED_LANGUAGE === 'he';
+      buildFullLyricsSheet(isRTL);
+    }
+
+    ok(`✓ ${currentAIMode.toUpperCase()} mode - ${timeline.length} אקורדים`);
+    hookPlaybackLive(); 
+    refreshSheetTabView();
+    playBtn.disabled=false; 
+    aiBadge.style.display='inline-flex';
+  }catch(e){ 
+    console.error(e); 
+    err('שגיאה: '+e.message); 
+  }
+};
+
+playBtn.onclick=async()=>{ 
+  try{ await player.play(); } 
+  catch(e){ alert('לחץ ▶️'); } 
+};
+
+async function decodeAudio(source){
+  if(source.type === 'file') return await decodeAudioFile(source.data);
+  else return await decodeYouTubeAudio(source.data);
+}
+
+async function decodeAudioFile(file){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC(); 
+  try{ await ctx.resume(); }catch{}
+  const arr = await file.arrayBuffer();
+  
+  try{
+    const buf = await ctx.decodeAudioData(arr.slice(0));
+    return postDecode(buf, URL.createObjectURL(file));
+  }catch(e1){
+    try{
+      const buf = await new Promise((resolve,reject)=>{ 
+        ctx.decodeAudioData(arr.slice(0), b=>resolve(b), err=>reject(err)); 
+      });
+      return postDecode(buf, URL.createObjectURL(file));
+    }catch(e2){ throw e2||e1; }
+  }
+  
+  function postDecode(buf, url){
+    const mono = (buf.numberOfChannels===1)? buf.getChannelData(0) : engine.mixStereo(buf);
+    const sr0=buf.sampleRate, sr=22050;
+    const x = engine.resampleLinear(mono, sr0, sr);
+    const bpm = engine.estimateTempo(x, sr);
+    return { 
+      x, 
+      sr, 
+      bpm, 
+      duration: x.length/sr, 
+      url,
+      audioBuffer: buf
+    };
+  }
+}
+
+async function decodeYouTubeAudio(video){
+  showAnalyzing('מוריד שמע מיוטיוב...');
+  try {
+    const r = await fetch(`${SERVER}/api/youtube-download?videoId=${video.id}`);
+    if (!r.ok) throw new Error(`Error: ${r.status}`);
+    
+    showAnalyzing('מעבד אודיו...');
+    const audioBlob = await r.blob();
+    const file = new File([audioBlob], 'audio.mp3', { type: 'audio/mpeg' });
+    
+    if (!WHISPER_RUNNING) {
+      runWhisperInBackground(video.id);
+    }
+    
+    return await decodeAudioFile(file);
+  } catch (err) {
+    console.error('YouTube audio error:', err);
+    throw new Error('לא הצלחתי להוריד');
+  }
+}
+
+function getHarmonicFunction(label, key){
+  const rootPc = parseRoot(label); 
+  if(rootPc<0) return '—';
+  const rel = engine.toPc(rootPc - key.root);
+  const scale = key.minor? engine.MINOR_SCALE : engine.MAJOR_SCALE;
+  let bestDeg = null, bestDist=999;
+  for(let d=0; d<scale.length; d++){
+    const dist = Math.min((rel-scale[d]+12)%12,(scale[d]-rel+12)%12);
+    if(dist<bestDist){ bestDist=dist; bestDeg=d; }
+  }
+  if(bestDeg===null) return '—';
+  const funcNames = key.minor ? ['i','ii°','III','iv','v','VI','VII'] : ['I','ii','iii','IV','V','vi','vii°'];
+  return funcNames[bestDeg] || '—';
+}
+
+function hookPlaybackLive(){
+  const st=window.__STATE; 
+  if(!st) return;
+  
+  console.log('🎯 hookPlaybackLive: DETECTED_LANGUAGE =', DETECTED_LANGUAGE);
+  const isRTL = DETECTED_LANGUAGE === 'he' || DETECTED_LANGUAGE === 'Hebrew';
+  console.log('🎯 isRTL =', isRTL);
+  
+  liveSheetEl.className = `synced-sheet ${isRTL ? 'rtl' : 'ltr'}`;
+  gateChip.style.display='inline-flex';
+  LIVE_POINTER=0;
+  
+  buildFullLyricsSheet(isRTL);
+
+  player.ontimeupdate=()=>{
+    const t=player.currentTime;
+    if(t < (st.gateTime || 0)){ 
+      liveChordEl.textContent='—'; 
+      liveFunctionEl.textContent='—';
+      liveLyricEl.textContent='—';
+      return; 
+    }
+    if(gateChip.style.display!=='none') gateChip.style.display='none';
+
+    // Find current chord - account for gateOffset!
+    const gateOffset = st.gateTime || 0;
+    let chordIdx = st.timeline.findIndex(x => (x.t + gateOffset) > t);
+    if(chordIdx === -1) chordIdx = st.timeline.length;
+    const ev = st.timeline[chordIdx - 1] || st.timeline[0];
+    if(!ev) return;
+    
+    const capo=parseInt(capoEl.value||'0',10);
+    const shown = sanitizeLabel(applyCapoToLabel(ev.label, capo));
+    liveChordEl.textContent = shown;
+    liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
+    
+    // Show current word (works for all languages)
+    const currentWord = WHISPER_WORDS.find(w => {
+      const wordStart = w.start + gateOffset;
+      const wordEnd = (w.end ? w.end : w.start + 0.3) + gateOffset;
+      return t >= wordStart && t < wordEnd;
+    });
+    if(currentWord) {
+      liveLyricEl.textContent = currentWord.word || currentWord.text || '';
+    } else {
+      liveLyricEl.textContent = '—';
+    }
+    
+    if(ev.ornamentType === 'structural'){
+      structuralChip.style.display='inline-flex';
+      ornamentChip.style.display='none';
+    } else {
+      structuralChip.style.display='none';
+      ornamentChip.style.display='inline-flex';
+    }
+
+    highlightCurrentChord(t);
+  };
+
+  resetSheetBtn.onclick=()=>{ 
+    LIVE_POINTER=0; 
+    buildFullLyricsSheet(isRTL);
+  };
+}
+
+function buildFullLyricsSheet(isRTL) {
+  const st = window.__STATE;
+  
+  if(!st || !st.timeline) {
+    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">⏳ ממתין לאקורדים...</div>';
+    return;
+  }
+  
+  const capo = parseInt(capoEl.value || '0', 10);
+  const gateOffset = st.gateTime || 0;
+  
+  // 🔥 Detect Hebrew by actual text content (more reliable!)
+  let hasHebrewText = false;
+  if (WHISPER_WORDS && WHISPER_WORDS.length > 0) {
+    // Check first 20 words, count Hebrew words
+    const sampleWords = WHISPER_WORDS.slice(0, 20);
+    let hebrewCount = 0;
+    for (const w of sampleWords) {
+      const text = w.word || w.text || '';
+      if (/[\u0590-\u05FF]/.test(text)) {
+        hebrewCount++;
+      }
+    }
+    hasHebrewText = hebrewCount >= 10; // At least 10 Hebrew words
+  }
+  
+  console.log('🔍 buildFullLyricsSheet:');
+  console.log('   DETECTED_LANGUAGE:', DETECTED_LANGUAGE);
+  console.log('   isRTL param:', isRTL);
+  console.log('   hasHebrewText:', hasHebrewText);
+  console.log('   WHISPER_WORDS:', WHISPER_WORDS?.length || 0);
+  
+  // 🔥 HEBREW: Show chords-only (no karaoke)
+  if(hasHebrewText && WHISPER_WORDS && WHISPER_WORDS.length > 0) {
+    console.log('✅ Hebrew detected - showing chords only!');
+    // Show chords in lines (gaps = line breaks), no karaoke
+    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;overflow-y:auto;max-height:500px;scroll-behavior:smooth">';
+    
+    const lines = [];
+    let currentLine = [];
+    const gapThreshold = 3.0;
+    
+    for(let i = 0; i < st.timeline.length; i++) {
+      const chord = st.timeline[i];
+      const nextChord = st.timeline[i + 1];
+      const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+      
+      currentLine.push({
+        label: chordLabel,
+        time: chord.t
+      });
+      
+      if(nextChord) {
+        const gap = nextChord.t - chord.t;
+        if(gap > gapThreshold) {
+          lines.push([...currentLine]);
+          currentLine = [];
+        }
+      }
+    }
+    
+    if(currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    
+    for(const line of lines) {
+      html += '<div style="margin-bottom:15px">';
+      for(const ch of line) {
+        html += `<span class="chord-marker" data-time="${ch.time}" style="color:#38bdf8;font-weight:700;cursor:pointer;margin-right:15px">${escapeHtml(ch.label)}</span>`;
+      }
+      html += '</div>';
+    }
+    
+    html += '</div>';
+    liveSheetEl.innerHTML = html;
+    
+    console.log(`✅ Hebrew mode: ${lines.length} chord lines (no karaoke)`);
+    return;
+  }
+  
+  if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
+    // 🎸 Show chords only - use gaps in timeline for line breaks
+    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;overflow-y:auto;max-height:500px;scroll-behavior:smooth">';
+    
+    const lines = [];
+    let currentLine = [];
+    const gapThreshold = 3.0; // seconds - break to new line if gap > 3s
+    
+    for(let i = 0; i < st.timeline.length; i++) {
+      const chord = st.timeline[i];
+      const nextChord = st.timeline[i + 1];
+      const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+      
+      currentLine.push({
+        label: chordLabel,
+        time: chord.t
+      });
+      
+      // Check if there's a gap to next chord
+      if(nextChord) {
+        const gap = nextChord.t - chord.t;
+        if(gap > gapThreshold) {
+          lines.push([...currentLine]);
+          currentLine = [];
+        }
+      }
+    }
+    
+    // Add last line
+    if(currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+    
+    // Build HTML - one line per paragraph
+    for(const line of lines) {
+      html += '<div style="margin-bottom:20px;font-size:18px;line-height:1.5">';
+      for(const ch of line) {
+        html += `<span class="chord-marker" data-time="${ch.time}" style="color:#38bdf8;font-weight:700;cursor:pointer;margin-right:15px">${escapeHtml(ch.label)}</span>`;
+      }
+      html += '</div>';
+    }
+    
+    html += '</div>';
+    liveSheetEl.innerHTML = html;
+    console.log(`✅ Live sheet built: ${st.timeline.length} chords (no lyrics)`);
+    return;
+  }
+  
+  // Group words into lines
+  const lines = [];
+  let currentLine = [];
+  const maxWords = isRTL ? 6 : 8;
+  
+  WHISPER_WORDS.forEach((w, idx) => {
+    const text = (w.word || w.text || '').trim();
+    if(!text) return;
+    
+    currentLine.push({
+      text: text,
+      time: w.start + gateOffset,
+      end: (w.end || w.start) + gateOffset,
+      id: `word-${idx}`
+    });
+    
+    const endsWithPunct = /[.!?,;؛،־]$/.test(text);
+    if(endsWithPunct || currentLine.length >= maxWords || idx === WHISPER_WORDS.length - 1) {
+      if(currentLine.length > 0) {
+        lines.push([...currentLine]);
+        currentLine = [];
+      }
+    }
+  });
+  
+  // Build HTML with Ultimate Guitar style
+  let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
+  
+  for(const line of lines) {
+    const words = line;
+    const lineStart = words[0].time;
+    const lineEnd = words[words.length - 1].end;
+    
+    // Find chords for this line
+    const lineChords = st.timeline.filter(ch => {
+      const chordTimeWithGate = ch.t + gateOffset;
+      return chordTimeWithGate >= lineStart && chordTimeWithGate <= lineEnd;
+    });
+    
+    // Build display
+    const lyricText = words.map(w => w.text).join(' ');
+    
+    // Calculate chord positions above words
+    const chordPositions = [];
+    for(const chord of lineChords) {
+      const chordTimeWithGate = chord.t + gateOffset;
+      let position = 0;
+      let found = false;
+      
+      for(let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordEnd = word.end || (word.time + 0.3); // minimum duration for matching
+        if(chordTimeWithGate >= word.time && chordTimeWithGate <= wordEnd) {
+          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+          position = beforeText.length;
+          if(position > 0) position += 1;
+          found = true;
+          break;
+        }
+      }
+      
+      if(!found) {
+        position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
+      }
+      
+      const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+      chordPositions.push({ position, label: chordLabel, id: chord.t });
+    }
+    
+    // Sort chord positions - ALWAYS ascending (0→10)
+    // The position calculation already handles RTL correctly
+    chordPositions.sort((a, b) => a.position - b.position);
+    
+    // Build chord line with spaces
+    let chordLine = '';
+    let lastPos = 0;
+    for(const cp of chordPositions) {
+      const spaces = Math.max(0, cp.position - lastPos);
+      chordLine += ' '.repeat(spaces);
+      chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
+      lastPos = cp.position + cp.label.length;
+    }
+    
+    // Hebrew: dir="rtl", English: dir="ltr"
+    const dirAttr = isRTL ? 'dir="rtl"' : 'dir="ltr"';
+    
+    html += `<div style="margin-bottom:25px">`;
+    
+    if(isRTL) {
+      // RTL (Hebrew): chords LTR right-aligned, lyrics RTL right-aligned
+      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace;direction:ltr;text-align:right">${chordLine}</div>`;
+      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre;direction:rtl;text-align:right">${escapeHtml(lyricText)}</div>`;
+    } else {
+      // LTR (English): keep original - UNCHANGED
+      html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${chordLine}</div>`;
+      html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
+    }
+    
+    html += `</div>`;
+  }
+  
+  html += '</div>';
+  liveSheetEl.innerHTML = html;
+  
+  console.log(`✅ Live sheet built: ${lines.length} lines`);
+}
+
+function highlightCurrentChord(currentTime) {
+  const st = window.__STATE;
+  if(!st) return;
+  
+  const gateOffset = st.gateTime || 0;
+  
+  // Remove all previous highlights
+  liveSheetEl.querySelectorAll('.chord-marker').forEach(el => {
+    el.style.background = 'transparent';
+    el.style.color = '#38bdf8';
+    el.style.padding = '0';
+    el.style.borderRadius = '0';
+  });
+  
+  // Find current chord - compare with gateOffset included!
+  const currentChord = st.timeline.find((ch, idx) => {
+    const nextChord = st.timeline[idx + 1];
+    const chordTime = ch.t + gateOffset;
+    const nextChordTime = nextChord ? (nextChord.t + gateOffset) : Infinity;
+    return chordTime <= currentTime && currentTime < nextChordTime;
+  });
+  
+  if(currentChord) {
+    // Highlight it
+    const marker = liveSheetEl.querySelector(`.chord-marker[data-time="${currentChord.t}"]`);
+    if(marker) {
+      marker.style.background = '#1e3a5f';
+      marker.style.color = '#60d5fd';
+      marker.style.padding = '2px 6px';
+      marker.style.borderRadius = '4px';
+      marker.style.transition = 'all 0.2s';
+      
+      // 🎤 Auto-scroll (karaoke style) - ONLY if marker is out of view
+      const lyricsContainer = liveSheetEl.querySelector('.lyrics-container');
+      if(lyricsContainer) {
+        const markerRect = marker.getBoundingClientRect();
+        const containerRect = lyricsContainer.getBoundingClientRect();
+        
+        // Check if marker is actually out of view
+        const isAboveView = markerRect.top < containerRect.top;
+        const isBelowView = markerRect.bottom > containerRect.bottom;
+        const isLeftOfView = markerRect.left < containerRect.left;
+        const isRightOfView = markerRect.right > containerRect.right;
+        
+        // Only scroll if marker is out of view
+        if(isAboveView || isBelowView || isLeftOfView || isRightOfView) {
+          const markerTop = markerRect.top - containerRect.top + lyricsContainer.scrollTop;
+          const markerLeft = markerRect.left - containerRect.left + lyricsContainer.scrollLeft;
+          
+          // Scroll to keep marker visible (with some padding)
+          const targetScrollTop = markerTop - (containerRect.height / 3);
+          const targetScrollLeft = markerLeft - (containerRect.width / 2);
+          
+          lyricsContainer.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            left: Math.max(0, targetScrollLeft),
+            behavior: 'smooth'
+          });
+        }
+      }
+    }
+  }
+}
+
+function refreshSheetTabView(){
+  SyncEngine.refreshSheetTabView(window.__STATE, WHISPER_WORDS, WHISPER_TEXT, DETECTED_LANGUAGE, capoEl.value, sanitizeLabel, applyCapoToLabel, fullSheetEl);
+}
+
+copyBtn.onclick = () => {
+  const text = fullSheetEl.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyBtn.textContent = '✅ הועתק!';
+    setTimeout(() => copyBtn.textContent = '📋 העתק דף', 1500);
+  });
+};
+
+exportBtn.onclick=()=>{
+  const text = fullSheetEl.textContent || '';
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); 
+  a.href = url; 
+  a.download = 'chords.txt'; 
+  a.click(); 
+  URL.revokeObjectURL(url);
+};
+
+let transposeOffset = 0;
+
+function transposeUp() {
+  if(!window.__STATE) return;
+  transposeOffset++;
+  applyTranspose();
+}
+
+function transposeDown() {
+  if(!window.__STATE) return;
+  transposeOffset--;
+  applyTranspose();
+}
+
+function applyTranspose() {
+  const st = window.__STATE;
+  if(!st) return;
+  
+  const newRoot = engine.toPc(st.key.root + transposeOffset);
+  const keyLabel = engine.nameSharp(newRoot) + (st.key.minor ? 'm' : '');
+  const capo = parseInt(capoEl.value || '0', 10);
+  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
+  
+  st.timeline.forEach(ev => {
+    const originalRoot = parseRoot(ev.label);
+    if(originalRoot < 0) return;
+    
+    const quality = ev.label.replace(/^[A-G](?:#|b)?/, '');
+    const newChordRoot = engine.toPc(originalRoot + transposeOffset);
+    const newLabel = engine.nameSharp(newChordRoot) + quality;
+    
+    if(!ev._originalLabel) ev._originalLabel = ev.label;
+    ev.label = newLabel;
+  });
+  
+  refreshSheetTabView();
+  
+  const circleChords = engine.buildCircleOfFifths({
+    root: engine.toPc(st.key.root + transposeOffset),
+    minor: st.key.minor
+  });
+  const circleEl = document.getElementById('circleOfFifths');
+  circleEl.innerHTML = circleChords.map(ch => {
+    const displayLabel = applyCapoToLabel(ch.label, capo);
+    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8" title="${ch.function}">${displayLabel}</span>`;
+  }).join('');
+  
+  console.log(`🎵 Transposed ${transposeOffset > 0 ? '+' : ''}${transposeOffset} semitones`);
+}
+
+function toggleMajorMinor() {
+  const st = window.__STATE;
+  if(!st) return;
+  
+  st.key.minor = !st.key.minor;
+  
+  const keyLabel = engine.nameSharp(st.key.root) + (st.key.minor ? 'm' : '');
+  const capo = parseInt(capoEl.value || '0', 10);
+  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
+  
+  modeBadge.textContent = st.key.minor ? 'Natural Minor' : 'Major';
+  
+  const circleChords = engine.buildCircleOfFifths(st.key);
+  const circleEl = document.getElementById('circleOfFifths');
+  circleEl.innerHTML = circleChords.map(ch => {
+    const displayLabel = applyCapoToLabel(ch.label, capo);
+    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8" title="${ch.function}">${displayLabel}</span>`;
+  }).join('');
+  
+  console.log(`🔄 Toggled to ${st.key.minor ? 'Minor' : 'Major'}`);
+}
+
+console.log('✅ ChordFinder Pro ULTIMATE loaded successfully!');
+console.log('🔥 All enhancements active: Modulation Detection, Bass Harmonic Series, Spectral Centroid, Rhythmic Patterns');
+
+</script>
+
+</body>
+</html>
