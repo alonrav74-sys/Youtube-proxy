@@ -956,14 +956,27 @@ function buildFullLyricsSheet(isRTL) {
     return;
   }
   
-  if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
-    // Show chords only
-    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">⏳ ממתין למילים... (אקורדים זוהו)</div>';
-    return;
-  }
-  
   const capo = parseInt(capoEl.value || '0', 10);
   const gateOffset = st.gateTime || 0;
+  
+  if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
+    // 🎸 Show chords only (no lyrics) - one per line
+    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;max-height:500px;scroll-behavior:smooth">';
+    
+    for(const chord of st.timeline) {
+      const chordLabel = sanitizeLabel(applyCapoToLabel(chord.label, capo));
+      const timeStr = formatTime(chord.t);
+      html += `<div style="margin-bottom:12px;display:flex;align-items:baseline;gap:15px">`;
+      html += `<span class="chord-marker" data-time="${chord.t}" style="color:#38bdf8;font-weight:700;font-size:18px;cursor:pointer">${escapeHtml(chordLabel)}</span>`;
+      html += `<span style="color:#64748b;font-size:13px">${timeStr}</span>`;
+      html += `</div>`;
+    }
+    
+    html += '</div>';
+    liveSheetEl.innerHTML = html;
+    console.log(`✅ Live sheet built: ${st.timeline.length} chords (no lyrics)`);
+    return;
+  }
   
   // Group words into lines
   const lines = [];
