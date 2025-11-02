@@ -1,128 +1,111 @@
 # 🎸 ChordFinder Pro - ULTIMATE Edition
 
-[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](https://github.com/alonrav74-sys/chordfinder-ultimate)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Music Theory](https://img.shields.io/badge/score-93%2F100-brightgreen.svg)](docs/musical-review.txt)
+Advanced chord detection with YouTube integration, real-time lyrics synchronization, and AI-powered analysis.
 
-Advanced chord detection with YouTube integration and real-time lyrics synchronization.
+## ✨ Features
 
-## 🆕 What's New in v5.0
+### 🎼 Advanced Chord Detection
+- **3 AI Modes:** Fast, Balanced, Accurate
+- **Key-Constrained Detection** - 93/100 music theory score
+- **Mode Detection** - Identifies 9 musical modes
+- **Roman Numeral Analysis** - Automatic scale degree notation
+- **Figured Bass Notation** - Professional inversion symbols
+- **Jazz Extended Chords** - 7alt, 13sus4, maj7#11
 
-Based on **doctorate-level musicological review** - improved from 84.2/100 to **93/100**:
+### 🎬 YouTube Integration
+- Search and analyze any YouTube video
+- Auto-sync chords with video playback
+- Download audio for processing
 
-### New Features
-- 🎵 **Mode Detection** - Dorian, Mixolydian, Phrygian, Lydian, etc.
-- 🎼 **Roman Numeral Analysis** - I, ii, iii, IV, V, vi, vii°
-- 🎹 **Figured Bass Notation** - 6, 6/4, 6/5, 4/3, 4/2
-- 🎯 **Cadential 6/4 Detection** - Critical for Classical music!
-- 🎷 **Jazz Extended Chords** - 7alt, 13sus4, maj7#11
-- 🎨 **Enhanced Modal Borrowing** - bIII, bII (Neapolitan)
+### 📝 Lyrics Synchronization  
+- **Groq Whisper** AI transcription
+- Real-time word-level alignment
+- Ultimate Guitar-style chord sheets
+- RTL/LTR automatic support (Hebrew & English)
+- Karaoke-style scrolling
 
-### Existing Features
-- 🎬 **YouTube Integration** - Analyze any YouTube video
-- 📝 **Lyrics Sync** - Real-time lyrics with chord alignment
-- 🎤 **Groq Whisper** - AI-powered transcription
-- 📊 **Professional Display** - Beautiful chord sheets
-- 💾 **Export/Share** - Save and share your analyses
+### 🎯 Professional Features
+- Circle of Fifths visualization
+- Harmonic analysis (structural/ornamental chords)
+- Secondary dominants detection
+- Modal borrowing identification
+- Transpose & capo support
+- Export to ChordPro format
 
 ## 🚀 Quick Start
 
-### Try it Live
-**[Open ChordFinder Pro](https://alonrav74-sys.github.io/chordfinder-ultimate/)**
+### Option 1: Local File
+1. Open `index.html` in your browser
+2. Click "📁 קובץ מקומי"
+3. Select an audio file (MP3, WAV, M4A)
+4. Click "נתח" (Analyze)
+5. View chords in real-time!
 
-### Or Run Locally
-```bash
-# Clone
-git clone https://github.com/alonrav74-sys/chordfinder-ultimate.git
-cd chordfinder-ultimate
+### Option 2: YouTube
+1. Click "🎬 יוטיוב" tab
+2. Search for a song OR paste YouTube URL
+3. Click "נתח" (Analyze)
+4. Chords + lyrics sync automatically!
 
-# Open in browser
-python -m http.server 8000
-# Visit: http://localhost:8000
-```
+## 📦 Files
 
-## 📖 How to Use
+- `index.html` - Main application (all-in-one)
+- `chord-engine.js` - Base chord detection engine
+- `chord-engine-pro.js` - Pro version with advanced features
+- `chord-engine-v5.js` - Latest engine (v5.0)
+- `sync-engine.js` - Lyrics synchronization engine
 
-1. **Open** `index.html` in your browser
-2. **Paste** a YouTube URL or upload an audio file
-3. **Click** "Analyze Chords"
-4. **View** chords with lyrics in real-time!
+## 🎯 How It Works
 
-## 🎯 Features
+1. **Audio Processing**: Converts audio to mono, resamples to 22kHz
+2. **Chromagram Analysis**: FFT-based frequency analysis
+3. **Chord Detection**: AI algorithms with harmonic validation
+4. **Key Detection**: Krumhansl-Schmuckler algorithm
+5. **Lyrics Sync**: Groq Whisper transcription + word-level timing
+6. **Sheet Generation**: Ultimate Guitar-style chord sheets
 
-### Chord Detection
-- Advanced algorithms with 93/100 music theory score
-- Mode detection (Dorian, Mixolydian, etc.)
-- Roman numeral analysis
-- Figured bass notation
-- Jazz extended chords
+## 🎨 AI Modes
 
-### YouTube Integration
-- Analyze any YouTube video
-- Auto-sync with video playback
-- Export chord sheets
+### ⚡ Fast Mode (~2-5 seconds)
+- Basic chord detection
+- Quick results
+- Good for simple songs
 
-### Lyrics Sync
-- AI-powered transcription (Groq Whisper)
-- Real-time word-level alignment
-- Professional chord sheet display
+### ⚖️ Balanced Mode (~5-10 seconds) ⭐ **Default**
+- Key-constrained detection
+- Harmonic validation
+- Best balance of speed/accuracy
 
-### Export & Share
-- Save as chord sheet
-- Print-friendly format
-- Share with others
-
-## 📊 Comparison
-
-| Feature | v4.0 | v5.0 |
-|---------|------|------|
-| Basic Detection | ✅ | ✅ |
-| YouTube | ✅ | ✅ |
-| Lyrics Sync | ✅ | ✅ |
-| **Mode Detection** | ❌ | ✅ |
-| **Roman Numerals** | ❌ | ✅ |
-| **Figured Bass** | ❌ | ✅ |
-| **Cadential 6/4** | ❌ | ✅ |
-| **Jazz Extended** | Partial | ✅ |
-| **Score** | 84.2 | **93.0** |
+### 🎯 Accurate Mode (~10-15 seconds)
+- Full harmonic analysis
+- Ornament detection
+- Maximum accuracy
 
 ## 🎓 Perfect For
 
 - 🎸 **Musicians** - Learn songs faster
-- 🎹 **Teachers** - Demonstrate theory concepts
-- 📚 **Students** - Study harmony and progressions
-- 🎼 **Composers** - Analyze existing works
-- 🎵 **Music Lovers** - Understand favorite songs
-
-## 📝 Examples
-
-### YouTube Analysis
-```
-1. Paste: https://www.youtube.com/watch?v=VIDEO_ID
-2. Click "Analyze"
-3. View chords synced with video!
-```
-
-### File Upload
-```
-1. Click "Upload Audio File"
-2. Select MP3/WAV/M4A
-3. Get instant chord analysis
-```
+- 🎹 **Teachers** - Demonstrate theory
+- 📚 **Students** - Study harmony
+- 🎼 **Composers** - Analyze works
+- 🎵 **Music Lovers** - Understand songs
 
 ## 🔧 Technical Details
 
-### Chord Engine v5.0
-- Mode detection with 9 musical modes
-- Roman numeral analysis
-- Figured bass notation
-- Cadential 6/4 detection
-- Jazz harmony (7alt, 13sus4, maj7#11)
+### Chord Engine
+- FFT size: 16384 samples
+- Hop size: 2048 samples  
+- Chromagram: 12 pitch classes
+- Sample rate: 22050 Hz
 
-### Performance
-- Fast mode: ~2-5 seconds
-- Balanced mode: ~5-10 seconds
-- Accurate mode: ~10-15 seconds
+### Supported Formats
+- Audio: MP3, WAV, M4A, OGG, FLAC
+- Video: MP4, WEBM (audio extracted)
+
+### Browser Compatibility
+- Chrome 90+ ✅
+- Firefox 88+ ✅
+- Safari 14+ ✅
+- Edge 90+ ✅
 
 ## 📄 License
 
@@ -130,20 +113,17 @@ MIT License - Free for personal and commercial use!
 
 ## 👨‍💻 Author
 
-**Alon Raviv**
-- Version 5.0.0 - November 2025
-- Based on doctorate-level music theory review
+**Alon Raviv**  
+Built with ❤️ for musicians worldwide
 
-## 🙏 Acknowledgments
+## 🙏 Credits
 
-- Music theory research (Krumhansl, Temperley, Kostka & Payne)
-- Jazz legends (Miles Davis, Herbie Hancock, Bill Evans)
-- Classical composers (Bach, Mozart, Beethoven, Chopin)
+- **Music Theory:** Krumhansl, Temperley, Kostka & Payne
+- **Transcription:** Groq Whisper AI
+- **Inspiration:** Ultimate Guitar, Chordify
 
 ---
 
-**🎸 ChordFinder Pro ULTIMATE Edition**
+**🎸 ChordFinder Pro ULTIMATE Edition** - Most advanced. Most accurate. Most musical.
 
-Most advanced. Most accurate. Most musical.
-
-⭐ Star us on GitHub if you find this useful!
+⭐ If you find this useful, share it with other musicians!
