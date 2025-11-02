@@ -50,7 +50,7 @@ Advanced chord detection with YouTube integration, real-time lyrics synchronizat
 ## 📦 Files
 
 - `index.html` - Main application (all-in-one)
-- `chord-engine.js` - Base chord detection engine
+- `chord-engine-v5.js` - Base chord detection engine
 - `chord-engine-pro.js` - Pro version with advanced features
 - `chord-engine-v5.js` - Latest engine (v5.0)
 - `sync-engine.js` - Lyrics synchronization engine
