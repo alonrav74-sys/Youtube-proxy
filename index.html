@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChordEngine v5.0 Demo - מוזיקה מתקדמת</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .version-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        .features-strip {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .feature-tag {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 0.85em;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+        }
+        
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-upload {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .file-upload:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+        
+        .file-upload.dragover {
+            background: #e0e7ff;
+            border-color: #4f46e5;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .results-section {
+            display: none;
+        }
+        
+        .key-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .key-info h3 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .mode-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 15px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        
+        .circle-of-fifths {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .chord-degree {
+            flex: 1;
+            min-width: 100px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .roman {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .chord-label {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin: 5px 0;
+        }
+        
+        .function {
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+        
+        .chord-timeline {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .chord-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-right: 4px solid #667eea;
+            transition: all 0.2s;
+        }
+        
+        .chord-item:hover {
+            transform: translateX(-5px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chord-item.cadential {
+            border-right-color: #dc3545;
+            background: #fff5f5;
+        }
+        
+        .chord-item.borrowed {
+            border-right-color: #ffc107;
+            background: #fffef0;
+        }
+        
+        .chord-item.jazz {
+            border-right-color: #17a2b8;
+            background: #f0f9ff;
+        }
+        
+        .chord-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .chord-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .chord-time {
+            background: #e9ecef;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+        
+        .chord-details {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .tag {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            margin-right: 5px;
+        }
+        
+        .tag.critical {
+            background: #dc3545;
+        }
+        
+        .tag.jazz {
+            background: #17a2b8;
+        }
+        
+        .tag.borrowed {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow-y: auto;
+            direction: ltr;
+            text-align: left;
+        }
+        
+        .log-info { color: #4fc3f7; }
+        .log-success { color: #81c784; }
+        .log-warning { color: #ffb74d; }
+        .log-error { color: #e57373; }
+        
+        footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 2px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎸 ChordEngine v5.0</h1>
+            <p>מנוע זיהוי אקורדים מתקדם עם אינטליגנציה מוזיקלית מלאה</p>
+            <div class="version-badge">v5.0 - Complete Musical Intelligence</div>
+        </header>
+        
+        <div class="features-strip">
+            <span class="feature-tag">🎼 Mode Detection</span>
+            <span class="feature-tag">📊 Roman Numerals</span>
+            <span class="feature-tag">🎹 Figured Bass</span>
+            <span class="feature-tag">🎯 Cadential 6/4</span>
+            <span class="feature-tag">🎷 Jazz Extended</span>
+            <span class="feature-tag">🎨 Modal Borrowing</span>
+        </div>
+        
+        <div class="main-content">
+            <div class="panel">
+                <h2>📁 העלאת קובץ</h2>
+                
+                <div class="file-upload" id="fileUpload">
+                    <div style="font-size: 3em; margin-bottom: 15px;">🎵</div>
+                    <div style="font-size: 1.2em; margin-bottom: 10px;">גרור קובץ או לחץ לבחירה</div>
+                    <div style="font-size: 0.9em; color: #6c757d;">MP3, WAV, M4A</div>
+                    <input type="file" id="fileInput" accept="audio/*">
+                </div>
+                
+                <div id="fileName" style="text-align: center; margin-bottom: 15px; font-weight: 600;"></div>
+                
+                <div style="text-align: center;">
+                    <button class="btn" id="analyzeBtn" disabled>🔍 נתח אקורדים</button>
+                </div>
+                
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                
+                <div class="console-output" id="console">
+                    <div class="log-info">📋 ChordEngine v5.0 מוכן לניתוח...</div>
+                    <div class="log-info">🆕 תכונות חדשות: Modes, Roman Numerals, Figured Bass, Cadential 6/4</div>
+                </div>
+            </div>
+            
+            <div class="panel results-section" id="resultsPanel">
+                <h2>🎼 תוצאות ניתוח</h2>
+                
+                <div class="key-info" id="keyInfo">
+                    <h3 id="keyLabel">-</h3>
+                    <div class="mode-badge" id="modeBadge">-</div>
+                    <div style="margin-top: 10px; font-size: 0.9em;" id="tonicInfo">-</div>
+                </div>
+                
+                <h3 style="margin-bottom: 15px;">⭕ Circle of Fifths</h3>
+                <div class="circle-of-fifths" id="circleOfFifths"></div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalChords">0</div>
+                        <div class="stat-label">סה"כ אקורדים</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="cadential64">0</div>
+                        <div class="stat-label">Cadential 6/4</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="jazzChords">0</div>
+                        <div class="stat-label">Jazz Extended</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="inversions">0</div>
+                        <div class="stat-label">אינברסיות</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel" style="margin: 0 30px 30px 30px;" id="timelinePanel" hidden>
+            <h2>📊 ציר זמן של אקורדים</h2>
+            <div class="chord-timeline" id="chordTimeline"></div>
+        </div>
+        
+        <footer>
+            <p><strong>ChordEngine v5.0</strong> - Based on Doctorate-Level Music Review (84.2→93/100)</p>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #6c757d;">
+                נוצר על ידי Alon | מבוסס על ביקורת מוזיקולוגית מקצועית
+            </p>
+        </footer>
+    </div>
+    
+    <script src="chord-engine-v5.js"></script>
+    <script>
+        const fileUpload = document.getElementById('fileUpload');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const consoleOutput = document.getElementById('console');
+        const resultsPanel = document.getElementById('resultsPanel');
+        const timelinePanel = document.getElementById('timelinePanel');
+        
+        let audioBuffer = null;
+        let engine = new ChordEngine();
+        
+        // File upload handlers
+        fileUpload.addEventListener('click', () => fileInput.click());
+        
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+        
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+        
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        async function handleFile(file) {
+            addLog(`📁 טוען קובץ: ${file.name}`, 'info');
+            fileName.textContent = file.name;
+            
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                addLog(`✅ קובץ נטען בהצלחה (${audioBuffer.duration.toFixed(1)}s)`, 'success');
+                analyzeBtn.disabled = false;
+            } catch (error) {
+                addLog(`❌ שגיאה בטעינת קובץ: ${error.message}`, 'error');
+                analyzeBtn.disabled = true;
+            }
+        }
+        
+        analyzeBtn.addEventListener('click', analyzeAudio);
+        
+        async function analyzeAudio() {
+            if (!audioBuffer) return;
+            
+            analyzeBtn.disabled = true;
+            progressBar.style.display = 'block';
+            progressFill.style.width = '10%';
+            
+            addLog(`\n🔬 מתחיל ניתוח מוזיקלי...`, 'info');
+            addLog(`⚙️ משתמש ב-ChordEngine v5.0 (Enhanced Musical Intelligence)`, 'info');
+            
+            try {
+                // Simulate progress
+                progressFill.style.width = '30%';
+                
+                const startTime = performance.now();
+                const result = await engine.detect(audioBuffer, {
+                    bpm: 120,
+                    mode: 'balanced'
+                });
+                
+                const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+                
+                progressFill.style.width = '100%';
+                
+                addLog(`\n✅ ניתוח הושלם ב-${elapsed} שניות!`, 'success');
+                addLog(`🎼 זוהו ${result.chords.length} אקורדים`, 'success');
+                
+                displayResults(result);
+                
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progressFill.style.width = '0%';
+                    analyzeBtn.disabled = false;
+                }, 1000);
+                
+            } catch (error) {
+                addLog(`❌ שגיאה בניתוח: ${error.message}`, 'error');
+                progressBar.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        function displayResults(result) {
+            // Key info
+            document.getElementById('keyLabel').textContent = result.key.label;
+            document.getElementById('modeBadge').textContent = 
+                `Mode: ${result.key.mode} (${(result.key.modeConfidence * 100).toFixed(0)}%)`;
+            document.getElementById('tonicInfo').textContent = 
+                `Tonic: ${result.tonic.label} (${result.tonic.confidence}% confidence)`;
+            
+            // Circle of Fifths
+            const circleDiv = document.getElementById('circleOfFifths');
+            circleDiv.innerHTML = result.circleOfFifths.map(ch => `
+                <div class="chord-degree">
+                    <span class="roman">${ch.roman}</span>
+                    <span class="chord-label">${ch.label}</span>
+                    <span class="function">${ch.function}</span>
+                </div>
+            `).join('');
+            
+            // Stats
+            document.getElementById('totalChords').textContent = result.chords.length;
+            document.getElementById('cadential64').textContent = result.stats.cadential64Found || 0;
+            document.getElementById('jazzChords').textContent = result.stats.jazzChordsFound || 0;
+            
+            const totalInversions = Object.values(result.stats.inversionsFound || {})
+                .reduce((a, b) => a + b, 0);
+            document.getElementById('inversions').textContent = totalInversions;
+            
+            // Timeline
+            const timelineDiv = document.getElementById('chordTimeline');
+            timelineDiv.innerHTML = result.chords.map(chord => {
+                const minutes = Math.floor(chord.t / 60);
+                const seconds = Math.floor(chord.t % 60);
+                const time = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                let classes = ['chord-item'];
+                let tags = [];
+                
+                if (chord.isCadential64) {
+                    classes.push('cadential');
+                    tags.push('<span class="tag critical">Cadential 6/4</span>');
+                }
+                
+                if (chord.isModalBorrowing) {
+                    classes.push('borrowed');
+                    tags.push('<span class="tag borrowed">Modal Borrowing</span>');
+                }
+                
+                if (chord.label.includes('alt') || chord.label.includes('sus4') || chord.label.includes('#11')) {
+                    classes.push('jazz');
+                    tags.push('<span class="tag jazz">Jazz Extended</span>');
+                }
+                
+                const details = [];
+                if (chord.romanNumeral) details.push(`<span>Roman: ${chord.romanNumeral}</span>`);
+                if (chord.figuredBass) details.push(`<span>Figured Bass: ${chord.figuredBass}</span>`);
+                if (chord.harmonicFunction) details.push(`<span>Function: ${chord.harmonicFunction}</span>`);
+                
+                return `
+                    <div class="${classes.join(' ')}">
+                        <div class="chord-main">
+                            <div class="chord-name">${chord.label}</div>
+                            <div class="chord-time">${time}</div>
+                        </div>
+                        <div class="chord-details">
+                            ${tags.join('')}
+                            ${details.join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            resultsPanel.style.display = 'block';
+            timelinePanel.hidden = false;
+            
+            addLog(`\n📊 סטטיסטיקות:`, 'info');
+            addLog(`   - סה"כ אקורדים: ${result.chords.length}`, 'info');
+            addLog(`   - Cadential 6/4: ${result.stats.cadential64Found || 0}`, 'success');
+            addLog(`   - Jazz Extended: ${result.stats.jazzChordsFound || 0}`, 'success');
+            addLog(`   - Modal Borrowing: ${result.stats.modalBorrowings || 0}`, 'success');
+            addLog(`   - אינברסיות: ${totalInversions}`, 'info');
+        }
+        
+        function addLog(message, type = 'info') {
+            const logClass = `log-${type}`;
+            const logDiv = document.createElement('div');
+            logDiv.className = logClass;
+            logDiv.textContent = message;
+            consoleOutput.appendChild(logDiv);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        addLog(`🎸 ChordEngine v5.0 initialized`, 'success');
+        addLog(`🎼 New features active: Modes, Roman Numerals, Figured Bass, Cadential 6/4`, 'info');
+    </script>
+</body>
+</html>
