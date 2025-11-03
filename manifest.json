@@ -1,0 +1,59 @@
+{
+  "name": "ChordFinder Pro - AI Enhanced",
+  "short_name": "ChordFinder",
+  "description": "🎸 זיהוי אקורדים מתקדם עם AI, Groq Whisper, תמיכה ב-YouTube, inversions, extensions ומודולציות",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#38bdf8",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "icon192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["music", "utilities", "education"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "העלה קובץ",
+      "short_name": "קובץ",
+      "description": "נתח קובץ אודיו",
+      "url": "/?tab=file",
+      "icons": [{ "src": "icon192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "YouTube",
+      "short_name": "YouTube",
+      "description": "נתח מיוטיוב",
+      "url": "/?tab=youtube",
+      "icons": [{ "src": "icon192.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}
