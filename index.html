@@ -148,16 +148,16 @@
     }
     #debug-toggle-btn {
       position: fixed;
-      bottom: 20px;
+      bottom: 80px;
       right: 20px;
-      z-index: 100000;
+      z-index: 99998;
       background: #f00;
       color: white;
       border: none;
       border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      font-size: 24px;
+      width: 55px;
+      height: 55px;
+      font-size: 22px;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       transition: all 0.3s;
@@ -167,9 +167,9 @@
     }
     #debug-clear-btn {
       position: fixed;
-      bottom: 90px;
+      bottom: 145px;
       right: 20px;
-      z-index: 100000;
+      z-index: 99998;
       background: #ff0;
       color: #000;
       border: none;
@@ -531,15 +531,42 @@ console.log('🔍 DEBUG: Checking ChordEngineEnhanced:', typeof ChordEngineEnhan
 console.log('🔍 DEBUG: Checking SyncEngine:', typeof SyncEngine);
 
 if(typeof ChordEngineEnhanced === 'undefined') {
-  console.error('❌ chord-engine-unified.js לא נטען!');
-  console.error('🔍 DEBUG: מנסה לטעון מ:', window.location.origin + '/chord-engine-unified.js');
+  const errorMsg = '❌ חמור! chord-engine-unified.js לא נטען!\n\n' +
+    'הקובץ צריך להיות באותה תיקייה כמו index.html\n\n' +
+    'URL: ' + window.location.origin + '/chord-engine-unified.js\n\n' +
+    'פתרון:\n' +
+    '1. ודא שהקובץ קיים ב-GitHub\n' +
+    '2. נקה Cache של Vercel (Deployments → Redeploy)\n' +
+    '3. בדוק שאין שגיאות syntax בקובץ';
+  
+  console.error(errorMsg);
+  alert(errorMsg);
   throw new Error('chord-engine-unified.js not loaded');
 }
 
 console.log('✅ Creating enhanced engine instance...');
-const engine = new ChordEngineEnhanced();
-console.log('✅ Engine created:', engine);
-console.log('✅ Engine has nameSharp?', typeof engine.nameSharp);
+let engine;
+try {
+  engine = new ChordEngineEnhanced();
+  console.log('✅ Engine created successfully');
+  
+  // Verify critical methods exist
+  const requiredMethods = ['nameSharp', 'nameFlat', 'detect', 'getDiatonicChords'];
+  const missingMethods = requiredMethods.filter(method => typeof engine[method] !== 'function');
+  
+  if (missingMethods.length > 0) {
+    throw new Error('Engine missing methods: ' + missingMethods.join(', '));
+  }
+  
+  console.log('✅ All engine methods verified');
+} catch(e) {
+  const errorMsg = '❌ שגיאה ביצירת Engine:\n\n' + e.message + '\n\n' + 
+    'הקובץ chord-engine-unified.js אולי פגום או לא מלא.\n\n' +
+    'נסה להעלות אותו מחדש ל-GitHub.';
+  console.error(errorMsg);
+  alert(errorMsg);
+  throw e;
+}
 
 const SERVER = window.location.origin;
 let selectedYouTubeVideo = null;
