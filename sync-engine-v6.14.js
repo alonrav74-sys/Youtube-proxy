@@ -74,26 +74,8 @@ const SyncEngine = {
 
     const isReallyHebrew = this.isHebrewText(whisperText);
     
-    // HEBREW: Same as Live - only chords!
-    if (isReallyHebrew) {
-      const capoVal = parseInt(capo || '0', 10);
-      
-      let html = '<div dir="rtl" style="background:#0a1324;padding:20px;border-radius:12px;overflow-y:auto">';
-      html += '<div style="color:#38bdf8;font-weight:700;font-size:18px;margin-bottom:15px;text-align:center">🎸 אקורדים</div>';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">';
-      
-      state.timeline.forEach(ch => {
-        const displayLabel = sanitizeLabel(applyCapoToLabel(ch.label, capoVal));
-        html += `<span style="color:#38bdf8;font-weight:700;font-size:20px;padding:6px 12px;background:#0b1221;border-radius:8px">${this.escapeHtml(displayLabel)}</span>`;
-      });
-      
-      html += '</div></div>';
-      fullSheetEl.innerHTML = html;
-      return;
-    }
-    
-    // ENGLISH: chords + lyrics (unchanged)
-    this.buildEnglishSheet(state, whisperWords, whisperText, capo, sanitizeLabel, applyCapoToLabel, fullSheetEl, false);
+    // Both Hebrew and English use same format (chords above lyrics)
+    this.buildEnglishSheet(state, whisperWords, whisperText, capo, sanitizeLabel, applyCapoToLabel, fullSheetEl, isReallyHebrew);
   },
 
   buildEnglishSheet: function(state, whisperWords, whisperText, capo, sanitizeLabel, applyCapoToLabel, fullSheetEl, isHebrewOverride) {
@@ -170,7 +152,15 @@ const SyncEngine = {
       let chordLine = '';
       
       if (lineChords.length > 0) {
-        const chordPositions = [];
+        if (isRTL) {
+          // HEBREW: Simple spacing between chords
+          chordLine = lineChords.map(ch => {
+            const displayLabel = sanitizeLabel(applyCapoToLabel(ch.label, capoVal));
+            return displayLabel;
+          }).join('   '); // 3 spaces between chords
+        } else {
+          // ENGLISH: Exact positioning above words
+          const chordPositions = [];
         
         for (const chord of lineChords) {
           const chordTime = chord.t + gateOffset;
@@ -213,6 +203,7 @@ const SyncEngine = {
           chordLine += cp.label;
           currentPos = cp.pos + cp.label.length;
         }
+        } // end of else (English)
       }
 
       html += '<div style="margin-bottom:20px;white-space:nowrap;overflow-x:auto">';
