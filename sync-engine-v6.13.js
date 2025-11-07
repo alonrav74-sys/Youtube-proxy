@@ -370,6 +370,7 @@ const SyncEngine = {
     // Debug
     let debugInfo2 = '<div style="background:#2a1a1a;padding:10px;border-radius:8px;margin-bottom:15px;font-size:12px;color:#f59e0b;font-family:monospace">';
     debugInfo2 += '⚠️ <b>Rendering Debug:</b><br>';
+    debugInfo2 += `firstLyricTime: ${firstLyricTime === Infinity ? 'Infinity' : firstLyricTime.toFixed(1)+'s'}<br>`;
     debugInfo2 += `introChords: ${introChords.length}<br>`;
     debugInfo2 += `mainCells: ${mainCells.length}<br>`;
     debugInfo2 += `mainCells with lyrics: ${mainCells.filter(c => c.lyric).length}<br>`;
