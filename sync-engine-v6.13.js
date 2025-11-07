@@ -289,6 +289,9 @@ const SyncEngine = {
     }).filter(x => x !== null);
     
     debugInfo += `lyrics: ${lyrics.length}<br>`;
+    if (lyrics.length > 0) {
+      debugInfo += `Sample lyric 0: "${lyrics[0].label}" (type: ${typeof lyrics[0].label})<br>`;
+    }
     
     // Build cells: auto-merge chord+lyric if close
     const cells = [];
@@ -349,7 +352,8 @@ const SyncEngine = {
     const sampleCells = cells.slice(0, 3);
     debugInfo += `<br><b>First 3 cells:</b><br>`;
     sampleCells.forEach((c, i) => {
-      debugInfo += `[${i}] time:${c.time.toFixed(1)}s, chord:${c.chord || '—'}, lyric:${c.lyric || '—'}<br>`;
+      const lyricDisplay = c.lyric ? `"${c.lyric}" (type: ${typeof c.lyric})` : '—';
+      debugInfo += `[${i}] time:${c.time.toFixed(1)}s, chord:${c.chord || '—'}, lyric: ${lyricDisplay}<br>`;
     });
     debugInfo += '</div>';
     
