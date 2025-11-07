@@ -358,10 +358,18 @@ const SyncEngine = {
       debugInfo += `  lyric: ${c.lyric ? '"'+c.lyric+'"' : 'null'} (type: ${typeof c.lyric})<br>`;
       debugInfo += `</div>`;
     });
+    
+    // Find first lyric - debug
+    debugInfo += `<br><b>Finding first lyric:</b><br>`;
+    debugInfo += `cells[0].lyric = ${cells[0]?.lyric ? '"'+cells[0].lyric+'"' : 'falsy'}<br>`;
+    debugInfo += `cells[1].lyric = ${cells[1]?.lyric ? '"'+cells[1].lyric+'"' : 'falsy'}<br>`;
+    debugInfo += `cells[2].lyric = ${cells[2]?.lyric ? '"'+cells[2].lyric+'"' : 'falsy'}<br>`;
+    
     debugInfo += '</div>';
     
-    // Find first lyric
-    const firstLyricTime = cells.find(c => c.lyric)?.time || Infinity;
+    // Find first lyric - use filter to be safe
+    const cellsWithLyrics = cells.filter(c => c.lyric && typeof c.lyric === 'string' && c.lyric.length > 0);
+    const firstLyricTime = cellsWithLyrics.length > 0 ? cellsWithLyrics[0].time : Infinity;
     
     // Split intro and main
     const introChords = cells.filter(c => c.chord && c.time < firstLyricTime);
