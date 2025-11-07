@@ -984,9 +984,12 @@ function buildFullLyricsSheet(isRTL) {
   const gateOffset = st.gateTime || 0;
   
   // HEBREW: Only chords!
-  if (typeof DETECTED_LANGUAGE !== 'undefined' && DETECTED_LANGUAGE === 'he') {
+  const isHebrew = (typeof DETECTED_LANGUAGE !== 'undefined' && 
+                    (DETECTED_LANGUAGE === 'he' || DETECTED_LANGUAGE === 'Hebrew' || DETECTED_LANGUAGE === 'hebrew'));
+  
+  if (isHebrew) {
     let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;overflow-y:auto;max-height:500px" dir="rtl">';
-    html += '<div style="color:#38bdf8;font-weight:700;font-size:18px;margin-bottom:15px;text-align:center">🎸 אקורדים</div>';
+    html += '<div style="color:#38bdf8;font-weight:700;font-size:18px;margin-bottom:15px;text-align:center">🎸 אקורדים בלבד</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">';
     
     st.timeline.forEach(ch => {
@@ -998,13 +1001,6 @@ function buildFullLyricsSheet(isRTL) {
     liveSheetEl.innerHTML = html;
     return; // STOP HERE!
   }
-  
-  // DEBUG: Show what DETECTED_LANGUAGE is!
-  let debugBox = '<div style="background:#dc2626;color:#fff;padding:15px;margin:10px;border-radius:8px;font-weight:bold;text-align:center">';
-  debugBox += '⚠️ NOT HEBREW!<br>';
-  debugBox += 'DETECTED_LANGUAGE = "' + (typeof DETECTED_LANGUAGE !== 'undefined' ? DETECTED_LANGUAGE : 'undefined') + '"<br>';
-  debugBox += 'Expected: "he"';
-  debugBox += '</div>';
   
   // ENGLISH: chords + lyrics
   const lines = [];
@@ -1029,7 +1025,7 @@ function buildFullLyricsSheet(isRTL) {
     }
   });
   
-  let html = debugBox + '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
+  let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
   for(const line of lines) {
     const words = line;
     const lineStart = words[0].time;
