@@ -349,11 +349,14 @@ const SyncEngine = {
     debugInfo += `cells with chords: ${cells.filter(c => c.chord).length}<br>`;
     
     // Show sample
-    const sampleCells = cells.slice(0, 3);
-    debugInfo += `<br><b>First 3 cells:</b><br>`;
+    const sampleCells = cells.slice(0, 5);
+    debugInfo += `<br><b>First 5 cells (RAW):</b><br>`;
     sampleCells.forEach((c, i) => {
-      const lyricDisplay = c.lyric ? `"${c.lyric}" (type: ${typeof c.lyric})` : '—';
-      debugInfo += `[${i}] time:${c.time.toFixed(1)}s, chord:${c.chord || '—'}, lyric: ${lyricDisplay}<br>`;
+      debugInfo += `<div style="border:1px solid #38bdf8;padding:5px;margin:3px;background:#0a1324">`;
+      debugInfo += `Cell ${i}: time=${c.time.toFixed(1)}s<br>`;
+      debugInfo += `  chord: ${c.chord ? '"'+c.chord+'"' : 'null'}<br>`;
+      debugInfo += `  lyric: ${c.lyric ? '"'+c.lyric+'"' : 'null'} (type: ${typeof c.lyric})<br>`;
+      debugInfo += `</div>`;
     });
     debugInfo += '</div>';
     
@@ -364,8 +367,17 @@ const SyncEngine = {
     const introChords = cells.filter(c => c.chord && c.time < firstLyricTime);
     const mainCells = cells.filter(c => c.time >= firstLyricTime);
     
+    // Debug
+    let debugInfo2 = '<div style="background:#2a1a1a;padding:10px;border-radius:8px;margin-bottom:15px;font-size:12px;color:#f59e0b;font-family:monospace">';
+    debugInfo2 += '⚠️ <b>Rendering Debug:</b><br>';
+    debugInfo2 += `introChords: ${introChords.length}<br>`;
+    debugInfo2 += `mainCells: ${mainCells.length}<br>`;
+    debugInfo2 += `mainCells with lyrics: ${mainCells.filter(c => c.lyric).length}<br>`;
+    debugInfo2 += '</div>';
+    
     // Build HTML
     let html = debugInfo;  // Show debug first!
+    html += debugInfo2;    // Show rendering debug!
     html += `<div dir="rtl" style="padding:20px;font-family:'Arial',sans-serif;font-size:16px;line-height:1.8">`;
     
     // [Intro]
