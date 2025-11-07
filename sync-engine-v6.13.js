@@ -264,6 +264,12 @@ const SyncEngine = {
     const capoVal = parseInt(capo || '0', 10);
     const gateOffset = state.gateTime || 0;
     
+    // Debug info to display on screen
+    let debugInfo = '<div style="background:#1a2332;padding:10px;border-radius:8px;margin-bottom:15px;font-size:12px;color:#38bdf8;font-family:monospace">';
+    debugInfo += '🔍 <b>Debug Info:</b><br>';
+    debugInfo += `whisperWords: ${whisperWords ? whisperWords.length : 'NULL'}<br>`;
+    debugInfo += `chords: ${state.timeline ? state.timeline.length : 'NULL'}<br>`;
+    
     // Collect chords and lyrics separately
     const chords = state.timeline.map(ch => ({
       time: ch.t + gateOffset,
@@ -275,11 +281,14 @@ const SyncEngine = {
       if (!text) return null;
       text = text.replace(/&nbsp;?/g, '').replace(/&amp;/g, '').trim();
       if (!text) return null;
+      
       return {
         time: w.start + gateOffset,
         label: text
       };
     }).filter(x => x !== null);
+    
+    debugInfo += `lyrics: ${lyrics.length}<br>`;
     
     // Build cells: auto-merge chord+lyric if close
     const cells = [];
@@ -332,6 +341,18 @@ const SyncEngine = {
     // Sort by timeline
     cells.sort((a, b) => a.time - b.time);
     
+    debugInfo += `cells total: ${cells.length}<br>`;
+    debugInfo += `cells with lyrics: ${cells.filter(c => c.lyric).length}<br>`;
+    debugInfo += `cells with chords: ${cells.filter(c => c.chord).length}<br>`;
+    
+    // Show sample
+    const sampleCells = cells.slice(0, 3);
+    debugInfo += `<br><b>First 3 cells:</b><br>`;
+    sampleCells.forEach((c, i) => {
+      debugInfo += `[${i}] time:${c.time.toFixed(1)}s, chord:${c.chord || '—'}, lyric:${c.lyric || '—'}<br>`;
+    });
+    debugInfo += '</div>';
+    
     // Find first lyric
     const firstLyricTime = cells.find(c => c.lyric)?.time || Infinity;
     
@@ -340,7 +361,8 @@ const SyncEngine = {
     const mainCells = cells.filter(c => c.time >= firstLyricTime);
     
     // Build HTML
-    let html = `<div dir="rtl" style="padding:20px;font-family:'Arial',sans-serif;font-size:16px;line-height:1.8">`;
+    let html = debugInfo;  // Show debug first!
+    html += `<div dir="rtl" style="padding:20px;font-family:'Arial',sans-serif;font-size:16px;line-height:1.8">`;
     
     // [Intro]
     if (introChords.length > 0) {
@@ -384,7 +406,7 @@ const SyncEngine = {
           html += '<tr>';
           for (const cell of currentLine) {
             if (cell.lyric) {
-              html += `<td style="padding:4px 12px;color:#ffffff;text-align:center;vertical-align:top;font-size:16px;white-space:nowrap">${this.escapeHtml(cell.lyric)}</td>`;
+              html += `<td style="padding:4px 12px;color:#e5e7eb;text-align:center;vertical-align:top;font-size:16px;white-space:nowrap">${this.escapeHtml(cell.lyric)}</td>`;
             } else {
               html += `<td style="padding:4px 12px;vertical-align:top">&nbsp;</td>`;
             }
