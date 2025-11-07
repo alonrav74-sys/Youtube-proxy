@@ -982,6 +982,14 @@ function buildFullLyricsSheet(isRTL) {
     return;
   }
   
+  // DEBUG: Show what isRTL is!
+  liveSheetEl.innerHTML = `<div style="background:#f59e0b;color:#000;padding:20px;font-size:16px;font-weight:bold">
+    🔍 DEBUG:<br>
+    isRTL = ${isRTL}<br>
+    DETECTED_LANGUAGE = ${DETECTED_LANGUAGE}<br>
+    Type: ${typeof isRTL}
+  </div>`;
+  
   const capo = parseInt(capoEl.value || '0', 10);
   const gateOffset = st.gateTime || 0;
   
