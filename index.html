@@ -999,6 +999,13 @@ function buildFullLyricsSheet(isRTL) {
     return; // STOP HERE!
   }
   
+  // DEBUG: Show what DETECTED_LANGUAGE is!
+  let debugBox = '<div style="background:#dc2626;color:#fff;padding:15px;margin:10px;border-radius:8px;font-weight:bold;text-align:center">';
+  debugBox += '⚠️ NOT HEBREW!<br>';
+  debugBox += 'DETECTED_LANGUAGE = "' + (typeof DETECTED_LANGUAGE !== 'undefined' ? DETECTED_LANGUAGE : 'undefined') + '"<br>';
+  debugBox += 'Expected: "he"';
+  debugBox += '</div>';
+  
   // ENGLISH: chords + lyrics
   const lines = [];
   let currentLine = [];
@@ -1022,7 +1029,7 @@ function buildFullLyricsSheet(isRTL) {
     }
   });
   
-  let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
+  let html = debugBox + '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
   for(const line of lines) {
     const words = line;
     const lineStart = words[0].time;
