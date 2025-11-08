@@ -179,6 +179,7 @@
         <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
           סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
         </span>
+        <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
         <button onclick="transposeDown()" style="padding:4px 10px;font-size:12px" title="הורד חצי טון">♭</button>
         <button onclick="transposeUp()" style="padding:4px 10px;font-size:12px" title="העלה חצי טון">♯</button>
         <span class="badge">מצב: <b id="modeBadge">—</b></span>
@@ -794,7 +795,31 @@ analyzeBtn.onclick=async()=>{
     // 🔧 v14.20: Update key display AFTER all processing (including validation)
     // This ensures we show the corrected key, not the initial detection
     console.log(`🎯 Final key to display: ${engine.NOTES_SHARP[engine.toPc(key.root)]}${key.minor?'m':''}`);
-    keyBadge.textContent = applyCapoToLabel(engine.NOTES_SHARP[engine.toPc(key.root)]+(key.minor?'m':''), capo);
+    
+    // 🆕 AGGRESSIVE FIX: Force update key display every 100ms for 2 seconds
+    // This ensures the corrected key is shown even if timing issues occur
+    const updateKeyDisplay = () => {
+      const currentKey = window.__STATE ? window.__STATE.key : key;
+      const displayKey = applyCapoToLabel(engine.NOTES_SHARP[engine.toPc(currentKey.root)]+(currentKey.minor?'m':''), capo);
+      if (keyBadge.textContent !== displayKey) {
+        console.log(`🔄 Updating keyBadge: ${keyBadge.textContent} → ${displayKey}`);
+        keyBadge.textContent = displayKey;
+      }
+    };
+    
+    // Initial update
+    updateKeyDisplay();
+    
+    // Poll for 2 seconds to catch any late updates
+    let pollCount = 0;
+    const pollInterval = setInterval(() => {
+      updateKeyDisplay();
+      pollCount++;
+      if (pollCount >= 20) { // 20 * 100ms = 2 seconds
+        clearInterval(pollInterval);
+      }
+    }, 100);
+    
     modeBadge.textContent = mode;
     
     // 🔧 FIXED: Use engine.NOTES_SHARP instead of engine.nameSharp()
