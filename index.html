@@ -258,8 +258,9 @@
     </section>
   </div>
 
-<script src="chord-engine-v14-7-fast.js"></script>
+<script src="chord-engine-v14-9-improved.js"></script>
 <script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded - lyrics sync disabled')"></script>
+<script src="hebrew-spell-checker.js"></script>
 
 <script>
 let engine;
@@ -392,6 +393,20 @@ function initTabs() {
 }
 initTabs();
 
+// 🔤 Hebrew Word Correction using spell checker
+async function correctHebrewWords(words, fullText) {
+  console.log('🔤 Correcting Hebrew words...');
+  const corrected = HebrewSpellChecker.correctWords(words);
+  
+  // Count corrections
+  const corrections = corrected.filter(w => w.original).length;
+  if (corrections > 0) {
+    console.log(`✅ Fixed ${corrections} words`);
+  }
+  
+  return corrected;
+}
+
 async function runWhisperInBackground(videoId) {
   if(WHISPER_RUNNING) return;
   WHISPER_RUNNING = true;
@@ -419,6 +434,11 @@ async function runWhisperInBackground(videoId) {
       WHISPER_WORDS = data.words || [];
       WHISPER_TEXT = data.text || '';
       DETECTED_LANGUAGE = data.language || 'en';
+      
+      // 🔤 Auto-correct Hebrew transcription
+      if (DETECTED_LANGUAGE === 'he' && WHISPER_WORDS.length > 0) {
+        WHISPER_WORDS = await correctHebrewWords(WHISPER_WORDS, WHISPER_TEXT);
+      }
       
       console.log(`⏱️ Whisper Transcription: ${whisperTime.toFixed(1)}ms (${(whisperTime/1000).toFixed(2)}s)`);
       
