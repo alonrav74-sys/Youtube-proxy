@@ -1,0 +1,17 @@
+{
+  "name": "ChordFinder Pro",
+  "short_name": "ChordFinder",
+  "description": "Advanced chord detection with AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
