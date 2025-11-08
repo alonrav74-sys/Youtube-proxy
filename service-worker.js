@@ -3,14 +3,15 @@
  * PWA offline support with cache
  */
 
-const CACHE_NAME = 'chordfinder-pro-v7.1';
+const CACHE_NAME = 'chordfinder-pro-v14.7';
 const urlsToCache = [
   '/',
   '/index.html',
-  '/chord-engine-unified.js',
-  '/sync-engine.js',
-  '/icon192.png',
-  '/icon512.png'
+  '/chord-engine-v14-7-fast.js',
+  '/sync-engine-v6.14.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 // Install - cache files
@@ -78,12 +79,10 @@ self.addEventListener('fetch', event => {
       .then(response => {
         // Cache hit - return response
         if (response) {
-          console.log('📦 Cache hit:', event.request.url);
           return response;
         }
         
         // Cache miss - fetch from network
-        console.log('🌐 Network fetch:', event.request.url);
         return fetch(event.request)
           .then(response => {
             // Don't cache invalid responses
@@ -112,31 +111,4 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Background sync (future feature)
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-chords') {
-    console.log('🔄 Background sync triggered');
-    // Future: sync analyzed chords to cloud
-  }
-});
-
-// Push notifications (future feature)
-self.addEventListener('push', event => {
-  if (event.data) {
-    const data = event.data.json();
-    console.log('🔔 Push notification:', data);
-    
-    const options = {
-      body: data.body,
-      icon: '/icon192.png',
-      badge: '/icon192.png',
-      vibrate: [200, 100, 200]
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
-  }
-});
-
-console.log('🎸 ChordFinder Pro Service Worker loaded');
+console.log('🎸 ChordFinder Pro Service Worker v14.7 loaded');
