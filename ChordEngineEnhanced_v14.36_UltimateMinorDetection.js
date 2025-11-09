@@ -680,11 +680,16 @@ class ChordEngineEnhanced {
 
       let score = dot(c, tmpl.mask) / (chromaNorms[i] * tmpl.maskNorm);
 
+      // ✅ FIX: Require stronger evidence - reject weak/noisy frames
+      if (score < 0.35) return -Infinity; // Hard threshold for chord confidence
+
       if (!cand.borrowed) score += 0.20;
       else score -= 0.25;
 
       if (bassPc[i] >= 0 && cand.root === bassPc[i]) score += 0.15 * bassMultiplier;
-      if (frameE[i] < lowE) score -= 0.10;
+      
+      // ✅ FIX: Heavily penalize low-energy frames (noise)
+      if (frameE[i] < lowE) score -= 0.30; // Increased from 0.10
 
       return score;
     };
@@ -899,11 +904,15 @@ class ChordEngineEnhanced {
       candidates[root].duration += dur;
     }
 
-    const opening = timeline.slice(0, Math.min(3, timeline.length));
+    // ✅ FIX: Find REAL first chord (skip early noise, minimum 1.5s into song)
+    const realStart = Math.max(0, timeline.findIndex(c => c.t >= 1.5));
+    const opening = timeline.slice(realStart, Math.min(realStart + 3, timeline.length));
+    
     for (let i = 0; i < opening.length; i++) {
       const root = this.parseRoot(opening[i].label);
       if (root >= 0 && candidates[root]) {
-        const w = i === 0 ? 40 : (3 - i) * 5;
+        // ✅ FIX: Massively boost first REAL chord (after noise)
+        const w = i === 0 ? 60 : (3 - i) * 8; // Increased from 40/5
         candidates[root].openingScore += w;
       }
     }
@@ -912,7 +921,8 @@ class ChordEngineEnhanced {
     for (let i = 0; i < closing.length; i++) {
       const root = this.parseRoot(closing[i].label);
       if (root >= 0 && candidates[root]) {
-        candidates[root].closingScore += (i + 1) * 8;
+        // ✅ FIX: Boost last chord significantly
+        candidates[root].closingScore += (i + 1) * 12; // Increased from 8
       }
     }
 
@@ -962,7 +972,7 @@ class ChordEngineEnhanced {
     if (!timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const minDur = Math.max(0.5, 0.45 * spb);
+    const minDur = Math.max(0.5, 0.50 * spb); // ✅ FIX: Increased from 0.45
     const energyMedian = this.percentile(feats.frameE, 50);
 
     const filtered = [];
@@ -972,12 +982,16 @@ class ChordEngineEnhanced {
       const b = timeline[i + 1];
       const dur = b ? (b.t - a.t) : minDur;
       const energy = feats.frameE[a.fi] || 0;
-      const isWeak = energy < energyMedian * 0.8;
+      const isWeak = energy < energyMedian * 0.85; // ✅ FIX: Stricter from 0.8
 
       const r = this.parseRoot(a.label);
       const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
 
+      // ✅ FIX: More aggressive filtering of weak non-diatonic chords
       if (dur < minDur && filtered.length > 0 && (isWeak || !isDiatonic)) continue;
+      
+      // ✅ FIX: Also remove very weak diatonic chords if too short
+      if (dur < minDur * 0.6 && isWeak) continue;
 
       filtered.push(a);
     }
@@ -1002,7 +1016,10 @@ class ChordEngineEnhanced {
     if (!timeline || !timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const earlyWindow = Math.max(10.0, 4 * spb);
+    
+    // ✅ FIX: More aggressive intro cleaning - wait for stable music
+    const earlyWindow = Math.max(15.0, 6 * spb); // Increased from 10s/4*spb
+    
     const toPc = n => ((n % 12) + 12) % 12;
 
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
@@ -1039,9 +1056,12 @@ class ChordEngineEnhanced {
         if (!inKey) {
           const bp = feats.bassPc[ev.fi] ?? -1;
           let newRoot = bp >= 0 ? snapToDiatonic(bp) : snapToDiatonic(r >= 0 ? r : key.root);
-          if (ev.t < Math.min(2.0, 1.5 * spb)) {
+          
+          // ✅ FIX: Very aggressive - force tonic for first 3 seconds
+          if (ev.t < Math.min(3.0, 2.0 * spb)) {
             newRoot = key.root;
           }
+          
           const q = getQuality(newRoot);
           label = this.NOTES_SHARP[toPc(newRoot)] + q;
         } else {
