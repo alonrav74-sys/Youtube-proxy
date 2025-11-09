@@ -1,17 +1,115 @@
 {
-  "name": "ChordFinder Pro",
-  "short_name": "ChordFinder",
-  "description": "Advanced chord detection with AI",
+  "name": "ChordFinder Pro - Ultimate Chord Detection",
+  "short_name": "ChordFinder Pro",
+  "description": "🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, מודולציות וסנכרון lyrics מלא עם Groq Whisper",
+  "version": "14.36",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "theme_color": "#38bdf8",
+  "background_color": "#0b1022",
+  "lang": "he",
+  "dir": "rtl",
+  "categories": [
+    "music",
+    "entertainment",
+    "utilities",
+    "productivity"
+  ],
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "icon192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "קובץ מקומי",
+      "short_name": "קובץ",
+      "description": "פתח קובץ אודיו מקומי",
+      "url": "/?tab=file",
+      "icons": [
+        {
+          "src": "icon192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "YouTube",
+      "short_name": "YouTube",
+      "description": "חפש שיר ביוטיוב",
+      "url": "/?tab=youtube",
+      "icons": [
+        {
+          "src": "icon192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "share_target": {
+    "action": "/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "audio",
+          "accept": [
+            "audio/*",
+            "video/*"
+          ]
+        }
+      ]
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "audio/*": [
+          ".mp3",
+          ".wav",
+          ".m4a",
+          ".ogg",
+          ".flac"
+        ],
+        "video/*": [
+          ".mp4",
+          ".webm",
+          ".mkv"
+        ]
+      }
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+music",
+      "url": "/?url=%s"
     }
   ]
 }
