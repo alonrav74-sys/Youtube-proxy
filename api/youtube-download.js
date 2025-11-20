@@ -1,5 +1,5 @@
 // /api/youtube-download.js
-// YouTube audio download using Cloud Api Hub
+// YouTube audio download using YouTube MP3 API
 
 export const config = {
   maxDuration: 60,
@@ -29,14 +29,15 @@ export default async function handler(req, res) {
 
     console.log('📥 Downloading audio for:', videoId);
     
-    // Cloud Api Hub - /download endpoint
+    // YouTube MP3 API - simple structure
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const rapidUrl = `https://cloud-api-hub---youtube-downloader.p.rapidapi.com/download?url=${encodeURIComponent(videoUrl)}`;
+    const rapidUrl = `https://youtube-mp36.p.rapidapi.com/dl?id=${videoId}`;
     
+    // First request - get MP3 link
     const rapidRes = await fetch(rapidUrl, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'cloud-api-hub---youtube-downloader.p.rapidapi.com',
+        'x-rapidapi-host': 'youtube-mp36.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
       }
     });
@@ -49,32 +50,51 @@ export default async function handler(req, res) {
     
     const rapidData = await rapidRes.json();
     
-    // Log response for debugging
+    // Log full response
     console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
+    console.log('📦 Status:', rapidData.status);
+    console.log('📦 Message:', rapidData.msg);
     
-    // Cloud Api Hub returns direct download links
-    // Look for audio formats
-    let audioUrl = null;
-    
-    // Check different possible structures
-    if (rapidData.formats && Array.isArray(rapidData.formats)) {
-      // Find audio-only format (usually has no video)
-      const audioFormat = rapidData.formats.find(f => 
-        f.mimeType && f.mimeType.includes('audio') && !f.hasVideo
-      );
-      audioUrl = audioFormat?.url;
+    // Handle processing status
+    if (rapidData.status === 'processing') {
+      console.log('⏳ Video is processing, waiting 1 second...');
       
-      console.log('🎵 Found audio format:', audioFormat ? 'YES' : 'NO');
+      // Wait 1 second and retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const retryRes = await fetch(rapidUrl, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-host': 'youtube-mp36.p.rapidapi.com',
+          'x-rapidapi-key': RAPIDAPI_KEY
+        }
+      });
+      
+      if (!retryRes.ok) {
+        throw new Error(`Retry failed: ${retryRes.status}`);
+      }
+      
+      const retryData = await retryRes.json();
+      console.log('📦 Retry Response:', JSON.stringify(retryData, null, 2));
+      
+      if (retryData.status === 'processing') {
+        return res.status(202).json({ 
+          error: 'Video still processing, please try again',
+          status: 'processing'
+        });
+      }
+      
+      Object.assign(rapidData, retryData);
     }
     
-    // Fallback: check for direct url field
-    if (!audioUrl) {
-      audioUrl = rapidData.url || 
-                 rapidData.downloadUrl || 
-                 rapidData.download_url ||
-                 rapidData.link ||
-                 rapidData.audio_url;
+    // Check for errors
+    if (rapidData.status === 'fail') {
+      console.error('❌ Conversion failed:', rapidData.msg);
+      throw new Error(rapidData.msg || 'Conversion failed');
     }
+    
+    // Extract MP3 link
+    const audioUrl = rapidData.link;
     
     console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
     
@@ -84,7 +104,7 @@ export default async function handler(req, res) {
       throw new Error('No audio URL in response');
     }
     
-    // Download the actual audio file
+    // Download the actual MP3 file
     console.log('⬇️ Downloading from:', audioUrl.substring(0, 100) + '...');
     const audioRes = await fetch(audioUrl);
     if (!audioRes.ok) {
