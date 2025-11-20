@@ -1,5 +1,5 @@
 // /api/youtube-download.js
-// Simple YouTube audio download
+// YouTube audio download using YouTube MP3 Audio Video Downloader API
 
 export const config = {
   maxDuration: 60,
@@ -29,47 +29,42 @@ export default async function handler(req, res) {
 
     console.log('📥 Downloading audio for:', videoId);
     
-    // Try the YT Search and Download MP3 API
-    const params = new URLSearchParams({
-      videoId: videoId,
-      id: videoId,
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      v: videoId
-    });
+    // NEW API: YouTube MP3 Audio Video Downloader
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const rapidUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/mp3`;
     
-    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?${params}`;
-    
+    // First request - get the download link
     const rapidRes = await fetch(rapidUrl, {
+      method: 'POST',
       headers: {
-        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com',
+        'content-type': 'application/json',
+        'x-rapidapi-host': 'youtube-mp3-audio-video-downloader.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
-      }
+      },
+      body: JSON.stringify({
+        url: videoUrl,
+        quality: 'high' // or 'mid' or 'low'
+      })
     });
     
     if (!rapidRes.ok) {
+      const errorText = await rapidRes.text();
+      console.error('❌ RapidAPI error:', rapidRes.status, errorText);
       throw new Error(`RapidAPI failed: ${rapidRes.status}`);
     }
     
     const rapidData = await rapidRes.json();
     
-    // Log EVERYTHING to see what we get
+    // Log response for debugging
     console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
-    console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
-    console.log('📦 Response type:', typeof rapidData);
     
-    // Find audio URL - the field is called "download"!
-    const audioUrl = rapidData.download || 
-                     rapidData.link || 
+    // Extract download URL
+    const audioUrl = rapidData.link || 
+                     rapidData.download || 
                      rapidData.url || 
-                     rapidData.download_link || 
-                     rapidData.downloadLink ||
-                     rapidData.audio_url ||
-                     rapidData.audioUrl ||
-                     rapidData.mp3 ||
+                     rapidData.download_link ||
                      rapidData.file ||
-                     rapidData.dlink ||
-                     (rapidData.data && rapidData.data.link) ||
-                     (rapidData.data && rapidData.data.url);
+                     (rapidData.data && rapidData.data.link);
     
     console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
     
@@ -79,7 +74,8 @@ export default async function handler(req, res) {
       throw new Error('No audio URL in response');
     }
     
-    // Download audio
+    // Download the actual audio file
+    console.log('⬇️ Downloading from:', audioUrl);
     const audioRes = await fetch(audioUrl);
     if (!audioRes.ok) {
       throw new Error(`Download failed: ${audioRes.status}`);
