@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     
     console.log('📥 Download:', videoId);
     
-    // YouTube V2 - הendpoint הנכון!
+    // YouTube V2
     const apiUrl = `https://youtube-v2.p.rapidapi.com/video/details?video_id=${videoId}`;
     
     const response = await fetch(apiUrl, {
@@ -35,40 +35,71 @@ export default async function handler(req, res) {
     console.log('📬 Status:', response.status);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ API Error:', errorText);
       throw new Error(`API error: ${response.status}`);
     }
     
     const data = await response.json();
     console.log('📦 Got video data');
     
-    // Find download links
+    // DEBUG: Print the entire response structure
+    console.log('🔍 Response keys:', Object.keys(data).join(', '));
+    console.log('🔍 Full response (first 500 chars):', JSON.stringify(data).substring(0, 500));
+    
+    // Try multiple ways to find audio URL
     let audioUrl = null;
     
-    // Check for direct download links
-    if (data.download_links) {
-      // Find audio link
+    // Method 1: download_links
+    if (data.download_links && Array.isArray(data.download_links)) {
+      console.log('🔍 Found download_links array');
       const audioLink = data.download_links.find(link => 
-        link.format && (link.format.includes('audio') || link.format.includes('m4a'))
+        link.format && (link.format.includes('audio') || link.format.includes('m4a') || link.format.includes('mp3'))
       );
-      audioUrl = audioLink?.url;
+      if (audioLink) {
+        audioUrl = audioLink.url || audioLink.link;
+        console.log('✅ Found audio in download_links');
+      }
     }
     
-    // Fallback: check streaming data
+    // Method 2: streamingData
     if (!audioUrl && data.streamingData?.adaptiveFormats) {
+      console.log('🔍 Checking streamingData');
       const audioFormat = data.streamingData.adaptiveFormats.find(f => 
         f.mimeType && f.mimeType.includes('audio') && f.url
       );
-      audioUrl = audioFormat?.url;
+      if (audioFormat) {
+        audioUrl = audioFormat.url;
+        console.log('✅ Found audio in streamingData');
+      }
+    }
+    
+    // Method 3: formats array
+    if (!audioUrl && data.formats && Array.isArray(data.formats)) {
+      console.log('🔍 Checking formats array');
+      const audioFormat = data.formats.find(f => 
+        f.mimeType && f.mimeType.includes('audio') && f.url
+      );
+      if (audioFormat) {
+        audioUrl = audioFormat.url;
+        console.log('✅ Found audio in formats');
+      }
+    }
+    
+    // Method 4: direct fields
+    if (!audioUrl) {
+      console.log('🔍 Checking direct fields');
+      audioUrl = data.audioUrl || data.audio_url || data.downloadUrl || data.download_url;
+      if (audioUrl) {
+        console.log('✅ Found audio in direct fields');
+      }
     }
     
     if (!audioUrl) {
-      console.error('❌ No audio URL found');
-      throw new Error('No audio URL available');
+      console.error('❌ No audio URL found after all attempts');
+      console.error('📦 Available data:', JSON.stringify(data, null, 2).substring(0, 1000));
+      throw new Error('No audio URL available - check logs for response structure');
     }
     
-    console.log('🎵 Found audio URL');
+    console.log('🎵 Audio URL found:', audioUrl.substring(0, 100) + '...');
     console.log('⬇️ Downloading...');
     
     // Download audio
@@ -86,12 +117,10 @@ export default async function handler(req, res) {
     
     console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
     
-    // Determine content type
     const contentType = audioUrl.includes('.m4a') || audioUrl.includes('mp4') 
       ? 'audio/mp4' 
       : 'audio/webm';
     
-    // Send audio
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', audioBuffer.length);
     res.status(200).send(audioBuffer);
@@ -102,7 +131,7 @@ export default async function handler(req, res) {
     console.error('💥 Error:', error.message);
     res.status(500).json({ 
       error: error.message,
-      details: 'YouTube V2 download failed'
+      details: 'Check Vercel logs for full response structure'
     });
   }
 }
