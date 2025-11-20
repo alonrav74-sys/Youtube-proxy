@@ -21,10 +21,11 @@ export default async function handler(req, res) {
     
     console.log('📥 Download:', videoId);
     
-    // YouTube V2 API
-    const apiUrl = `https://youtube-v2.p.rapidapi.com/video/info?video_id=${videoId}`;
+    // YouTube V2 - הendpoint הנכון!
+    const apiUrl = `https://youtube-v2.p.rapidapi.com/video/details?video_id=${videoId}`;
     
     const response = await fetch(apiUrl, {
+      method: 'GET',
       headers: {
         'x-rapidapi-host': 'youtube-v2.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
@@ -35,31 +36,47 @@ export default async function handler(req, res) {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Error:', errorText);
+      console.error('❌ API Error:', errorText);
       throw new Error(`API error: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('📦 Got data');
+    console.log('📦 Got video data');
     
-    // Get audio format
-    const formats = data.streamingData?.adaptiveFormats || [];
-    console.log('📦 Found', formats.length, 'formats');
+    // Find download links
+    let audioUrl = null;
     
-    const audioFormat = formats.find(f => 
-      f.mimeType && f.mimeType.includes('audio') && f.url
-    );
-    
-    if (!audioFormat) {
-      console.error('❌ No audio format');
-      throw new Error('No audio format available');
+    // Check for direct download links
+    if (data.download_links) {
+      // Find audio link
+      const audioLink = data.download_links.find(link => 
+        link.format && (link.format.includes('audio') || link.format.includes('m4a'))
+      );
+      audioUrl = audioLink?.url;
     }
     
-    console.log('🎵 Audio format:', audioFormat.mimeType);
+    // Fallback: check streaming data
+    if (!audioUrl && data.streamingData?.adaptiveFormats) {
+      const audioFormat = data.streamingData.adaptiveFormats.find(f => 
+        f.mimeType && f.mimeType.includes('audio') && f.url
+      );
+      audioUrl = audioFormat?.url;
+    }
+    
+    if (!audioUrl) {
+      console.error('❌ No audio URL found');
+      throw new Error('No audio URL available');
+    }
+    
+    console.log('🎵 Found audio URL');
     console.log('⬇️ Downloading...');
     
     // Download audio
-    const audioRes = await fetch(audioFormat.url);
+    const audioRes = await fetch(audioUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
     
     if (!audioRes.ok) {
       throw new Error(`Download failed: ${audioRes.status}`);
@@ -69,8 +86,13 @@ export default async function handler(req, res) {
     
     console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
     
+    // Determine content type
+    const contentType = audioUrl.includes('.m4a') || audioUrl.includes('mp4') 
+      ? 'audio/mp4' 
+      : 'audio/webm';
+    
     // Send audio
-    res.setHeader('Content-Type', 'audio/webm');
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', audioBuffer.length);
     res.status(200).send(audioBuffer);
     
