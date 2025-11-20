@@ -21,84 +21,70 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No videoId' });
     }
 
-    const API_KEY = process.env.API_NINJAS_KEY;
-    if (!API_KEY) {
-      return res.status(500).json({ error: 'API_NINJAS_KEY not configured' });
-    }
-
-    console.log('📥 Starting download for:', videoId);
-    console.log('🔑 Using API Ninjas');
+    console.log('📥 Download:', videoId);
     
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Get download URL from API Ninjas
-    let downloadUrl = null;
+    // Try Loader.to API (FREE, no API key needed!)
+    let downloadData = null;
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         console.log(`🔄 Attempt ${attempt}/${MAX_RETRIES}`);
         
-        const apiUrl = `https://api.api-ninjas.com/v1/youtubemp3?video_id=${videoId}`;
+        // Loader.to API
+        const apiUrl = `https://ab.cococococ.com/ajax/download.php?format=mp3&url=${encodeURIComponent(videoUrl)}`;
         
         const apiRes = await fetch(apiUrl, {
           method: 'GET',
           headers: {
-            'X-Api-Key': API_KEY
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
           }
         });
         
-        console.log('📬 API Status:', apiRes.status);
+        console.log('📬 Status:', apiRes.status);
         
         if (!apiRes.ok) {
-          const errorText = await apiRes.text();
-          console.error('❌ API Error:', errorText);
-          
-          if (attempt < MAX_RETRIES) {
-            console.log(`⏳ Waiting ${RETRY_DELAY}ms before retry...`);
-            await sleep(RETRY_DELAY);
-            continue;
-          }
-          throw new Error(`API Ninjas error: ${apiRes.status}`);
+          throw new Error(`API error: ${apiRes.status}`);
         }
         
-        const data = await apiRes.json();
-        console.log('📦 API Response keys:', Object.keys(data).join(', '));
+        downloadData = await apiRes.json();
+        console.log('📦 Response:', downloadData.success ? 'SUCCESS' : 'FAILED');
         
-        // API Ninjas returns: { download_url: "..." }
-        downloadUrl = data.download_url || data.url || data.link;
-        
-        if (!downloadUrl) {
-          console.error('❌ No download URL in response');
-          console.error('Response:', JSON.stringify(data, null, 2));
-          
-          if (attempt < MAX_RETRIES) {
-            await sleep(RETRY_DELAY);
-            continue;
-          }
-          throw new Error('No download URL from API Ninjas');
+        if (downloadData.success) {
+          break;
         }
         
-        console.log('✅ Got download URL');
-        break;
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY);
+        }
         
       } catch (error) {
-        console.error(`❌ Attempt ${attempt} failed:`, error.message);
+        console.error(`❌ Attempt ${attempt}:`, error.message);
         if (attempt === MAX_RETRIES) throw error;
         await sleep(RETRY_DELAY);
       }
     }
     
-    if (!downloadUrl) {
-      throw new Error('Failed to get download URL after all retries');
+    if (!downloadData || !downloadData.success) {
+      throw new Error('Failed to get download link');
     }
     
-    // Download the audio file
+    const downloadUrl = downloadData.url;
+    
+    if (!downloadUrl) {
+      throw new Error('No download URL');
+    }
+    
+    console.log('⬇️ Downloading audio...');
+    
+    // Download with retries
     let audioBuffer = null;
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         console.log(`⬇️ Download attempt ${attempt}/${MAX_RETRIES}`);
-        console.log('🎵 URL:', downloadUrl.substring(0, 100) + '...');
         
         const audioRes = await fetch(downloadUrl, {
           headers: {
@@ -106,52 +92,37 @@ export default async function handler(req, res) {
           }
         });
         
-        console.log('📥 Download status:', audioRes.status);
-        
         if (!audioRes.ok) {
-          console.error('❌ Download failed:', audioRes.status);
-          
-          if (attempt < MAX_RETRIES) {
-            await sleep(RETRY_DELAY);
-            continue;
-          }
           throw new Error(`Download failed: ${audioRes.status}`);
         }
         
         audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-        console.log('✅ Downloaded:', audioBuffer.length, 'bytes');
-        console.log('📊 Size:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+        console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
         break;
         
       } catch (error) {
-        console.error(`❌ Download attempt ${attempt} failed:`, error.message);
+        console.error(`❌ Download ${attempt}:`, error.message);
         if (attempt === MAX_RETRIES) throw error;
         await sleep(RETRY_DELAY);
       }
     }
     
     if (!audioBuffer) {
-      throw new Error('Failed to download audio after all retries');
+      throw new Error('Failed to download audio');
     }
     
-    // Send audio to client
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="${videoId}.mp3"`);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    
-    console.log('✅ Sending to client...');
     res.status(200).send(audioBuffer);
-    console.log('✅ Complete!');
+    
+    console.log('✅ Success!');
 
   } catch (error) {
-    console.error('💥 Final error:', error.message);
-    console.error('💥 Stack:', error.stack);
-    
+    console.error('💥 Error:', error.message);
     res.status(500).json({ 
       error: error.message,
-      details: 'API Ninjas download failed',
-      suggestion: 'Check server logs or try again'
+      suggestion: 'Try again or check video availability'
     });
   }
 }
