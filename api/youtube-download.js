@@ -1,15 +1,16 @@
+// /api/youtube-download.js
+// Simple YouTube audio download
+
 export const config = {
   maxDuration: 60,
 };
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;
-
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -21,108 +22,78 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No videoId' });
     }
 
-    console.log('📥 Download:', videoId);
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+    if (!RAPIDAPI_KEY) {
+      return res.status(500).json({ error: 'API key not configured' });
+    }
+
+    console.log('📥 Downloading audio for:', videoId);
     
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // Try the YT Search and Download MP3 API
+    const params = new URLSearchParams({
+      videoId: videoId,
+      id: videoId,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      v: videoId
+    });
     
-    // Try Loader.to API (FREE, no API key needed!)
-    let downloadData = null;
+    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?${params}`;
     
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`🔄 Attempt ${attempt}/${MAX_RETRIES}`);
-        
-        // Loader.to API
-        const apiUrl = `https://ab.cococococ.com/ajax/download.php?format=mp3&url=${encodeURIComponent(videoUrl)}`;
-        
-        const apiRes = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        
-        console.log('📬 Status:', apiRes.status);
-        
-        if (!apiRes.ok) {
-          throw new Error(`API error: ${apiRes.status}`);
-        }
-        
-        downloadData = await apiRes.json();
-        console.log('📦 Response:', downloadData.success ? 'SUCCESS' : 'FAILED');
-        
-        if (downloadData.success) {
-          break;
-        }
-        
-        if (attempt < MAX_RETRIES) {
-          await sleep(RETRY_DELAY);
-        }
-        
-      } catch (error) {
-        console.error(`❌ Attempt ${attempt}:`, error.message);
-        if (attempt === MAX_RETRIES) throw error;
-        await sleep(RETRY_DELAY);
+    const rapidRes = await fetch(rapidUrl, {
+      headers: {
+        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com',
+        'x-rapidapi-key': RAPIDAPI_KEY
       }
+    });
+    
+    if (!rapidRes.ok) {
+      throw new Error(`RapidAPI failed: ${rapidRes.status}`);
     }
     
-    if (!downloadData || !downloadData.success) {
-      throw new Error('Failed to get download link');
+    const rapidData = await rapidRes.json();
+    
+    // Log EVERYTHING to see what we get
+    console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
+    console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
+    console.log('📦 Response type:', typeof rapidData);
+    
+    // Find audio URL - the field is called "download"!
+    const audioUrl = rapidData.download || 
+                     rapidData.link || 
+                     rapidData.url || 
+                     rapidData.download_link || 
+                     rapidData.downloadLink ||
+                     rapidData.audio_url ||
+                     rapidData.audioUrl ||
+                     rapidData.mp3 ||
+                     rapidData.file ||
+                     rapidData.dlink ||
+                     (rapidData.data && rapidData.data.link) ||
+                     (rapidData.data && rapidData.data.url);
+    
+    console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
+    
+    if (!audioUrl) {
+      console.error('❌ No audio URL found!');
+      console.error('Available fields:', Object.keys(rapidData));
+      throw new Error('No audio URL in response');
     }
     
-    const downloadUrl = downloadData.url;
-    
-    if (!downloadUrl) {
-      throw new Error('No download URL');
+    // Download audio
+    const audioRes = await fetch(audioUrl);
+    if (!audioRes.ok) {
+      throw new Error(`Download failed: ${audioRes.status}`);
     }
     
-    console.log('⬇️ Downloading audio...');
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
     
-    // Download with retries
-    let audioBuffer = null;
-    
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        console.log(`⬇️ Download attempt ${attempt}/${MAX_RETRIES}`);
-        
-        const audioRes = await fetch(downloadUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        
-        if (!audioRes.ok) {
-          throw new Error(`Download failed: ${audioRes.status}`);
-        }
-        
-        audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-        console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
-        break;
-        
-      } catch (error) {
-        console.error(`❌ Download ${attempt}:`, error.message);
-        if (attempt === MAX_RETRIES) throw error;
-        await sleep(RETRY_DELAY);
-      }
-    }
-    
-    if (!audioBuffer) {
-      throw new Error('Failed to download audio');
-    }
-    
+    // Return audio
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.length);
-    res.setHeader('Content-Disposition', `attachment; filename="${videoId}.mp3"`);
     res.status(200).send(audioBuffer);
-    
-    console.log('✅ Success!');
 
   } catch (error) {
     console.error('💥 Error:', error.message);
-    res.status(500).json({ 
-      error: error.message,
-      suggestion: 'Try again or check video availability'
-    });
+    res.status(500).json({ error: error.message });
   }
 }
