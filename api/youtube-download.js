@@ -1,16 +1,15 @@
-// /api/youtube-download.js
-// Simple YouTube audio download
-
 export const config = {
   maxDuration: 60,
 };
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000;
+
 export default async function handler(req, res) {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -24,76 +23,177 @@ export default async function handler(req, res) {
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     if (!RAPIDAPI_KEY) {
-      return res.status(500).json({ error: 'API key not configured' });
+      return res.status(500).json({ error: 'RAPIDAPI_KEY not configured' });
     }
 
-    console.log('📥 Downloading audio for:', videoId);
+    console.log('📥 Starting download for:', videoId);
     
-    // Try the YT Search and Download MP3 API
-    const params = new URLSearchParams({
-      videoId: videoId,
-      id: videoId,
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      v: videoId
-    });
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     
-    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?${params}`;
+    // Step 1: Get available qualities
+    let qualityData = null;
     
-    const rapidRes = await fetch(rapidUrl, {
-      headers: {
-        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com',
-        'x-rapidapi-key': RAPIDAPI_KEY
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🔄 Quality check attempt ${attempt}/${MAX_RETRIES}`);
+        
+        // Get video info with qualities
+        const infoUrl = `https://youtube-video-fast-downloader.p.rapidapi.com/get-video-info/${videoId}`;
+        
+        const infoRes = await fetch(infoUrl, {
+          headers: {
+            'x-rapidapi-host': 'youtube-video-fast-downloader.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY
+          }
+        });
+        
+        console.log('📬 Info status:', infoRes.status);
+        
+        if (!infoRes.ok) {
+          if (attempt < MAX_RETRIES) {
+            await sleep(RETRY_DELAY);
+            continue;
+          }
+          throw new Error(`API error: ${infoRes.status}`);
+        }
+        
+        qualityData = await infoRes.json();
+        console.log('📦 Got quality data');
+        break;
+        
+      } catch (error) {
+        console.error(`❌ Attempt ${attempt}:`, error.message);
+        if (attempt === MAX_RETRIES) throw error;
+        await sleep(RETRY_DELAY);
       }
-    });
-    
-    if (!rapidRes.ok) {
-      throw new Error(`RapidAPI failed: ${rapidRes.status}`);
     }
     
-    const rapidData = await rapidRes.json();
+    // Find audio quality ID
+    let audioQualityId = null;
     
-    // Log EVERYTHING to see what we get
-    console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
-    console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
-    console.log('📦 Response type:', typeof rapidData);
-    
-    // Find audio URL - the field is called "download"!
-    const audioUrl = rapidData.download || 
-                     rapidData.link || 
-                     rapidData.url || 
-                     rapidData.download_link || 
-                     rapidData.downloadLink ||
-                     rapidData.audio_url ||
-                     rapidData.audioUrl ||
-                     rapidData.mp3 ||
-                     rapidData.file ||
-                     rapidData.dlink ||
-                     (rapidData.data && rapidData.data.link) ||
-                     (rapidData.data && rapidData.data.url);
-    
-    console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
-    
-    if (!audioUrl) {
-      console.error('❌ No audio URL found!');
-      console.error('Available fields:', Object.keys(rapidData));
-      throw new Error('No audio URL in response');
+    if (qualityData && Array.isArray(qualityData)) {
+      // Look for audio format (type: "audio")
+      const audioFormat = qualityData.find(q => q.type === 'audio');
+      
+      if (audioFormat) {
+        audioQualityId = audioFormat.id;
+        console.log('🎵 Found audio quality ID:', audioQualityId);
+      }
     }
     
-    // Download audio
-    const audioRes = await fetch(audioUrl);
-    if (!audioRes.ok) {
-      throw new Error(`Download failed: ${audioRes.status}`);
+    if (!audioQualityId) {
+      console.error('❌ No audio quality found');
+      throw new Error('No audio quality available');
     }
     
-    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    // Step 2: Get download URL
+    let downloadUrl = null;
     
-    // Return audio
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🔄 Download URL attempt ${attempt}/${MAX_RETRIES}`);
+        
+        const downloadApiUrl = `https://youtube-video-fast-downloader.p.rapidapi.com/download_video/${videoId}?quality=${audioQualityId}`;
+        
+        const downloadRes = await fetch(downloadApiUrl, {
+          headers: {
+            'x-rapidapi-host': 'youtube-video-fast-downloader.p.rapidapi.com',
+            'x-rapidapi-key': RAPIDAPI_KEY
+          }
+        });
+        
+        console.log('📬 Download info status:', downloadRes.status);
+        
+        if (!downloadRes.ok) {
+          if (attempt < MAX_RETRIES) {
+            await sleep(RETRY_DELAY);
+            continue;
+          }
+          throw new Error(`Download API error: ${downloadRes.status}`);
+        }
+        
+        const downloadData = await downloadRes.json();
+        console.log('📦 Download data keys:', Object.keys(downloadData).join(', '));
+        
+        // Extract download URL
+        downloadUrl = downloadData.file || downloadData.url || downloadData.download_url;
+        
+        if (downloadUrl) {
+          console.log('✅ Got download URL');
+          break;
+        }
+        
+        if (attempt < MAX_RETRIES) {
+          await sleep(RETRY_DELAY);
+        }
+        
+      } catch (error) {
+        console.error(`❌ Attempt ${attempt}:`, error.message);
+        if (attempt === MAX_RETRIES) throw error;
+        await sleep(RETRY_DELAY);
+      }
+    }
+    
+    if (!downloadUrl) {
+      throw new Error('No download URL received');
+    }
+    
+    // Step 3: Download the audio file
+    let audioBuffer = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`⬇️ Download attempt ${attempt}/${MAX_RETRIES}`);
+        console.log('🎵 URL:', downloadUrl.substring(0, 100) + '...');
+        
+        const audioRes = await fetch(downloadUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        console.log('📥 Audio status:', audioRes.status);
+        
+        if (!audioRes.ok) {
+          if (attempt < MAX_RETRIES) {
+            await sleep(RETRY_DELAY);
+            continue;
+          }
+          throw new Error(`Audio download failed: ${audioRes.status}`);
+        }
+        
+        audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+        console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+        break;
+        
+      } catch (error) {
+        console.error(`❌ Download ${attempt}:`, error.message);
+        if (attempt === MAX_RETRIES) throw error;
+        await sleep(RETRY_DELAY);
+      }
+    }
+    
+    if (!audioBuffer) {
+      throw new Error('Failed to download audio');
+    }
+    
+    // Send audio to client
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${videoId}.mp3"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    
+    console.log('✅ Sending to client...');
     res.status(200).send(audioBuffer);
+    console.log('✅ Complete!');
 
   } catch (error) {
-    console.error('💥 Error:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('💥 Final error:', error.message);
+    console.error('💥 Stack:', error.stack);
+    
+    res.status(500).json({ 
+      error: error.message,
+      details: 'YouTube FAST Downloader failed'
+    });
   }
 }
