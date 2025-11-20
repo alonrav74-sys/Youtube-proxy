@@ -19,55 +19,54 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No videoId' });
     }
 
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-    if (!RAPIDAPI_KEY) {
-      return res.status(500).json({ error: 'API key not configured' });
-    }
-
     console.log('Download:', videoId);
     
-    // YouTube Media Downloader API
-    const apiUrl = `https://youtube-media-downloader.p.rapidapi.com/v2/video/details?videoId=${videoId}`;
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    const response = await fetch(apiUrl, {
-      method: 'GET',
+    // Cobalt API - FREE and WORKS!
+    const cobaltRes = await fetch('https://api.cobalt.tools/api/json', {
+      method: 'POST',
       headers: {
-        'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com',
-        'x-rapidapi-key': RAPIDAPI_KEY
-      }
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: videoUrl,
+        isAudioOnly: true,
+        aFormat: 'mp3',
+        filenamePattern: 'basic'
+      })
     });
     
-    console.log('API Status:', response.status);
+    console.log('Cobalt status:', cobaltRes.status);
     
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+    if (!cobaltRes.ok) {
+      throw new Error(`Cobalt error: ${cobaltRes.status}`);
     }
     
-    const data = await response.json();
-    console.log('Response keys:', Object.keys(data).join(', '));
+    const cobaltData = await cobaltRes.json();
+    console.log('Cobalt response:', cobaltData.status);
     
-    // Find audio URL
-    let audioUrl = null;
-    
-    // Check for audio formats
-    if (data.audios && Array.isArray(data.audios) && data.audios.length > 0) {
-      audioUrl = data.audios[0].url;
-      console.log('Found audio URL');
-    } else if (data.formats && Array.isArray(data.formats)) {
-      const audioFormat = data.formats.find(f => 
-        f.mimeType && f.mimeType.includes('audio')
-      );
-      audioUrl = audioFormat?.url;
-      console.log('Found format URL');
+    if (cobaltData.status === 'error') {
+      throw new Error(cobaltData.text || 'Cobalt processing error');
     }
+    
+    if (cobaltData.status === 'rate-limit') {
+      throw new Error('Rate limited. Try again in a few seconds.');
+    }
+    
+    const audioUrl = cobaltData.url;
     
     if (!audioUrl) {
-      console.error('No audio URL found');
-      throw new Error('No audio URL available');
+      throw new Error('No audio URL from Cobalt');
     }
     
     console.log('Downloading audio...');
-    const audioRes = await fetch(audioUrl);
+    const audioRes = await fetch(audioUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
     
     if (!audioRes.ok) {
       throw new Error(`Download failed: ${audioRes.status}`);
@@ -86,7 +85,7 @@ export default async function handler(req, res) {
     console.error('Error:', error.message);
     res.status(500).json({ 
       error: error.message,
-      details: 'Failed to download audio'
+      suggestion: 'Try again or check if video is available'
     });
   }
 }
