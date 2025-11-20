@@ -1,5 +1,5 @@
 // /api/youtube-download.js
-// YouTube audio download using YouTube MP3 Audio Video Downloader API
+// YouTube audio download using Cloud Api Hub
 
 export const config = {
   maxDuration: 60,
@@ -29,22 +29,16 @@ export default async function handler(req, res) {
 
     console.log('📥 Downloading audio for:', videoId);
     
-    // NEW API: YouTube MP3 Audio Video Downloader
+    // Cloud Api Hub - /download endpoint
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const rapidUrl = `https://youtube-mp3-audio-video-downloader.p.rapidapi.com/mp3`;
+    const rapidUrl = `https://cloud-api-hub---youtube-downloader.p.rapidapi.com/download?url=${encodeURIComponent(videoUrl)}`;
     
-    // First request - get the download link
     const rapidRes = await fetch(rapidUrl, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'content-type': 'application/json',
-        'x-rapidapi-host': 'youtube-mp3-audio-video-downloader.p.rapidapi.com',
+        'x-rapidapi-host': 'cloud-api-hub---youtube-downloader.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
-      },
-      body: JSON.stringify({
-        url: videoUrl,
-        quality: 'high' // or 'mid' or 'low'
-      })
+      }
     });
     
     if (!rapidRes.ok) {
@@ -58,13 +52,29 @@ export default async function handler(req, res) {
     // Log response for debugging
     console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
     
-    // Extract download URL
-    const audioUrl = rapidData.link || 
-                     rapidData.download || 
-                     rapidData.url || 
-                     rapidData.download_link ||
-                     rapidData.file ||
-                     (rapidData.data && rapidData.data.link);
+    // Cloud Api Hub returns direct download links
+    // Look for audio formats
+    let audioUrl = null;
+    
+    // Check different possible structures
+    if (rapidData.formats && Array.isArray(rapidData.formats)) {
+      // Find audio-only format (usually has no video)
+      const audioFormat = rapidData.formats.find(f => 
+        f.mimeType && f.mimeType.includes('audio') && !f.hasVideo
+      );
+      audioUrl = audioFormat?.url;
+      
+      console.log('🎵 Found audio format:', audioFormat ? 'YES' : 'NO');
+    }
+    
+    // Fallback: check for direct url field
+    if (!audioUrl) {
+      audioUrl = rapidData.url || 
+                 rapidData.downloadUrl || 
+                 rapidData.download_url ||
+                 rapidData.link ||
+                 rapidData.audio_url;
+    }
     
     console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
     
@@ -75,13 +85,15 @@ export default async function handler(req, res) {
     }
     
     // Download the actual audio file
-    console.log('⬇️ Downloading from:', audioUrl);
+    console.log('⬇️ Downloading from:', audioUrl.substring(0, 100) + '...');
     const audioRes = await fetch(audioUrl);
     if (!audioRes.ok) {
       throw new Error(`Download failed: ${audioRes.status}`);
     }
     
     const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    
+    console.log('✅ Downloaded:', audioBuffer.length, 'bytes');
     
     // Return audio
     res.setHeader('Content-Type', 'audio/mpeg');
