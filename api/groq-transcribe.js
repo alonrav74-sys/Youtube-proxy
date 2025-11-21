@@ -1,6 +1,3 @@
-// /api/groq-transcribe.js
-// Groq Whisper with yt-search-and-download-mp3 API
-
 export const config = {
   maxDuration: 300,
 };
@@ -17,81 +14,92 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🎤 Groq Transcription Started');
+    console.log('🎤 ===== GROQ TRANSCRIPTION STARTED =====');
     
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
-    if (!GROQ_API_KEY || !RAPIDAPI_KEY) {
+    if (!GROQ_API_KEY) {
+      console.error('❌ GROQ_API_KEY not configured');
       return res.status(500).json({ 
         success: false, 
-        error: 'API keys not configured' 
+        error: 'GROQ_API_KEY not configured' 
       });
     }
 
-    const { videoId } = req.body || {};
-    if (!videoId) {
-      return res.status(400).json({ success: false, error: 'No videoId' });
-    }
-
-    // Step 1: Get MP3 from yt-search-and-download-mp3
-    console.log('📥 Getting MP3 from RapidAPI...');
+    const contentType = req.headers['content-type'] || '';
+    console.log('📦 Content-Type:', contentType);
     
-    // Try common parameter names
-    const params = new URLSearchParams({
-      videoId: videoId,
-      id: videoId,
-      url: `https://www.youtube.com/watch?v=${videoId}`,
-      v: videoId
-    });
+    let audioBuffer;
     
-    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?${params}`;
-    console.log('📡 Request URL:', rapidUrl);
-    
-    const rapidRes = await fetch(rapidUrl, {
-      headers: {
-        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com',
-        'x-rapidapi-key': RAPIDAPI_KEY
+    // Handle different content types
+    if (contentType.includes('multipart/form-data')) {
+      // Parse multipart form data
+      console.log('📋 Parsing multipart form data...');
+      
+      const boundary = contentType.split('boundary=')[1];
+      if (!boundary) {
+        throw new Error('No boundary in multipart data');
       }
-    });
-    
-    if (!rapidRes.ok) {
-      const errorText = await rapidRes.text();
-      console.error('❌ RapidAPI error:', errorText.substring(0, 500));
-      throw new Error(`RapidAPI failed: ${rapidRes.status}`);
+      
+      // Get raw body
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const bodyBuffer = Buffer.concat(chunks);
+      
+      // Find audio file in multipart data
+      const boundaryStr = `--${boundary}`;
+      const parts = bodyBuffer.toString('binary').split(boundaryStr);
+      
+      for (const part of parts) {
+        if (part.includes('Content-Type: audio/')) {
+          const headerEnd = part.indexOf('\r\n\r\n');
+          if (headerEnd !== -1) {
+            const bodyStart = headerEnd + 4;
+            const bodyEnd = part.lastIndexOf('\r\n');
+            const audioData = part.substring(bodyStart, bodyEnd);
+            audioBuffer = Buffer.from(audioData, 'binary');
+            break;
+          }
+        }
+      }
+      
+    } else if (contentType.includes('application/json')) {
+      // Handle JSON with base64 audio
+      console.log('📋 Parsing JSON...');
+      
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      
+      if (body.audioData) {
+        // Base64 encoded audio
+        console.log('📦 Got base64 audio data');
+        audioBuffer = Buffer.from(body.audioData, 'base64');
+      } else {
+        throw new Error('No audioData in request body');
+      }
+      
+    } else {
+      // Assume raw audio body
+      console.log('📋 Reading raw audio body...');
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      audioBuffer = Buffer.concat(chunks);
     }
     
-    const rapidData = await rapidRes.json();
-    console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
-    
-    // Find audio URL - the field is called "download"!
-    let audioUrl = rapidData.download ||
-                   rapidData.link || 
-                   rapidData.url || 
-                   rapidData.download_link || 
-                   rapidData.downloadLink ||
-                   rapidData.audio_url ||
-                   rapidData.audioUrl ||
-                   rapidData.mp3 ||
-                   rapidData.file;
-    
-    if (!audioUrl) {
-      console.error('❌ No audio URL found!');
-      console.error('Response:', JSON.stringify(rapidData).substring(0, 500));
-      throw new Error('No audio URL in API response');
+    if (!audioBuffer || audioBuffer.length === 0) {
+      throw new Error('No audio data received');
     }
     
-    console.log('✅ Got audio URL!');
+    console.log('✅ Audio received:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
 
-    // Step 2: Download audio
-    console.log('⬇️  Downloading audio...');
-    const audioRes = await fetch(audioUrl);
-    if (!audioRes.ok) throw new Error(`Download failed: ${audioRes.status}`);
-    
-    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-    console.log(`✅ Downloaded: ${audioBuffer.length} bytes`);
-
-    // Step 3: Send to Groq using manual multipart form
+    // Send to Groq Whisper
     console.log('🎯 Sending to Groq Whisper...');
     
     const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
@@ -123,6 +131,8 @@ export default async function handler(req, res) {
       )
     );
     
+    console.log('📤 Sending to Groq (', (formBody.length / 1024 / 1024).toFixed(2), 'MB )...');
+    
     const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -132,14 +142,18 @@ export default async function handler(req, res) {
       body: formBody,
     });
     
+    console.log('📬 Groq response status:', groqRes.status);
+    
     if (!groqRes.ok) {
       const error = await groqRes.text();
       console.error('❌ Groq error:', error);
-      throw new Error(`Groq failed: ${groqRes.status}`);
+      throw new Error(`Groq failed: ${groqRes.status} - ${error}`);
     }
     
     const result = await groqRes.json();
     console.log('✅ Transcription complete!');
+    console.log('📝 Text length:', result.text?.length || 0);
+    console.log('🔤 Words count:', result.words?.length || 0);
     
     // Format response
     const words = result.words || [];
@@ -159,6 +173,8 @@ export default async function handler(req, res) {
       }
     });
     
+    console.log('✅ ===== TRANSCRIPTION SUCCESS =====\n');
+    
     return res.status(200).json({
       success: true,
       text: result.text || '',
@@ -169,7 +185,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    console.error('💥 ===== TRANSCRIPTION ERROR =====');
     console.error('💥 Error:', error.message);
+    console.error('💥 Stack:', error.stack);
+    
     return res.status(500).json({ 
       success: false, 
       error: error.message 
