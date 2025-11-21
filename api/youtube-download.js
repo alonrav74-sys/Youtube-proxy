@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'videoId required' });
     }
 
-    console.log('🎵 Downloading YouTube audio:', videoId);
+    console.log('🎵 Downloading YouTube audio (M4A):', videoId);
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
@@ -34,22 +34,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ YouTube to Mp3 API
+    // ✅ youtube-video-info1 API (works great!)
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const apiUrl = `https://youtube-video-info1.p.rapidapi.com/youtube-info/?url=${encodeURIComponent(videoUrl)}`;
     
-    // Try POST method with JSON body
-    console.log('📡 Sending POST request to YouTube to Mp3 API...');
+    console.log('📡 Getting video info from youtube-video-info1...');
     
-    const response = await fetch('https://youtube-to-mp3-api.p.rapidapi.com/api/youtube-video', {
-      method: 'POST',
+    const response = await fetch(apiUrl, {
+      method: 'GET',
       headers: {
-        'x-rapidapi-host': 'youtube-to-mp3-api.p.rapidapi.com',
-        'x-rapidapi-key': RAPIDAPI_KEY,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        urls: [videoUrl]
-      })
+        'x-rapidapi-host': 'youtube-video-info1.p.rapidapi.com',
+        'x-rapidapi-key': RAPIDAPI_KEY
+      }
     });
 
     if (!response.ok) {
@@ -60,33 +56,19 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     console.log('📦 Response keys:', Object.keys(data));
-    console.log('📦 Response data:', JSON.stringify(data).substring(0, 300));
 
-    // ✅ Extract audio URL from response
-    let downloadUrl = null;
-    
-    // Check if response has audio_medias
-    if (data.audio_medias && Array.isArray(data.audio_medias) && data.audio_medias.length > 0) {
-      // Get first audio (usually best quality)
-      downloadUrl = data.audio_medias[0].url;
-      console.log('✅ Found audio URL in audio_medias');
-    } else if (data.url) {
-      downloadUrl = data.url;
-      console.log('✅ Found audio URL in data.url');
-    } else if (data.download_url) {
-      downloadUrl = data.download_url;
-      console.log('✅ Found audio URL in data.download_url');
-    }
+    // Extract download URL (M4A)
+    let downloadUrl = data.download_url || data.url || data.audio_url || data.link;
     
     if (!downloadUrl) {
-      console.error('❌ No audio URL found in response:', JSON.stringify(data));
-      throw new Error('No audio URL in API response');
+      console.error('❌ No download URL found:', JSON.stringify(data).substring(0, 500));
+      throw new Error('No download URL in API response');
     }
 
-    console.log('✅ Got audio download URL');
+    console.log('✅ Got download URL');
 
-    // ✅ Download the MP3 file
-    console.log('⬇️ Downloading MP3...');
+    // Download the audio file
+    console.log('⬇️ Downloading M4A...');
     const audioResponse = await fetch(downloadUrl);
     
     if (!audioResponse.ok) {
@@ -95,10 +77,10 @@ export default async function handler(req, res) {
 
     const audioBuffer = await audioResponse.arrayBuffer();
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
-    console.log('✅ Downloaded MP3:', sizeInMB, 'MB');
+    console.log('✅ Downloaded M4A:', sizeInMB, 'MB');
 
-    // ✅ Return MP3 to client
-    res.setHeader('Content-Type', 'audio/mpeg');
+    // Return M4A to client (will be compressed in browser before sending to Groq)
+    res.setHeader('Content-Type', 'audio/mp4');
     res.setHeader('Content-Length', audioBuffer.byteLength);
     return res.status(200).send(Buffer.from(audioBuffer));
 
