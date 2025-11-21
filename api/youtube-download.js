@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'videoId required' });
     }
 
-    console.log('🎵 Downloading YouTube audio (128kbps MP3):', videoId);
+    console.log('🎵 Downloading YouTube audio:', videoId);
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
@@ -34,15 +34,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ YouTube MP3 2025 API - Use video ID with quality
-    const apiUrl = `https://cdn-ytb.zm.io.vn/sse-client/download?id=${videoId}&quality=128kbps`;
+    // ✅ YouTube to Mp3 API - correct endpoint!
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const apiUrl = `https://youtube-to-mp3-api.p.rapidapi.com/?url=${encodeURIComponent(videoUrl)}`;
     
-    console.log('📡 Getting download link from YouTube MP3 2025...');
+    console.log('📡 Getting audio links from YouTube to Mp3 API...');
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'cdn-ytb.zm.io.vn',
+        'x-rapidapi-host': 'youtube-to-mp3-api.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
       }
     });
@@ -56,21 +57,33 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('📦 Response keys:', Object.keys(data));
 
-    // ✅ Extract MP3 download link
-    const downloadUrl = data.linkDownload;
+    // ✅ Extract audio URL from audio_medias array
+    let downloadUrl = null;
+    
+    if (data.audio_medias && Array.isArray(data.audio_medias)) {
+      // Get MEDIUM or LOW quality (smaller file)
+      const audioMedium = data.audio_medias.find(a => a.quality === 'AUDIO_QUALITY_MEDIUM');
+      const audioLow = data.audio_medias.find(a => a.quality === 'AUDIO_QUALITY_LOW');
+      
+      const selectedAudio = audioMedium || audioLow || data.audio_medias[0];
+      
+      if (selectedAudio) {
+        downloadUrl = selectedAudio.url;
+        console.log('✅ Selected audio quality:', selectedAudio.quality);
+      }
+    }
     
     if (!downloadUrl) {
-      console.error('❌ No linkDownload in response:', JSON.stringify(data));
+      console.error('❌ No audio URL found:', JSON.stringify(data).substring(0, 500));
       
-      // Check for error in response
       if (data.error) {
         throw new Error(`API error: ${data.error}`);
       }
       
-      throw new Error('No download link in API response');
+      throw new Error('No audio URL in API response');
     }
 
-    console.log('✅ Got MP3 download link');
+    console.log('✅ Got audio download URL');
 
     // ✅ Download the MP3 file
     console.log('⬇️ Downloading MP3...');
@@ -82,7 +95,7 @@ export default async function handler(req, res) {
 
     const audioBuffer = await audioResponse.arrayBuffer();
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
-    console.log('✅ Downloaded MP3:', sizeInMB, 'MB (128kbps)');
+    console.log('✅ Downloaded MP3:', sizeInMB, 'MB');
 
     // ✅ Return MP3 to client
     res.setHeader('Content-Type', 'audio/mpeg');
