@@ -1,14 +1,13 @@
-import ytdl from '@distube/ytdl-core';
-
 export const config = {
   maxDuration: 60,
 };
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -20,73 +19,106 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No videoId' });
     }
 
-    console.log('📥 Download:', videoId);
-    
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    // Get video info
-    console.log('🔍 Getting video info...');
-    const info = await ytdl.getInfo(videoUrl);
-    
-    console.log('📦 Video title:', info.videoDetails.title);
-    
-    // Get audio formats
-    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-    
-    if (audioFormats.length === 0) {
-      throw new Error('No audio formats available');
+    const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
+    if (!RAPIDAPI_KEY) {
+      return res.status(500).json({ error: 'API key not configured' });
     }
+
+    console.log('📥 Downloading audio for:', videoId);
     
-    console.log('🎵 Found', audioFormats.length, 'audio formats');
+    // Try the YT Search and Download MP3 API
+    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?videoId=${videoId}`;
     
-    // Get highest quality audio
-    const audioFormat = audioFormats.reduce((prev, current) => {
-      return (prev.audioBitrate > current.audioBitrate) ? prev : current;
-    });
+    console.log('🔗 API URL:', rapidUrl);
     
-    console.log('✅ Selected format:', audioFormat.mimeType, audioFormat.audioBitrate + 'kbps');
-    
-    const audioUrl = audioFormat.url;
-    
-    if (!audioUrl) {
-      throw new Error('No audio URL');
-    }
-    
-    console.log('⬇️ Downloading audio...');
-    
-    // Download audio
-    const audioRes = await fetch(audioUrl, {
+    const rapidRes = await fetch(rapidUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com',
+        'x-rapidapi-key': RAPIDAPI_KEY
       }
     });
     
-    if (!audioRes.ok) {
-      throw new Error(`Download failed: ${audioRes.status}`);
+    console.log('📬 Status:', rapidRes.status);
+    console.log('📬 Status Text:', rapidRes.statusText);
+    
+    if (!rapidRes.ok) {
+      const errorText = await rapidRes.text();
+      console.error('❌ Error response:', errorText);
+      throw new Error(`RapidAPI failed: ${rapidRes.status} - ${errorText}`);
     }
     
-    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    const rapidData = await rapidRes.json();
     
-    console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+    // Log EVERYTHING
+    console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
+    console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
     
-    // Determine content type
-    const mimeType = audioFormat.mimeType.split(';')[0];
+    // Find audio URL
+    const audioUrl = rapidData.download || 
+                     rapidData.link || 
+                     rapidData.url || 
+                     rapidData.download_link || 
+                     rapidData.downloadLink ||
+                     rapidData.audio_url ||
+                     rapidData.audioUrl ||
+                     rapidData.mp3 ||
+                     rapidData.file ||
+                     rapidData.dlink;
     
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Length', audioBuffer.length);
-    res.setHeader('Content-Disposition', `attachment; filename="${videoId}.audio"`);
-    res.setHeader('Cache-Control', 'public, max-age=3600');
+    console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
     
-    console.log('✅ Sending to client...');
-    res.status(200).send(audioBuffer);
-    console.log('✅ Complete!');
+    if (!audioUrl) {
+      console.error('❌ No audio URL found!');
+      console.error('📋 Available fields:', Object.keys(rapidData));
+      console.error('📋 Full data:', JSON.stringify(rapidData));
+      throw new Error('No audio URL in response');
+    }
+    
+    console.log('🎵 Audio URL:', audioUrl.substring(0, 100) + '...');
+    console.log('⬇️ Downloading...');
+    
+    // Download audio with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30 sec timeout
+    
+    try {
+      const audioRes = await fetch(audioUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      clearTimeout(timeout);
+      
+      console.log('📥 Download status:', audioRes.status);
+      
+      if (!audioRes.ok) {
+        throw new Error(`Download failed: ${audioRes.status}`);
+      }
+      
+      const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+      
+      console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+      
+      // Return audio
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.length);
+      res.status(200).send(audioBuffer);
+      
+      console.log('✅ Complete!');
+      
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      throw fetchError;
+    }
 
   } catch (error) {
     console.error('💥 Error:', error.message);
     console.error('💥 Stack:', error.stack);
     res.status(500).json({ 
       error: error.message,
-      details: 'ytdl-core download failed'
+      details: 'Check Vercel logs for details'
     });
   }
 }
