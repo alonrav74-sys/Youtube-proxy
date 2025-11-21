@@ -1,0 +1,6 @@
+{
+  "buildCommand": null,
+  "installCommand": "npm install",
+  "devCommand": null,
+  "framework": null
+}
