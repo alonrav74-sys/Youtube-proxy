@@ -34,18 +34,22 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ YouTube to Mp3 API - correct endpoint!
+    // ✅ YouTube to Mp3 API
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const apiUrl = `https://youtube-to-mp3-api.p.rapidapi.com/?url=${encodeURIComponent(videoUrl)}`;
     
-    console.log('📡 Getting audio links from YouTube to Mp3 API...');
+    // Try POST method with JSON body
+    console.log('📡 Sending POST request to YouTube to Mp3 API...');
     
-    const response = await fetch(apiUrl, {
-      method: 'GET',
+    const response = await fetch('https://youtube-to-mp3-api.p.rapidapi.com/api/youtube-video', {
+      method: 'POST',
       headers: {
         'x-rapidapi-host': 'youtube-to-mp3-api.p.rapidapi.com',
-        'x-rapidapi-key': RAPIDAPI_KEY
-      }
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        urls: [videoUrl]
+      })
     });
 
     if (!response.ok) {
@@ -56,30 +60,26 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     console.log('📦 Response keys:', Object.keys(data));
+    console.log('📦 Response data:', JSON.stringify(data).substring(0, 300));
 
-    // ✅ Extract audio URL from audio_medias array
+    // ✅ Extract audio URL from response
     let downloadUrl = null;
     
-    if (data.audio_medias && Array.isArray(data.audio_medias)) {
-      // Get MEDIUM or LOW quality (smaller file)
-      const audioMedium = data.audio_medias.find(a => a.quality === 'AUDIO_QUALITY_MEDIUM');
-      const audioLow = data.audio_medias.find(a => a.quality === 'AUDIO_QUALITY_LOW');
-      
-      const selectedAudio = audioMedium || audioLow || data.audio_medias[0];
-      
-      if (selectedAudio) {
-        downloadUrl = selectedAudio.url;
-        console.log('✅ Selected audio quality:', selectedAudio.quality);
-      }
+    // Check if response has audio_medias
+    if (data.audio_medias && Array.isArray(data.audio_medias) && data.audio_medias.length > 0) {
+      // Get first audio (usually best quality)
+      downloadUrl = data.audio_medias[0].url;
+      console.log('✅ Found audio URL in audio_medias');
+    } else if (data.url) {
+      downloadUrl = data.url;
+      console.log('✅ Found audio URL in data.url');
+    } else if (data.download_url) {
+      downloadUrl = data.download_url;
+      console.log('✅ Found audio URL in data.download_url');
     }
     
     if (!downloadUrl) {
-      console.error('❌ No audio URL found:', JSON.stringify(data).substring(0, 500));
-      
-      if (data.error) {
-        throw new Error(`API error: ${data.error}`);
-      }
-      
+      console.error('❌ No audio URL found in response:', JSON.stringify(data));
       throw new Error('No audio URL in API response');
     }
 
