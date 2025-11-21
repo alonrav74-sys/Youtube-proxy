@@ -26,8 +26,9 @@ export default async function handler(req, res) {
 
     console.log('📥 Downloading audio for:', videoId);
     
-    // Try the YT Search and Download MP3 API
-    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?videoId=${videoId}`;
+    // FIXED: Send full YouTube URL!
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const rapidUrl = `https://yt-search-and-download-mp3.p.rapidapi.com/mp3?url=${encodeURIComponent(videoUrl)}`;
     
     console.log('🔗 API URL:', rapidUrl);
     
@@ -39,19 +40,17 @@ export default async function handler(req, res) {
     });
     
     console.log('📬 Status:', rapidRes.status);
-    console.log('📬 Status Text:', rapidRes.statusText);
     
     if (!rapidRes.ok) {
       const errorText = await rapidRes.text();
       console.error('❌ Error response:', errorText);
-      throw new Error(`RapidAPI failed: ${rapidRes.status} - ${errorText}`);
+      throw new Error(`RapidAPI failed: ${rapidRes.status}`);
     }
     
     const rapidData = await rapidRes.json();
     
-    // Log EVERYTHING
-    console.log('📦 Full Response:', JSON.stringify(rapidData, null, 2));
     console.log('📦 Response keys:', Object.keys(rapidData).join(', '));
+    console.log('📦 Full data:', JSON.stringify(rapidData));
     
     // Find audio URL
     const audioUrl = rapidData.download || 
@@ -60,65 +59,45 @@ export default async function handler(req, res) {
                      rapidData.download_link || 
                      rapidData.downloadLink ||
                      rapidData.audio_url ||
-                     rapidData.audioUrl ||
-                     rapidData.mp3 ||
-                     rapidData.file ||
-                     rapidData.dlink;
+                     rapidData.mp3;
     
     console.log('🔍 Found audio URL:', audioUrl ? 'YES' : 'NO');
     
     if (!audioUrl) {
       console.error('❌ No audio URL found!');
-      console.error('📋 Available fields:', Object.keys(rapidData));
-      console.error('📋 Full data:', JSON.stringify(rapidData));
       throw new Error('No audio URL in response');
     }
     
-    console.log('🎵 Audio URL:', audioUrl.substring(0, 100) + '...');
     console.log('⬇️ Downloading...');
     
-    // Download audio with timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000); // 30 sec timeout
-    
-    try {
-      const audioRes = await fetch(audioUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      clearTimeout(timeout);
-      
-      console.log('📥 Download status:', audioRes.status);
-      
-      if (!audioRes.ok) {
-        throw new Error(`Download failed: ${audioRes.status}`);
+    // Download audio
+    const audioRes = await fetch(audioUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
-      
-      const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-      
-      console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
-      
-      // Return audio
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Content-Length', audioBuffer.length);
-      res.status(200).send(audioBuffer);
-      
-      console.log('✅ Complete!');
-      
-    } catch (fetchError) {
-      clearTimeout(timeout);
-      throw fetchError;
+    });
+    
+    console.log('📥 Download status:', audioRes.status);
+    
+    if (!audioRes.ok) {
+      throw new Error(`Download failed: ${audioRes.status}`);
     }
+    
+    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+    
+    console.log('✅ Downloaded:', (audioBuffer.length / 1024 / 1024).toFixed(2), 'MB');
+    
+    // Return audio
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.status(200).send(audioBuffer);
+    
+    console.log('✅ Complete!');
 
   } catch (error) {
     console.error('💥 Error:', error.message);
-    console.error('💥 Stack:', error.stack);
     res.status(500).json({ 
-      error: error.message,
-      details: 'Check Vercel logs for details'
+      error: error.message
     });
   }
 }
