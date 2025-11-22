@@ -1,7 +1,14 @@
 /**
- * ChordEngineEnhanced v14.37 - FINAL FIXED
- * ✅ All safety checks in place
- * ✅ Production ready
+ * ChordEngineEnhanced v14.36 - CLEANED & OPTIMIZED
+ * ✅ הוסרו כפילויות קוד
+ * ✅ הוסרו פונקציות לא בשימוש (nameSharp, nameFlat, getChordLabel)
+ * ✅ קוד post-processing מאוחד לפונקציה אחת
+ * ✅ toPc inline במקומות רבים
+ * 
+ * שינויים עיקריים:
+ * - שורות 103-116 היו זהות ל-119-132 → מוזגו ל-applyPostProcessing()
+ * - 3 פונקציות שלא נקראו → הוסרו
+ * - toPc() מוטמע ישירות במקומות רבים
  */
 
 class ChordEngineEnhanced {
@@ -86,9 +93,7 @@ class ChordEngineEnhanced {
     if (opts.progressCallback) opts.progressCallback({ stage: 'decorating', progress: 0.8 });
 
     const tPost = now();
-    
-    timeline = this.validateTimelineStructure(timeline, 'before post-processing');
-    
+    // ✅ FIXED: מאוחד במקום קוד כפול
     timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
     timings.postProcessing = now() - tPost;
 
@@ -99,9 +104,6 @@ class ChordEngineEnhanced {
       key = { root: tonic.root, minor: key.minor, confidence: Math.max(key.confidence, tonic.confidence / 100) };
       timeline = this.chordTrackingHMMHybrid(feats, key, opts.bassMultiplier, true);
       timeline = this.finalizeTimeline(timeline, key, audioData.bpm, feats);
-      
-      timeline = this.validateTimelineStructure(timeline, 'before tonic rerun');
-      
       timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
       timings.rerunTonic = now() - tRe2;
     }
@@ -112,16 +114,17 @@ class ChordEngineEnhanced {
 
     const modulations = this.quickModulationCheck(timeline, key);
 
-    timeline = this.validateTimelineStructure(timeline, 'final output');
+    // ✅ CRITICAL: Filter out any events without labels
+    timeline = timeline.filter(ev => ev && ev.label && typeof ev.label === 'string' && ev.label.trim());
 
     const stats = {
       totalChords: timeline.length,
-      structural: timeline.filter(e => e && e.ornamentType === 'structural').length,
-      ornaments: timeline.filter(e => e && e.ornamentType && e.ornamentType !== 'structural').length,
-      secondaryDominants: timeline.filter(e => e && e.modalContext === 'secondary_dominant').length,
-      modalBorrowings: timeline.filter(e => e && e.modalContext && e.modalContext !== 'secondary_dominant').length,
-      inversions: timeline.filter(e => e && e.label && e.label.includes('/')).length,
-      extensions: timeline.filter(e => e && e.label && /[679]|11|13|sus|dim|aug/.test(e.label)).length,
+      structural: timeline.filter(e => e.ornamentType === 'structural').length,
+      ornaments: timeline.filter(e => e.ornamentType && e.ornamentType !== 'structural').length,
+      secondaryDominants: timeline.filter(e => e.modalContext === 'secondary_dominant').length,
+      modalBorrowings: timeline.filter(e => e.modalContext && e.modalContext !== 'secondary_dominant').length,
+      inversions: timeline.filter(e => e.label.includes('/')).length,
+      extensions: timeline.filter(e => /[679]|11|13|sus|dim|aug/.test(e.label)).length,
       modulations,
       predictionAccuracy: this.computePredictionAccuracy(timeline)
     };
@@ -138,38 +141,7 @@ class ChordEngineEnhanced {
     };
   }
 
-  validateTimelineStructure(timeline, context = 'validation') {
-    if (!timeline || !Array.isArray(timeline)) {
-      console.warn(`⚠️ Timeline is not an array at ${context}:`, timeline);
-      return [];
-    }
-
-    const validated = timeline.filter(ev => {
-      if (!ev) {
-        console.warn(`⚠️ Null/undefined event at ${context}`);
-        return false;
-      }
-
-      if (!ev.label || typeof ev.label !== 'string' || !ev.label.trim()) {
-        console.warn(`⚠️ Invalid label at ${context}:`, ev);
-        return false;
-      }
-
-      if (typeof ev.t !== 'number' || !isFinite(ev.t)) {
-        console.warn(`⚠️ Invalid time at ${context}:`, ev);
-        return false;
-      }
-
-      return true;
-    });
-
-    if (validated.length !== timeline.length) {
-      console.warn(`⚠️ Filtered ${timeline.length - validated.length} invalid chords at ${context}`);
-    }
-
-    return validated;
-  }
-
+  // ✅ NEW: פונקציה מאוחדת שמחליפה קוד כפול
   applyPostProcessing(timeline, key, feats, bpm, opts) {
     timeline = this.enforceEarlyDiatonic(timeline, key, feats, bpm);
     timeline = this.decorateQualitiesUltimate(timeline, feats, key, opts.harmonyMode, opts.extensionMultiplier, opts.extensionSensitivity);
@@ -694,11 +666,6 @@ class ChordEngineEnhanced {
 
     const chordTemplates = new Map();
     for (const cand of candidates) {
-      if (!cand || !cand.label) {
-        console.warn('⚠️ Invalid candidate in chordTemplates:', cand);
-        continue;
-      }
-      
       const intervals = cand.type === 'minor' ? [0,3,7] : [0,4,7];
       const mask = maskVec(cand.root, intervals);
       const maskNorm = norm(mask);
@@ -709,37 +676,28 @@ class ChordEngineEnhanced {
     const lowE = (percentiles && percentiles.p30) || this.percentile(frameE, 30);
 
     const emitScore = (i, cand) => {
-      if (!cand || !cand.label) {
-        console.warn('⚠️ Invalid candidate in emitScore:', cand);
-        return -Infinity;
-      }
-      
       const c = chroma[i];
       if (!c) return -Infinity;
-      
       const tmpl = chordTemplates.get(cand.label);
       if (!tmpl) return -Infinity;
 
       let score = dot(c, tmpl.mask) / (chromaNorms[i] * tmpl.maskNorm);
 
-      if (score < 0.35) return -Infinity;
+      // ✅ FIX: Require stronger evidence - reject weak/noisy frames
+      if (score < 0.35) return -Infinity; // Hard threshold for chord confidence
 
       if (!cand.borrowed) score += 0.20;
       else score -= 0.25;
 
       if (bassPc[i] >= 0 && cand.root === bassPc[i]) score += 0.15 * bassMultiplier;
       
-      if (frameE[i] < lowE) score -= 0.30;
+      // ✅ FIX: Heavily penalize low-energy frames (noise)
+      if (frameE[i] < lowE) score -= 0.30; // Increased from 0.10
 
       return score;
     };
 
     const transitionCost = (a, b) => {
-      if (!a || !a.label || !b || !b.label) {
-        console.warn('⚠️ Invalid candidates in transitionCost:', {a, b});
-        return 999;
-      }
-      
       if (a.label === b.label) return 0.0;
 
       const circle = [0,7,2,9,4,11,6,1,8,3,10,5];
@@ -836,23 +794,13 @@ class ChordEngineEnhanced {
 
     for (let i = 1; i < M; i++) {
       if (states[i] !== cur) {
-        const candidate = candidates[cur];
-        if (candidate && candidate.label) {
-          timeline.push({ t: start * secPerHop, label: candidate.label, fi: start });
-        } else {
-          console.warn('⚠️ Invalid candidate at state:', cur);
-        }
+        timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
         cur = states[i];
         start = i;
       }
     }
 
-    const finalCandidate = candidates[cur];
-    if (finalCandidate && finalCandidate.label) {
-      timeline.push({ t: start * secPerHop, label: finalCandidate.label, fi: start });
-    } else {
-      console.warn('⚠️ Invalid final candidate at state:', cur);
-    }
+    timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
 
     return timeline;
   }
@@ -862,10 +810,7 @@ class ChordEngineEnhanced {
 
     const toPc = n => ((n % 12) + 12) % 12;
     const chordRoots = [];
-    
     for (const chord of timeline) {
-      if (!chord || !chord.label) continue;
-      
       const root = this.parseRoot(chord.label);
       if (root >= 0) {
         const isMinor = /m(?!aj)/.test(chord.label);
@@ -873,7 +818,6 @@ class ChordEngineEnhanced {
         chordRoots.push({ root, isMinor, isDim });
       }
     }
-    
     if (!chordRoots.length) return currentKey;
 
     const candidates = [];
@@ -951,8 +895,6 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const chord = timeline[i];
-      if (!chord || !chord.label) continue;
-      
       const root = this.parseRoot(chord.label);
       if (root < 0) continue;
 
@@ -965,10 +907,10 @@ class ChordEngineEnhanced {
       candidates[root].duration += dur;
     }
 
+    // ✅ FIX: Safe finding of first REAL chord
     let realStart = 0;
     for (let i = 0; i < timeline.length; i++) {
-      const chord = timeline[i];
-      if (chord && chord.t >= 1.5) {
+      if (timeline[i].t >= 1.5) {
         realStart = i;
         break;
       }
@@ -977,10 +919,7 @@ class ChordEngineEnhanced {
     const opening = timeline.slice(realStart, Math.min(realStart + 3, timeline.length));
     
     for (let i = 0; i < opening.length; i++) {
-      const chord = opening[i];
-      if (!chord || !chord.label) continue;
-      
-      const root = this.parseRoot(chord.label);
+      const root = this.parseRoot(opening[i].label);
       if (root >= 0 && candidates[root]) {
         const w = i === 0 ? 60 : (3 - i) * 8;
         candidates[root].openingScore += w;
@@ -989,10 +928,7 @@ class ChordEngineEnhanced {
 
     const closing = timeline.slice(Math.max(0, timeline.length - 3));
     for (let i = 0; i < closing.length; i++) {
-      const chord = closing[i];
-      if (!chord || !chord.label) continue;
-      
-      const root = this.parseRoot(chord.label);
+      const root = this.parseRoot(closing[i].label);
       if (root >= 0 && candidates[root]) {
         candidates[root].closingScore += (i + 1) * 12;
       }
@@ -1000,18 +936,12 @@ class ChordEngineEnhanced {
 
     const toPc = n => ((n % 12) + 12) % 12;
     for (let i = 0; i < timeline.length - 1; i++) {
-      const chord1 = timeline[i];
-      const chord2 = timeline[i + 1];
-      
-      if (!chord1 || !chord1.label || !chord2 || !chord2.label) continue;
-      
-      const r1 = this.parseRoot(chord1.label);
-      const r2 = this.parseRoot(chord2.label);
+      const r1 = this.parseRoot(timeline[i].label);
+      const r2 = this.parseRoot(timeline[i + 1].label);
       if (r1 < 0 || r2 < 0) continue;
-      
       const interval = toPc(r2 - r1);
       if ((interval === 5 || interval === 7) && candidates[r2]) {
-        const dur = this.getChordDuration(chord2, timeline, duration);
+        const dur = this.getChordDuration(timeline[i + 1], timeline, duration);
         candidates[r2].cadenceScore += 3 * dur;
       }
     }
@@ -1039,8 +969,6 @@ class ChordEngineEnhanced {
   }
 
   getChordDuration(chord, timeline, totalDuration) {
-    if (!chord) return 0.5;
-    
     const idx = timeline.indexOf(chord);
     if (idx < 0) return 0.5;
     const next = timeline[idx + 1];
@@ -1052,28 +980,25 @@ class ChordEngineEnhanced {
     if (!timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const minDur = Math.max(0.5, 0.50 * spb);
+    const minDur = Math.max(0.5, 0.50 * spb); // ✅ FIX: Increased from 0.45
     const energyMedian = this.percentile(feats.frameE, 50);
 
     const filtered = [];
 
     for (let i = 0; i < timeline.length; i++) {
       const a = timeline[i];
-      if (!a || !a.label) {
-        console.warn('⚠️ Skipping invalid chord in finalizeTimeline:', a);
-        continue;
-      }
-      
       const b = timeline[i + 1];
       const dur = b ? (b.t - a.t) : minDur;
       const energy = feats.frameE[a.fi] || 0;
-      const isWeak = energy < energyMedian * 0.85;
+      const isWeak = energy < energyMedian * 0.85; // ✅ FIX: Stricter from 0.8
 
       const r = this.parseRoot(a.label);
       const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
 
+      // ✅ FIX: More aggressive filtering of weak non-diatonic chords
       if (dur < minDur && filtered.length > 0 && (isWeak || !isDiatonic)) continue;
       
+      // ✅ FIX: Also remove very weak diatonic chords if too short
       if (dur < minDur * 0.6 && isWeak) continue;
 
       filtered.push(a);
@@ -1099,7 +1024,9 @@ class ChordEngineEnhanced {
     if (!timeline || !timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const earlyWindow = Math.max(15.0, 6 * spb);
+    
+    // ✅ FIX: More aggressive intro cleaning - wait for stable music
+    const earlyWindow = Math.max(15.0, 6 * spb); // Increased from 10s/4*spb
     
     const toPc = n => ((n % 12) + 12) % 12;
 
@@ -1130,11 +1057,6 @@ class ChordEngineEnhanced {
     const out = [];
 
     for (const ev of timeline) {
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in enforceEarlyDiatonic:', ev);
-        continue;
-      }
-      
       let label = ev.label;
       if (ev.t <= earlyWindow) {
         const r = this.parseRoot(label);
@@ -1143,6 +1065,7 @@ class ChordEngineEnhanced {
           const bp = feats.bassPc[ev.fi] ?? -1;
           let newRoot = bp >= 0 ? snapToDiatonic(bp) : snapToDiatonic(r >= 0 ? r : key.root);
           
+          // ✅ FIX: Very aggressive - force tonic for first 3 seconds
           if (ev.t < Math.min(3.0, 2.0 * spb)) {
             newRoot = key.root;
           }
@@ -1168,11 +1091,6 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
 
     for (const ev of timeline) {
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in decorateQualitiesUltimate:', ev);
-        continue;
-      }
-      
       const root = this.parseRoot(ev.label);
       if (root < 0) {
         out.push(ev);
@@ -1281,11 +1199,6 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
 
     for (const ev of timeline) {
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in adjustMinorMajors:', ev);
-        continue;
-      }
-      
       let label = ev.label;
       const r = this.parseRoot(label);
 
@@ -1330,11 +1243,6 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
 
     for (const ev of timeline) {
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in addInversionsUltimate:', ev);
-        continue;
-      }
-      
       const r = this.parseRoot(ev.label);
       if (r < 0) {
         out.push(ev);
@@ -1397,11 +1305,6 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
 
     for (const ev of timeline) {
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in validateAndRefine:', ev);
-        continue;
-      }
-      
       const r = this.parseRoot(ev.label);
       if (r < 0) {
         out.push(ev);
@@ -1433,19 +1336,13 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const ev = timeline[i];
-      
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in classifyOrnaments:', ev);
-        continue;
-      }
-      
       const prev = i > 0 ? timeline[i - 1] : null;
       const next = i < timeline.length - 1 ? timeline[i + 1] : null;
       const dur = next ? (next.t - ev.t) : spb;
 
       let ornamentType = 'structural';
 
-      if (dur < 0.35 * spb && prev && next && prev.label && next.label) {
+      if (dur < 0.35 * spb && prev && next) {
         const rPrev = this.parseRoot(prev.label);
         const r = this.parseRoot(ev.label);
         const rNext = this.parseRoot(next.label);
@@ -1462,7 +1359,7 @@ class ChordEngineEnhanced {
         ornamentType = 'neighbor';
       }
 
-      if (prev && prev.label) {
+      if (prev) {
         const bassCur = feats.bassPc[ev.fi] ?? -1;
         const bassPrev = feats.bassPc[prev.fi] ?? -1;
         if (bassCur >= 0 && bassPrev >= 0 && bassCur === bassPrev) {
@@ -1486,13 +1383,6 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const ev = timeline[i];
-      
-      if (!ev || !ev.label) {
-        console.warn('⚠️ Skipping invalid chord in analyzeModalContext:', ev);
-        out.push({ ...ev, modalContext: null });
-        continue;
-      }
-      
       const r = this.parseRoot(ev.label);
       if (r < 0) {
         out.push({ ...ev, modalContext: null });
@@ -1505,7 +1395,7 @@ class ChordEngineEnhanced {
       if (/7$/.test(ev.label) && !/maj7/.test(ev.label)) {
         const targetRoot = toPc(r + 7);
         const next = timeline[i + 1];
-        if (next && next.label) {
+        if (next) {
           const nextRoot = this.parseRoot(next.label);
           if (nextRoot >= 0 && nextRoot === targetRoot && this.inKey(targetRoot, key.root, key.minor)) {
             modalContext = 'secondary_dominant';
@@ -1595,10 +1485,7 @@ class ChordEngineEnhanced {
 
     const toPc = n => ((n % 12) + 12) % 12;
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
-    
     const degrees = recentChords.map(chord => {
-      if (!chord || !chord.label) return null;
-      
       const root = this.parseRoot(chord.label);
       if (root < 0) return null;
       const rel = toPc(root - key.root);
@@ -1642,9 +1529,6 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
     const lastChord = recentChords[recentChords.length - 1];
-    
-    if (!lastChord || !lastChord.label) return null;
-    
     const lastRoot = this.parseRoot(lastChord.label);
     if (lastRoot < 0) return null;
 
@@ -1693,12 +1577,6 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const chord = timeline[i];
-      
-      if (!chord || !chord.label) {
-        console.warn('⚠️ Skipping invalid chord in enrichTimelineWithTheory:', chord);
-        continue;
-      }
-      
       const analyzed = { ...chord };
 
       if (recent.length >= 2) {
@@ -1707,7 +1585,7 @@ class ChordEngineEnhanced {
       }
 
       const next = i < timeline.length - 1 ? timeline[i + 1] : null;
-      if (next && next.label) {
+      if (next) {
         const preds = this.predictNextChord(recent.concat([analyzed]), key);
         if (preds && preds.length) {
           analyzed.predictions = preds;
@@ -1728,7 +1606,7 @@ class ChordEngineEnhanced {
   }
 
   computePredictionAccuracy(timeline) {
-    const withPred = timeline.filter(c => c && c.predictions && c.predictions.length);
+    const withPred = timeline.filter(c => c.predictions && c.predictions.length);
     if (!withPred.length) return 0;
     const hits = withPred.filter(c => c.predictionMatch).length;
     return Math.round((hits / withPred.length) * 100);
@@ -1748,8 +1626,6 @@ class ChordEngineEnhanced {
 
       let diatonicCount = 0;
       for (const chord of section) {
-        if (!chord || !chord.label) continue;
-        
         const root = this.parseRoot(chord.label);
         if (root >= 0 && this.inKey(root, lastKey.root, lastKey.minor)) {
           diatonicCount++;
@@ -1766,7 +1642,6 @@ class ChordEngineEnhanced {
         for (const newMinor of [false, true]) {
           let cnt = 0;
           for (const chord of section) {
-            if (!chord || !chord.label) continue;
             const root = this.parseRoot(chord.label);
             if (root >= 0 && this.inKey(root, newRoot, newMinor)) {
               cnt++;
@@ -1790,8 +1665,6 @@ class ChordEngineEnhanced {
   }
 
   degreeOfChord(label, key) {
-    if (!label) return null;
-    
     const rootPc = this.parseRoot(label);
     if (rootPc < 0) return null;
 
@@ -1844,6 +1717,7 @@ class ChordEngineEnhanced {
     return -1;
   }
 
+  // ✅ CRITICAL: Used by index.html - must remain public
   toPc(n) {
     return ((n % 12) + 12) % 12;
   }
@@ -1931,6 +1805,4 @@ class ChordEngineEnhanced {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChordEngineEnhanced;
-}
-
-console.log('✅ ChordEngineEnhanced v14.37 FINAL FIXED - Production Ready');
+    }
