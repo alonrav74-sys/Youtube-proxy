@@ -123,8 +123,8 @@ export default async function handler(req, res) {
     console.log('📦 Content-Type:', contentType);
     console.log('📦 Content-Length:', response.headers.get('content-length'));
 
-    // If it's a direct stream (audio file)
-    if (contentType && contentType.includes('audio')) {
+    // If it's a direct stream (audio file or octet-stream)
+    if (contentType && (contentType.includes('audio') || contentType.includes('octet-stream'))) {
       console.log('✅ Response is direct audio stream!');
       console.log('⬇️ Downloading audio buffer...');
       
