@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'videoId required' });
     }
 
-    console.log('🎵 Downloading YouTube audio (M4A):', videoId);
+    console.log('🎵 Downloading YouTube audio:', videoId);
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
@@ -34,16 +34,15 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ youtube-video-info1 API (works great!)
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const apiUrl = `https://youtube-video-info1.p.rapidapi.com/youtube-info/?url=${encodeURIComponent(videoUrl)}`;
+    // ✅ YouTube Search & Download3 API (NEW - 99.5% uptime!)
+    const apiUrl = `https://youtube-search-download3.p.rapidapi.com/download?video=${videoId}`;
     
-    console.log('📡 Getting video info from youtube-video-info1...');
+    console.log('📡 Getting download links from youtube-search-download3...');
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'youtube-video-info1.p.rapidapi.com',
+        'x-rapidapi-host': 'youtube-search-download3.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
       }
     });
@@ -57,8 +56,24 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('📦 Response keys:', Object.keys(data));
 
-    // Extract download URL (M4A)
-    let downloadUrl = data.download_url || data.url || data.audio_url || data.link;
+    // Extract MP3 download URL
+    let downloadUrl = null;
+    
+    if (data.mp3) {
+      downloadUrl = data.mp3;
+      console.log('✅ Found MP3 URL');
+    } else if (data.audio) {
+      downloadUrl = data.audio;
+      console.log('✅ Found audio URL');
+    } else if (data.formats && Array.isArray(data.formats)) {
+      const audioFormat = data.formats.find(f => 
+        f.mimeType && f.mimeType.includes('audio')
+      );
+      if (audioFormat) {
+        downloadUrl = audioFormat.url;
+        console.log('✅ Found audio in formats array');
+      }
+    }
     
     if (!downloadUrl) {
       console.error('❌ No download URL found:', JSON.stringify(data).substring(0, 500));
@@ -68,7 +83,7 @@ export default async function handler(req, res) {
     console.log('✅ Got download URL');
 
     // Download the audio file
-    console.log('⬇️ Downloading M4A...');
+    console.log('⬇️ Downloading audio...');
     const audioResponse = await fetch(downloadUrl);
     
     if (!audioResponse.ok) {
@@ -77,14 +92,15 @@ export default async function handler(req, res) {
 
     const audioBuffer = await audioResponse.arrayBuffer();
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
-    console.log('✅ Downloaded M4A:', sizeInMB, 'MB');
+    console.log('✅ Downloaded:', sizeInMB, 'MB');
 
     // ✅ Add headers to indicate if compression needed
     const MAX_SIZE = 15 * 1024 * 1024; // 15MB
     const needsCompression = audioBuffer.byteLength > MAX_SIZE;
     
-    // Return M4A to client with compression info
-    res.setHeader('Content-Type', 'audio/mp4');
+    // Return audio to client with compression info
+    const contentType = downloadUrl.includes('.mp3') ? 'audio/mpeg' : 'audio/mp4';
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', audioBuffer.byteLength);
     res.setHeader('X-Audio-Size-MB', sizeInMB);
     res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
