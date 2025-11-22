@@ -794,13 +794,23 @@ class ChordEngineEnhanced {
 
     for (let i = 1; i < M; i++) {
       if (states[i] !== cur) {
-        timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+        // 🔧 CRITICAL FIX: Safely access candidate with fallback
+        const cand = candidates[cur];
+        if (cand && cand.label) {
+          timeline.push({ t: start * secPerHop, label: cand.label, fi: start });
+        } else {
+          console.warn(`Invalid candidate at index ${cur}, skipping chord at t=${start * secPerHop}`);
+        }
         cur = states[i];
         start = i;
       }
     }
 
-    timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+    // 🔧 CRITICAL FIX: Safely access final candidate
+    const finalCand = candidates[cur];
+    if (finalCand && finalCand.label) {
+      timeline.push({ t: start * secPerHop, label: finalCand.label, fi: start });
+    }
 
     return timeline;
   }
