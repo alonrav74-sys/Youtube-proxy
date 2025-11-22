@@ -795,13 +795,19 @@ class ChordEngineEnhanced {
 
     for (let i = 1; i < M; i++) {
       if (states[i] !== cur) {
-        timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+        // 🔧 CRITICAL FIX: Check if candidates[cur] exists before accessing label
+        if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
+          timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+        }
         cur = states[i];
         start = i;
       }
     }
 
-    timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+    // 🔧 CRITICAL FIX: Check final chord too
+    if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
+      timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+    }
 
     return timeline;
   }
