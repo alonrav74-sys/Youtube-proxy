@@ -1,5 +1,5 @@
 // =====================================================
-// 🎵 SyncEngine v6.14 - CLEAN (No Debug)
+// 🎵 SyncEngine v6.14.1 - FIXED (Safety Checks Added)
 // =====================================================
 
 const SyncEngine = {
@@ -46,6 +46,8 @@ const SyncEngine = {
       const wordEnd = (w.end || wordStart + 0.3) + gateOffset;
 
       const overlappingChords = chords.filter(ch => {
+        // ✅ CRITICAL FIX: Safety check
+        if (!ch || !ch.label || typeof ch.t !== 'number') return false;
         const chordTime = ch.t + gateOffset;
         return chordTime >= wordStart && chordTime < wordEnd;
       });
@@ -75,6 +77,12 @@ const SyncEngine = {
       
       for (let i = 0; i < state.timeline.length; i++) {
         const chord = state.timeline[i];
+        // ✅ CRITICAL FIX: Safety check
+        if (!chord || !chord.label) {
+          console.warn('⚠️ Skipping invalid chord in refreshSheetTabView:', chord);
+          continue;
+        }
+        
         const displayLabel = sanitizeLabel(applyCapoToLabel(chord.label, capoVal));
         
         if (i > 0) html += '&nbsp;&nbsp;&nbsp;&nbsp;';
@@ -130,29 +138,35 @@ const SyncEngine = {
       // Check if first chord is tonic or relative minor
       let skipFirstChord = false;
       if (state.timeline[0]) {
-        const firstChordTime = state.timeline[0].t + gateOffset;
-        const firstChordLabel = state.timeline[0].label || '';
-        const keyRoot = state.key ? state.key.root : null;
-        
-        // Extract root from chord label (e.g., "Am" -> 0 for A, "C" -> 0 for C)
-        const chordRootMatch = firstChordLabel.match(/^([A-G][#b]?)/);
-        const chordRoot = chordRootMatch ? chordRootMatch[1] : null;
-        
-        // Check if chord is tonic or relative minor
-        const isTonic = (keyRoot !== null && chordRoot && 
-                         this.getChordRoot(chordRoot) === keyRoot);
-        const isRelativeMinor = (keyRoot !== null && chordRoot && 
-                                  this.getChordRoot(chordRoot) === (keyRoot + 9) % 12); // relative minor is +9 semitones
-        
-        // Skip ONLY if it's noise AND not tonic/relative minor
-        const isNoise = (firstChordTime < 1.5) && (firstChordTime < firstLineStart - 3.0);
-        skipFirstChord = isNoise && !isTonic && !isRelativeMinor;
+        const firstChord = state.timeline[0];
+        // ✅ CRITICAL FIX: Safety check
+        if (firstChord && firstChord.label && typeof firstChord.t === 'number') {
+          const firstChordTime = firstChord.t + gateOffset;
+          const firstChordLabel = firstChord.label;
+          const keyRoot = state.key ? state.key.root : null;
+          
+          const chordRootMatch = firstChordLabel.match(/^([A-G][#b]?)/);
+          const chordRoot = chordRootMatch ? chordRootMatch[1] : null;
+          
+          const isTonic = (keyRoot !== null && chordRoot && 
+                           this.getChordRoot(chordRoot) === keyRoot);
+          const isRelativeMinor = (keyRoot !== null && chordRoot && 
+                                    this.getChordRoot(chordRoot) === (keyRoot + 9) % 12);
+          
+          const isNoise = (firstChordTime < 1.5) && (firstChordTime < firstLineStart - 3.0);
+          skipFirstChord = isNoise && !isTonic && !isRelativeMinor;
+        }
       }
       
       const introChords = state.timeline.filter((ch, idx) => {
+        // ✅ CRITICAL FIX: Safety check
+        if (!ch || !ch.label || typeof ch.t !== 'number') {
+          console.warn('⚠️ Skipping invalid chord in introChords:', ch);
+          return false;
+        }
+        
         const chordTime = ch.t + gateOffset;
         
-        // Skip first chord if it's noise (and not tonic/relative)
         if (idx === 0 && skipFirstChord) {
           return false;
         }
@@ -182,7 +196,13 @@ const SyncEngine = {
       const lineStart = line[0].time;
       const lineEnd = line[line.length - 1].end;
       
+      // ✅ CRITICAL FIX: Safety check in filter
       const lineChords = state.timeline.filter((ch, idx) => {
+        if (!ch || !ch.label || typeof ch.t !== 'number') {
+          console.warn('⚠️ Skipping invalid chord in lineChords:', ch);
+          return false;
+        }
+        
         const chordTime = ch.t + gateOffset;
         if (chordTime >= lineStart && chordTime <= lineEnd) {
           usedChordIndices.add(idx);
@@ -205,47 +225,53 @@ const SyncEngine = {
           // ENGLISH: Exact positioning above words
           const chordPositions = [];
         
-        for (const chord of lineChords) {
-          const chordTime = chord.t + gateOffset;
-          let charPos = 0;
-          let foundWord = false;
-          
-          for (let i = 0; i < line.length; i++) {
-            const word = line[i];
+          // ✅ CRITICAL FIX: Safety check in loop
+          for (const chord of lineChords) {
+            if (!chord || !chord.label || typeof chord.t !== 'number') {
+              console.warn('⚠️ Skipping invalid chord in chordPositions loop:', chord);
+              continue;
+            }
             
-            if (chordTime < word.time) {
-              if (i === 0) {
-                charPos = 0;
-                foundWord = true;
+            const chordTime = chord.t + gateOffset;
+            let charPos = 0;
+            let foundWord = false;
+            
+            for (let i = 0; i < line.length; i++) {
+              const word = line[i];
+              
+              if (chordTime < word.time) {
+                if (i === 0) {
+                  charPos = 0;
+                  foundWord = true;
+                }
+                break;
               }
-              break;
+              
+              if (chordTime >= word.time && chordTime < word.end) {
+                const beforeText = line.slice(0, i).map(w => w.text).join(' ');
+                charPos = beforeText.length + (beforeText.length > 0 ? 1 : 0);
+                foundWord = true;
+                break;
+              }
             }
             
-            if (chordTime >= word.time && chordTime < word.end) {
-              const beforeText = line.slice(0, i).map(w => w.text).join(' ');
-              charPos = beforeText.length + (beforeText.length > 0 ? 1 : 0);
-              foundWord = true;
-              break;
+            if (!foundWord) {
+              charPos = lyricText.length + 4;
             }
+            
+            const displayLabel = sanitizeLabel(applyCapoToLabel(chord.label, capoVal));
+            chordPositions.push({ pos: charPos, label: displayLabel });
           }
-          
-          if (!foundWord) {
-            charPos = lyricText.length + 4;
+        
+          chordPositions.sort((a, b) => a.pos - b.pos);
+        
+          let currentPos = 0;
+          for (const cp of chordPositions) {
+            const spaces = cp.pos - currentPos;
+            if (spaces > 0) chordLine += ' '.repeat(spaces);
+            chordLine += cp.label;
+            currentPos = cp.pos + cp.label.length;
           }
-          
-          const displayLabel = sanitizeLabel(applyCapoToLabel(chord.label, capoVal));
-          chordPositions.push({ pos: charPos, label: displayLabel });
-        }
-        
-        chordPositions.sort((a, b) => a.pos - b.pos);
-        
-        let currentPos = 0;
-        for (const cp of chordPositions) {
-          const spaces = cp.pos - currentPos;
-          if (spaces > 0) chordLine += ' '.repeat(spaces);
-          chordLine += cp.label;
-          currentPos = cp.pos + cp.label.length;
-        }
         } // end of else (English)
       }
 
@@ -258,7 +284,11 @@ const SyncEngine = {
       
       if (lineIdx < lines.length - 1) {
         const nextLineStart = lines[lineIdx + 1][0].time;
+        
+        // ✅ CRITICAL FIX: Safety check
         const interludeChords = state.timeline.filter((ch, idx) => {
+          if (!ch || !ch.label || typeof ch.t !== 'number') return false;
+          
           const chordTime = ch.t + gateOffset;
           if (chordTime > lineEnd && chordTime < nextLineStart && !usedChordIndices.has(idx)) {
             usedChordIndices.add(idx);
@@ -282,7 +312,11 @@ const SyncEngine = {
     
     if (lines.length > 0) {
       const lastLineEnd = lines[lines.length - 1][lines[lines.length - 1].length - 1].end;
+      
+      // ✅ CRITICAL FIX: Safety check
       const outroChords = state.timeline.filter((ch, idx) => {
+        if (!ch || !ch.label || typeof ch.t !== 'number') return false;
+        
         const chordTime = ch.t + gateOffset;
         if (chordTime > lastLineEnd && !usedChordIndices.has(idx)) {
           return true;
@@ -311,11 +345,13 @@ const SyncEngine = {
     const capoVal = parseInt(capo || '0', 10);
     const gateOffset = state.gateTime || 0;
     
-    // Collect chords and lyrics
-    const chords = state.timeline.map(ch => ({
-      time: ch.t + gateOffset,
-      label: sanitizeLabel(applyCapoToLabel(ch.label, capoVal))
-    }));
+    // Collect chords and lyrics - ✅ CRITICAL FIX: Added safety checks
+    const chords = state.timeline
+      .filter(ch => ch && ch.label && typeof ch.t === 'number')
+      .map(ch => ({
+        time: ch.t + gateOffset,
+        label: sanitizeLabel(applyCapoToLabel(ch.label, capoVal))
+      }));
     
     const lyrics = whisperWords.map(w => {
       let text = (w.word || w.text || '').trim();
@@ -476,3 +512,5 @@ const SyncEngine = {
 if (typeof window !== 'undefined') {
   window.SyncEngine = SyncEngine;
 }
+
+console.log('✅ SyncEngine v6.14.1 FIXED - All safety checks in place');
