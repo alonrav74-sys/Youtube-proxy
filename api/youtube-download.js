@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'videoId required' });
     }
 
-    console.log('🎵 Downloading YouTube audio:', videoId);
+    console.log('🎵 Downloading YouTube audio (MP3):', videoId);
 
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
     
@@ -34,17 +34,21 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ Try YouTube v3.1 API (Simple yt-dlp wrapper)
-    const apiUrl = `https://youtube-v31.p.rapidapi.com/dl?id=${videoId}`;
+    // ✅ TUBE MP3 API - POST with videoId in body
+    const apiUrl = 'https://tube-mp31.p.rapidapi.com/json';
     
-    console.log('📡 Getting download link from YouTube v3.1...');
+    console.log('📡 Requesting MP3 from TUBE MP3 API...');
     
     const response = await fetch(apiUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'x-rapidapi-host': 'youtube-v31.p.rapidapi.com',
+        'Content-Type': 'application/json',
+        'x-rapidapi-host': 'tube-mp31.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
-      }
+      },
+      body: JSON.stringify({
+        videoId: videoId
+      })
     });
 
     if (!response.ok) {
@@ -54,45 +58,24 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    console.log('📦 Response keys:', Object.keys(data));
+    console.log('📦 API Response status:', data.status);
 
-    // Extract audio URL from response
-    let downloadUrl = null;
-    
-    // Method 1: Direct link in response
-    if (data.link) {
-      downloadUrl = data.link;
-      console.log('✅ Found link in data.link');
-    } 
-    // Method 2: Formats array
-    else if (data.formats && Array.isArray(data.formats)) {
-      // Find audio-only format
-      const audioFormat = data.formats.find(f => 
-        f.format_note && (f.format_note.toLowerCase().includes('audio') || f.format_note === 'tiny')
-      ) || data.formats.find(f => 
-        f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none')
-      ) || data.formats[0]; // Fallback to first format
-      
-      if (audioFormat) {
-        downloadUrl = audioFormat.url;
-        console.log('✅ Found audio in formats:', audioFormat.format_note || 'unknown');
-      }
+    if (data.status !== 'success') {
+      throw new Error('Conversion failed: ' + (data.error || 'Unknown error'));
     }
-    // Method 3: Direct URL field
-    else if (data.url) {
-      downloadUrl = data.url;
-      console.log('✅ Found url in data.url');
-    }
+
+    // Extract download URL from result
+    const downloadUrl = data.result?.[0]?.dlurl;
     
     if (!downloadUrl) {
-      console.error('❌ No download URL found:', JSON.stringify(data).substring(0, 500));
-      throw new Error('No download URL in API response');
+      console.error('❌ No download URL:', JSON.stringify(data));
+      throw new Error('No download URL in response');
     }
 
-    console.log('✅ Got download URL');
+    console.log('✅ Got MP3 URL');
 
-    // Download the audio file
-    console.log('⬇️ Downloading audio...');
+    // Download MP3
+    console.log('⬇️ Downloading MP3...');
     const audioResponse = await fetch(downloadUrl);
     
     if (!audioResponse.ok) {
@@ -103,19 +86,13 @@ export default async function handler(req, res) {
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
     console.log('✅ Downloaded:', sizeInMB, 'MB');
 
-    // Check if compression needed
-    const MAX_SIZE = 15 * 1024 * 1024;
-    const needsCompression = audioBuffer.byteLength > MAX_SIZE;
+    // Compression check
+    const needsCompression = audioBuffer.byteLength > 15 * 1024 * 1024;
     
-    // Return audio with headers
-    res.setHeader('Content-Type', 'audio/mp4');
+    res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.byteLength);
     res.setHeader('X-Audio-Size-MB', sizeInMB);
     res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
-    
-    if (needsCompression) {
-      console.log('⚠️ Audio >15MB - client will compress');
-    }
     
     return res.status(200).send(Buffer.from(audioBuffer));
 
