@@ -4,11 +4,13 @@
  * ✅ הוסרו פונקציות לא בשימוש (nameSharp, nameFlat, getChordLabel)
  * ✅ קוד post-processing מאוחד לפונקציה אחת
  * ✅ toPc inline במקומות רבים
+ * ✅ FIX: Added safety check at line 831 (emitScore)
  * 
  * שינויים עיקריים:
  * - שורות 103-116 היו זהות ל-119-132 → מוזגו ל-applyPostProcessing()
  * - 3 פונקציות שלא נקראו → הוסרו
  * - toPc() מוטמע ישירות במקומות רבים
+ * - 🔧 FIXED: emitScore now checks if cand exists before accessing cand.label
  */
 
 class ChordEngineEnhanced {
@@ -676,6 +678,9 @@ class ChordEngineEnhanced {
     const lowE = (percentiles && percentiles.p30) || this.percentile(frameE, 30);
 
     const emitScore = (i, cand) => {
+      // 🔧 FIXED: Check if cand exists BEFORE accessing cand.label
+      if (!cand || !cand.label) return -Infinity;
+      
       const c = chroma[i];
       if (!c) return -Infinity;
       const tmpl = chordTemplates.get(cand.label);
@@ -1805,4 +1810,6 @@ class ChordEngineEnhanced {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChordEngineEnhanced;
-    }
+}
+
+console.log('✅ ChordEngineEnhanced v14.36 - Ultimate Minor Detection FIXED - Line 831 safety check added');
