@@ -79,9 +79,20 @@ export default async function handler(req, res) {
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
     console.log('✅ Downloaded M4A:', sizeInMB, 'MB');
 
-    // Return M4A to client (will be compressed in browser before sending to Groq)
+    // ✅ Add headers to indicate if compression needed
+    const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+    const needsCompression = audioBuffer.byteLength > MAX_SIZE;
+    
+    // Return M4A to client with compression info
     res.setHeader('Content-Type', 'audio/mp4');
     res.setHeader('Content-Length', audioBuffer.byteLength);
+    res.setHeader('X-Audio-Size-MB', sizeInMB);
+    res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
+    
+    if (needsCompression) {
+      console.log('⚠️ Audio >15MB - client will compress before sending to Groq');
+    }
+    
     return res.status(200).send(Buffer.from(audioBuffer));
 
   } catch (error) {
