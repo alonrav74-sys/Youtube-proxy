@@ -46,8 +46,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ TUBE MP3 API
-    const apiUrl = 'https://tube-mp31.p.rapidapi.com/json';
+    // ✅ TUBE MP3 API - base URL (no endpoint)
+    const apiUrl = 'https://tube-mp31.p.rapidapi.com/';
     console.log('🌐 API URL:', apiUrl);
     
     const requestBody = { videoId: videoId };
