@@ -259,20 +259,15 @@
     </section>
   </div>
 
-<!-- ⚠️ סדר טעינה קריטי! Core → Enhancer → Engine -->
-<script src="ChordDetectionCore.js"></script>
-<script src="ChordEnhancer.js"></script>
-<script src="ChordEngineEnhanced.js"></script>
-
-<!-- קבצים נוספים -->
+<script src="ChordEngineEnhanced_v14.36_UltimateMinorDetection.js?v=2"></script>
 <script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded')"></script>
-<script src="hebrew-spell-checker.js" onerror="console.warn('hebrew-spell-checker not loaded')"></script>
+<script src="hebrew-spell-checker.js"></script>
 
 <script>
 let engine;
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngineEnhanced לא נטען! ודא שהקבצים בתיקייה js/');
+    alert('❌ ChordEngineEnhanced_v14.36_UltimateMinorDetection.js לא נטען!');
     throw new Error('Engine not loaded');
   }
   try {
@@ -748,7 +743,7 @@ analyzeBtn.onclick=async()=>{
     showAnalyzing('שלב 3/3: עיבוד...');
     
     timeline.forEach(ev => {
-      if (!ev || !ev.label) return;
+      if (!ev || !ev.label) return; // ✅ CRITICAL: Safety check
       ev.label = sanitizeLabel(ev.label);
       ev.words = ev.words || [];
     });
@@ -767,7 +762,7 @@ analyzeBtn.onclick=async()=>{
     
     if (!engine || !engine.NOTES_SHARP) {
       console.error('Engine not properly initialized!');
-      err('שגיאה: Engine לא הוגדר נכון');
+      showError('שגיאה: Engine לא הוגדר נכון');
       return;
     }
     
@@ -970,7 +965,7 @@ function hookPlaybackLive(){
     let chordIdx = st.timeline.findIndex(x => (x.t + gateOffset) > t);
     if(chordIdx === -1) chordIdx = st.timeline.length;
     const ev = st.timeline[chordIdx - 1] || st.timeline[0];
-    if(!ev || !ev.label) return;
+    if(!ev || !ev.label) return; // ✅ Safety check
     
     const capo=parseInt(capoEl.value||'0',10);
     const shown = displayChord(ev.label, capo);
@@ -1054,7 +1049,7 @@ function buildFullLyricsSheet(isRTL) {
     
     st.timeline.forEach((ch, idx) => {
       if (idx === 0 && skipFirstChord) return;
-      if (!ch || !ch.label) return;
+      if (!ch || !ch.label) return; // ✅ Safety check
       
       const displayLabel = displayChord(ch.label, capo);
       html += `<span class="chord-marker" data-time="${ch.t}" style="color:#38bdf8;font-weight:700;font-size:20px;padding:6px 12px;background:#0b1221;border-radius:8px">${escapeHtml(displayLabel)}</span>`;
@@ -1099,7 +1094,7 @@ function buildFullLyricsSheet(isRTL) {
     const lyricText = words.map(w => w.text).join(' ');
     const chordPositions = [];
     for(const chord of lineChords) {
-      if (!chord || !chord.label) continue;
+      if (!chord || !chord.label) continue; // ✅ Safety check
       
       const chordTimeWithGate = chord.t + gateOffset;
       let position = 0;
@@ -1229,7 +1224,7 @@ function applyTranspose() {
   const capo = parseInt(capoEl.value || '0', 10);
   keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
   st.timeline.forEach(ev => {
-    if (!ev || !ev.label) return;
+    if (!ev || !ev.label) return; // ✅ Safety check
     const originalRoot = parseRoot(ev.label);
     if(originalRoot < 0) return;
     const quality = ev.label.replace(/^[A-G](?:#|b)?/, '');
