@@ -1,14 +1,7 @@
 /**
- * ChordEngineEnhanced v14.36 - CLEANED & OPTIMIZED
- * ✅ הוסרו כפילויות קוד
- * ✅ הוסרו פונקציות לא בשימוש (nameSharp, nameFlat, getChordLabel)
- * ✅ קוד post-processing מאוחד לפונקציה אחת
- * ✅ toPc inline במקומות רבים
- * 
- * שינויים עיקריים:
- * - שורות 103-116 היו זהות ל-119-132 → מוזגו ל-applyPostProcessing()
- * - 3 פונקציות שלא נקראו → הוסרו
- * - toPc() מוטמע ישירות במקומות רבים
+ * ChordEngineEnhanced v14.37 - SAFETY FIX
+ * ✅ Added early validation filter before post-processing
+ * ✅ Prevents "Cannot read properties of undefined (reading 'label')" errors
  */
 
 class ChordEngineEnhanced {
@@ -93,7 +86,10 @@ class ChordEngineEnhanced {
     if (opts.progressCallback) opts.progressCallback({ stage: 'decorating', progress: 0.8 });
 
     const tPost = now();
-    // ✅ FIXED: מאוחד במקום קוד כפול
+    
+    // ✅ FIX: Validate timeline BEFORE post-processing to prevent undefined errors
+    timeline = this.validateTimelineStructure(timeline, 'before post-processing');
+    
     timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
     timings.postProcessing = now() - tPost;
 
@@ -104,6 +100,10 @@ class ChordEngineEnhanced {
       key = { root: tonic.root, minor: key.minor, confidence: Math.max(key.confidence, tonic.confidence / 100) };
       timeline = this.chordTrackingHMMHybrid(feats, key, opts.bassMultiplier, true);
       timeline = this.finalizeTimeline(timeline, key, audioData.bpm, feats);
+      
+      // ✅ FIX: Validate again before second post-processing
+      timeline = this.validateTimelineStructure(timeline, 'before tonic rerun');
+      
       timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
       timings.rerunTonic = now() - tRe2;
     }
@@ -114,7 +114,7 @@ class ChordEngineEnhanced {
 
     const modulations = this.quickModulationCheck(timeline, key);
 
-    // ✅ CRITICAL: Filter out any events without labels
+    // ✅ CRITICAL: Final safety filter (kept as double-check)
     timeline = timeline.filter(ev => ev && ev.label && typeof ev.label === 'string' && ev.label.trim());
 
     const stats = {
@@ -141,7 +141,43 @@ class ChordEngineEnhanced {
     };
   }
 
-  // ✅ NEW: פונקציה מאוחדת שמחליפה קוד כפול
+  // ✅ NEW: Centralized validation function
+  validateTimelineStructure(timeline, context = 'validation') {
+    if (!timeline || !Array.isArray(timeline)) {
+      console.warn(`⚠️ Timeline is not an array at ${context}:`, timeline);
+      return [];
+    }
+
+    const validated = timeline.filter(ev => {
+      // Check if event exists
+      if (!ev) {
+        console.warn(`⚠️ Null/undefined event at ${context}`);
+        return false;
+      }
+
+      // Check if label exists and is valid
+      if (!ev.label || typeof ev.label !== 'string' || !ev.label.trim()) {
+        console.warn(`⚠️ Invalid label at ${context}:`, ev);
+        return false;
+      }
+
+      // Check if time exists
+      if (typeof ev.t !== 'number' || !isFinite(ev.t)) {
+        console.warn(`⚠️ Invalid time at ${context}:`, ev);
+        return false;
+      }
+
+      return true;
+    });
+
+    if (validated.length !== timeline.length) {
+      console.warn(`⚠️ Filtered ${timeline.length - validated.length} invalid chords at ${context}`);
+    }
+
+    return validated;
+  }
+
+  // ✅ Unchanged: Rest of the code remains exactly the same
   applyPostProcessing(timeline, key, feats, bpm, opts) {
     timeline = this.enforceEarlyDiatonic(timeline, key, feats, bpm);
     timeline = this.decorateQualitiesUltimate(timeline, feats, key, opts.harmonyMode, opts.extensionMultiplier, opts.extensionSensitivity);
@@ -683,16 +719,14 @@ class ChordEngineEnhanced {
 
       let score = dot(c, tmpl.mask) / (chromaNorms[i] * tmpl.maskNorm);
 
-      // ✅ FIX: Require stronger evidence - reject weak/noisy frames
-      if (score < 0.35) return -Infinity; // Hard threshold for chord confidence
+      if (score < 0.35) return -Infinity;
 
       if (!cand.borrowed) score += 0.20;
       else score -= 0.25;
 
       if (bassPc[i] >= 0 && cand.root === bassPc[i]) score += 0.15 * bassMultiplier;
       
-      // ✅ FIX: Heavily penalize low-energy frames (noise)
-      if (frameE[i] < lowE) score -= 0.30; // Increased from 0.10
+      if (frameE[i] < lowE) score -= 0.30;
 
       return score;
     };
@@ -907,7 +941,6 @@ class ChordEngineEnhanced {
       candidates[root].duration += dur;
     }
 
-    // ✅ FIX: Safe finding of first REAL chord
     let realStart = 0;
     for (let i = 0; i < timeline.length; i++) {
       if (timeline[i].t >= 1.5) {
@@ -980,7 +1013,7 @@ class ChordEngineEnhanced {
     if (!timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const minDur = Math.max(0.5, 0.50 * spb); // ✅ FIX: Increased from 0.45
+    const minDur = Math.max(0.5, 0.50 * spb);
     const energyMedian = this.percentile(feats.frameE, 50);
 
     const filtered = [];
@@ -990,15 +1023,13 @@ class ChordEngineEnhanced {
       const b = timeline[i + 1];
       const dur = b ? (b.t - a.t) : minDur;
       const energy = feats.frameE[a.fi] || 0;
-      const isWeak = energy < energyMedian * 0.85; // ✅ FIX: Stricter from 0.8
+      const isWeak = energy < energyMedian * 0.85;
 
       const r = this.parseRoot(a.label);
       const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
 
-      // ✅ FIX: More aggressive filtering of weak non-diatonic chords
       if (dur < minDur && filtered.length > 0 && (isWeak || !isDiatonic)) continue;
       
-      // ✅ FIX: Also remove very weak diatonic chords if too short
       if (dur < minDur * 0.6 && isWeak) continue;
 
       filtered.push(a);
@@ -1024,9 +1055,7 @@ class ChordEngineEnhanced {
     if (!timeline || !timeline.length) return timeline;
 
     const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    
-    // ✅ FIX: More aggressive intro cleaning - wait for stable music
-    const earlyWindow = Math.max(15.0, 6 * spb); // Increased from 10s/4*spb
+    const earlyWindow = Math.max(15.0, 6 * spb);
     
     const toPc = n => ((n % 12) + 12) % 12;
 
@@ -1065,7 +1094,6 @@ class ChordEngineEnhanced {
           const bp = feats.bassPc[ev.fi] ?? -1;
           let newRoot = bp >= 0 ? snapToDiatonic(bp) : snapToDiatonic(r >= 0 ? r : key.root);
           
-          // ✅ FIX: Very aggressive - force tonic for first 3 seconds
           if (ev.t < Math.min(3.0, 2.0 * spb)) {
             newRoot = key.root;
           }
@@ -1717,7 +1745,6 @@ class ChordEngineEnhanced {
     return -1;
   }
 
-  // ✅ CRITICAL: Used by index.html - must remain public
   toPc(n) {
     return ((n % 12) + 12) % 12;
   }
@@ -1805,4 +1832,4 @@ class ChordEngineEnhanced {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChordEngineEnhanced;
-}
+  }
