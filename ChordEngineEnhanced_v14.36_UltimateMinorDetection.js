@@ -676,9 +676,6 @@ class ChordEngineEnhanced {
     const lowE = (percentiles && percentiles.p30) || this.percentile(frameE, 30);
 
     const emitScore = (i, cand) => {
-      // 🔧 CRITICAL FIX: Check if cand AND cand.label exist before accessing
-      if (!cand || !cand.label) return -Infinity;
-      
       const c = chroma[i];
       if (!c) return -Infinity;
       const tmpl = chordTemplates.get(cand.label);
@@ -797,19 +794,13 @@ class ChordEngineEnhanced {
 
     for (let i = 1; i < M; i++) {
       if (states[i] !== cur) {
-        // 🔧 CRITICAL FIX: Check if candidates[cur] exists before accessing label
-        if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
-          timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
-        }
+        timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
         cur = states[i];
         start = i;
       }
     }
 
-    // 🔧 CRITICAL FIX: Check final chord too
-    if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
-      timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
-    }
+    timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
 
     return timeline;
   }
