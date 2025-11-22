@@ -34,15 +34,15 @@ export default async function handler(req, res) {
       });
     }
 
-    // ✅ YouTube Search & Download3 API (NEW - 99.5% uptime!)
-    const apiUrl = `https://youtube-search-download3.p.rapidapi.com/download?video=${videoId}`;
+    // ✅ Try YouTube v3.1 API (Simple yt-dlp wrapper)
+    const apiUrl = `https://youtube-v31.p.rapidapi.com/dl?id=${videoId}`;
     
-    console.log('📡 Getting download links from youtube-search-download3...');
+    console.log('📡 Getting download link from YouTube v3.1...');
     
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'x-rapidapi-host': 'youtube-search-download3.p.rapidapi.com',
+        'x-rapidapi-host': 'youtube-v31.p.rapidapi.com',
         'x-rapidapi-key': RAPIDAPI_KEY
       }
     });
@@ -56,23 +56,32 @@ export default async function handler(req, res) {
     const data = await response.json();
     console.log('📦 Response keys:', Object.keys(data));
 
-    // Extract MP3 download URL
+    // Extract audio URL from response
     let downloadUrl = null;
     
-    if (data.mp3) {
-      downloadUrl = data.mp3;
-      console.log('✅ Found MP3 URL');
-    } else if (data.audio) {
-      downloadUrl = data.audio;
-      console.log('✅ Found audio URL');
-    } else if (data.formats && Array.isArray(data.formats)) {
+    // Method 1: Direct link in response
+    if (data.link) {
+      downloadUrl = data.link;
+      console.log('✅ Found link in data.link');
+    } 
+    // Method 2: Formats array
+    else if (data.formats && Array.isArray(data.formats)) {
+      // Find audio-only format
       const audioFormat = data.formats.find(f => 
-        f.mimeType && f.mimeType.includes('audio')
-      );
+        f.format_note && (f.format_note.toLowerCase().includes('audio') || f.format_note === 'tiny')
+      ) || data.formats.find(f => 
+        f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none')
+      ) || data.formats[0]; // Fallback to first format
+      
       if (audioFormat) {
         downloadUrl = audioFormat.url;
-        console.log('✅ Found audio in formats array');
+        console.log('✅ Found audio in formats:', audioFormat.format_note || 'unknown');
       }
+    }
+    // Method 3: Direct URL field
+    else if (data.url) {
+      downloadUrl = data.url;
+      console.log('✅ Found url in data.url');
     }
     
     if (!downloadUrl) {
@@ -94,19 +103,18 @@ export default async function handler(req, res) {
     const sizeInMB = (audioBuffer.byteLength / 1024 / 1024).toFixed(2);
     console.log('✅ Downloaded:', sizeInMB, 'MB');
 
-    // ✅ Add headers to indicate if compression needed
-    const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+    // Check if compression needed
+    const MAX_SIZE = 15 * 1024 * 1024;
     const needsCompression = audioBuffer.byteLength > MAX_SIZE;
     
-    // Return audio to client with compression info
-    const contentType = downloadUrl.includes('.mp3') ? 'audio/mpeg' : 'audio/mp4';
-    res.setHeader('Content-Type', contentType);
+    // Return audio with headers
+    res.setHeader('Content-Type', 'audio/mp4');
     res.setHeader('Content-Length', audioBuffer.byteLength);
     res.setHeader('X-Audio-Size-MB', sizeInMB);
     res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
     
     if (needsCompression) {
-      console.log('⚠️ Audio >15MB - client will compress before sending to Groq');
+      console.log('⚠️ Audio >15MB - client will compress');
     }
     
     return res.status(200).send(Buffer.from(audioBuffer));
