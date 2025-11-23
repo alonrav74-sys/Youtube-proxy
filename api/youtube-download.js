@@ -145,8 +145,13 @@ export default async function handler(req, res) {
       console.log('🗜️ Needs compression:', needsCompression);
       
       console.log('📤 Setting response headers...');
+      
+      // ✅ תיקון: תמיד החזר audio/mpeg גם אם RapidAPI מחזיר octet-stream
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Length', audioBuffer.byteLength);
+      res.setHeader('Content-Disposition', 'inline; filename="audio.mp3"');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('X-Audio-Size-MB', sizeInMB);
       res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
       
@@ -227,8 +232,13 @@ export default async function handler(req, res) {
     console.log('🗜️ Needs compression:', needsCompression);
     
     console.log('📤 Setting response headers...');
+    
+    // ✅ תיקון: תמיד החזר audio/mpeg
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.byteLength);
+    res.setHeader('Content-Disposition', 'inline; filename="audio.mp3"');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('X-Audio-Size-MB', sizeInMB);
     res.setHeader('X-Needs-Compression', needsCompression ? 'true' : 'false');
     
