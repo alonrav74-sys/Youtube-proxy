@@ -1,1298 +1,1833 @@
-<!doctype html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ChordFinderPro v14.36 🎵 Ultimate Minor Detection</title>
-  
-  <!-- PWA Meta Tags -->
-  <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, מודולציות וסנכרון lyrics" />
-  <meta name="theme-color" content="#38bdf8" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="ChordFinder Pro" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="manifest.json" />
-  
-  <!-- Icons -->
-  <link rel="icon" type="image/png" sizes="192x192" href="icon192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="icon512.png" />
-  <link rel="apple-touch-icon" href="icon192.png" />
-  
-  <style>
-    :root{--bg:#0b1022;--panel:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--card:#0a1324;--border:#1b2333;--brand:#22c55e;--accent:#38bdf8;--alert:#f59e0b}
-    *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(160deg,var(--bg),#0a0f1c);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);direction:rtl}
-    .wrap{max-width:1200px;margin:auto;padding:18px;padding-bottom:80px}
-    h1{margin:6px 0 10px;font-size:24px}
-    .muted{color:var(--muted);font-size:14px}
-    .panel{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:14px;margin-top:12px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    input[type="file"], select, button, input[type="number"], input[type="text"]{padding:10px 14px;border-radius:12px;border:1px solid #223;background:#0b1221;color:#cfe3ff;appearance:none;font-weight:700;cursor:pointer}
-    input[type="text"]{width:100%;max-width:500px;font-weight:400}
-    .badge{display:inline-flex;gap:6px;align-items:center;background:#0b1221;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px}
-    .badge.pro{border-color:#664d23;background:#2e1f0d;color:#ffd7a3}
-    .badge.whisper{border-color:#38bdf8;background:#0a1f2e;color:#bae6fd}
-    .live{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:18px;margin-top:10px}
-    .live .title{color:#a9b4c8;font-size:13px}
-    .live .ch{font-weight:800;font-size:42px}
-    .live .func{font-size:14px;color:#38bdf8;margin-top:4px}
-    .live .lyric{font-size:18px;color:#cbd5e1;margin-top:12px;font-style:italic;direction:rtl;line-height:1.6;background:#0a1324;padding:10px;border-radius:8px}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #2a3d55;margin:2px 4px;background:#0b1221}
-    .ok{border-color:#1f5f3f;color:#d7ffe6;background:#0d2e1f}
-    .err{border-color:#5f2323;color:#ffe0e0;background:#3f1d1d}
-    .warn{border-color:#8a6a1f;color:#fff0d9;background:#3a2a0c}
-    .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:sp 1s linear infinite}
-    @keyframes sp{to{transform:rotate(360deg)}}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:#0b1221;border:1px solid #1f2a40;font-size:12px}
-    .chip .dot{width:6px;height:6px;border-radius:50%;background:#22c55e}
-    .chip.ornament{border-color:#8a6a1f;background:#2a2010}
-    .chip.structural{border-color:#1f5f3f;background:#0d2e1f}
-    .analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:12px}
-    .analysis-card{background:#0b1221;border:1px solid #1f2a40;border-radius:12px;padding:12px}
-    .analysis-card h3{margin:0 0 8px 0;font-size:14px;color:#38bdf8}
-    .analysis-card .value{font-size:20px;font-weight:700;color:#22c55e}
-    .yt-result{display:flex;gap:10px;padding:10px;border:1px solid #1f2a40;border-radius:10px;margin-top:8px;align-items:center;cursor:pointer;transition:all 0.2s}
-    .yt-result:hover{background:#12203a;border-color:#38bdf8}
-    .yt-result.selected{background:#164e3a;border-color:#22c55e}
-    .yt-result img.thumb{width:120px;height:68px;object-fit:cover;border-radius:8px;flex-shrink:0}
-    .yt-result .info{flex:1;min-width:0}
-    .yt-result .title{font-weight:700;margin-bottom:4px;color:#e5e7eb;word-wrap:break-word;white-space:normal;line-height:1.3}
-    .yt-result .channel{font-size:12px;color:#94a3b8}
-    .yt-results{max-height:400px;overflow-y:auto}
-    .tabs{display:flex;gap:4px;margin-bottom:12px}
-    .tab{padding:8px 16px;border-radius:8px;background:#0b1221;border:1px solid #1f2a40;cursor:pointer;transition:all 0.2s}
-    .tab.active{background:#0d2e1f;border-color:#22c55e;color:#d7ffe6}
-    .tab:hover{border-color:#38bdf8}
-    .tab-content{display:none}
-    .tab-content.active{display:block}
-    .info-box{background:#1f2a40;padding:10px;border-radius:8px;margin-top:8px;font-size:13px;color:#cbd5e1}
-    .info-box.success{background:#0d2e1f;border:1px solid #22c55e}
-    .synced-sheet{background:#0a1324;color:#e5e7eb;padding:24px;border-radius:12px;font-family:'Courier New',Courier,monospace;line-height:1.8;overflow-x:auto;max-width:100%;white-space:pre;border:1px solid #1f2a40}
-    .synced-sheet.rtl{direction:rtl;text-align:right}
-    .synced-sheet.ltr{direction:ltr;text-align:left}
-    .lyrics-container{display:block;width:100%;background:#0a1324;padding:20px;border-radius:12px;border:1px solid #1f2a40;max-height:500px;overflow-y:auto;overflow-x:auto;scroll-behavior:smooth}
-    .sliderRow{display:flex;gap:10px;align-items:center;margin-top:8px}
-    .sliderRow input[type="range"]{flex:1;max-width:200px}
-    .sliderRow .tag{background:#1a2332;border:1px solid #38bdf8;padding:4px 8px;border-radius:8px;font-size:12px;min-width:45px;text-align:center}
-  </style>
-</head>
-<body>
+/**
+ * ChordEngineEnhanced v14.36 - FIXED FOR YOUTUBE
+ * ✅ תוקן processAudio() - עובד עם YouTube וקבצים
+ */
 
-  <div class="wrap">
-    <h1>Chord Finder Pro v14.36
-      <span class="badge pro">Ultimate Minor Detection</span>
-      <span class="badge whisper">Groq Whisper</span>
-    </h1>
-    <div class="muted">
-      אקורדים מעל מילים בזמן אמת + דף נגינה מלא. RTL/LTR אוטומטי.<br>
-      <small style="opacity:0.7;font-size:11px">
-        Powered by <strong>Groq Whisper</strong> • 
-        Harmonic Theory Enhanced • 
-        Built by <strong>Alon</strong>
-      </small>
-    </div>
-
-    <section class="panel">
-      <div class="tabs">
-        <div class="tab active" data-tab="file">📁 קובץ מקומי</div>
-        <div class="tab" data-tab="youtube">🎬 יוטיוב</div>
-        <div class="tab" data-tab="sheet">📝 דף נגינה</div>
-      </div>
-
-      <div id="fileTab" class="tab-content active">
-        <div class="row">
-          <input id="file" type="file" accept="audio/*,video/*" />
-        </div>
-      </div>
-
-      <div id="youtubeTab" class="tab-content">
-        <div class="info-box success">
-          ⚡ סנכרון מדויק: אקורד על מילה/בין מילים לפי הזמן המדויק.
-        </div>
-        
-        <div class="row" style="margin-top:12px">
-          <input id="ytSearch" type="text" placeholder='חפש שיר (למשל: "Leonard Cohen Hallelujah")' />
-          <button id="ytSearchBtn">🔍 חפש</button>
-        </div>
-        
-        <div id="ytResults" class="yt-results" style="display:none"></div>
-        
-        <div style="margin-top:12px">
-          <div style="margin-bottom:8px;font-weight:700">או הדבק קישור יוטיוב:</div>
-          <div class="row">
-            <input id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." style="flex:1" />
-            <button id="ytUrlBtn">✅ השתמש</button>
-          </div>
-        </div>
-        
-        <div id="ytStatus" class="pill" style="display:none;margin-top:8px"></div>
-        <div id="whisperStatus" class="pill warn" style="display:none;margin-top:8px">
-          <span class="spin"></span> 🎙️ Groq Whisper עובד ברקע...
-        </div>
-      </div>
-
-      <div id="sheetTab" class="tab-content">
-        <h3>📄 דף נגינה מקצועי</h3>
-        <div id="fullSheet" class="synced-sheet">—</div>
-        
-        <h3 style="margin-top:16px">🎙️ תמלול מלא</h3>
-        <div id="fullTranscript" style="max-height:300px;overflow:auto;background:#0b1221;padding:12px;border-radius:8px;white-space:pre-wrap;font-family:Arial">—</div>
-        
-        <div class="row" style="margin-top:12px">
-          <button id="exportBtn">💾 ייצא ל-ChordPro</button>
-          <button id="copyBtn">📋 העתק דף</button>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:16px">
-        <label>🎯 מצב זיהוי:
-          <select id="extMode">
-            <option value="basic">בסיסי (triads + 7ths)</option>
-            <option value="jazz" selected>🎷 ג'אז (+ 9/11/13/sus/6th)</option>
-          </select>
-        </label>
-        <label>קוונטה:
-          <select id="quant">
-            <option value="4" selected>1/4</option>
-            <option value="8">1/8</option>
-          </select>
-        </label>
-        <label>🎸 קאפו:
-          <input id="capo" type="number" value="0" min="0" max="11" style="width:80px" />
-        </label>
-        <label>🎚️ אודיו:
-          <select id="audioMode">
-            <option value="mono" selected>מונו (מהיר)</option>
-            <option value="stereo">2 ערוצים (מדויק)</option>
-          </select>
-        </label>
-        <button id="analyzeBtn">נתח</button>
-        <button id="playBtn" disabled>▶ הפעל</button>
-      </div>
-
-      <div class="row" style="margin-top:8px">
-        <span class="badge">BPM: <b id="bpm">—</b></span>
-        <span class="badge">משך: <b id="dur">—</b></span>
-        <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
-          סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
-        </span>
-        <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
-        <button onclick="transposeDown()" style="padding:4px 10px;font-size:12px" title="הורד חצי טון">♭</button>
-        <button onclick="transposeUp()" style="padding:4px 10px;font-size:12px" title="העלה חצי טון">♯</button>
-        <span class="badge">מצב: <b id="modeBadge">—</b></span>
-      </div>
-
-      <div id="status" class="pill ok" style="display:none"></div>
-      <div id="error" class="pill err" style="display:none"></div>
-
-      <div class="sliderRow">
-        <span class="tag">×<span id="bassSensTxt">1.0</span></span>
-        <input id="bassSens" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
-        <span style="color:#94a3b8;font-size:12px">רגישות בס (inversions/slash chords)</span>
-      </div>
-      <div class="sliderRow">
-        <span class="tag">×<span id="extSensTxt">1.0</span></span>
-        <input id="extSens" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
-        <span style="color:#94a3b8;font-size:12px">רגישות הרחבות (7/maj7/9/11/13/sus)</span>
-      </div>
-
-      <div class="row">
-        <span id="gateChip" class="chip warn" style="display:none"><span class="dot"></span>מחכה לפריטה...</span>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>ניתוח הרמוני מתקדם</h2>
-      <div class="analysis-grid">
-        <div class="analysis-card">
-          <h3>אקורדים מבניים</h3>
-          <div class="value" id="structuralCount">—</div>
-        </div>
-        <div class="analysis-card">
-          <h3>קישוטים</h3>
-          <div class="value" id="ornamentCount">—</div>
-        </div>
-        <div class="analysis-card">
-          <h3>דומיננט משני</h3>
-          <div class="value" id="secDomCount">—</div>
-        </div>
-        <div class="analysis-card">
-          <h3>השאלות מודאליות</h3>
-          <div class="value" id="modalBorrowCount">—</div>
-        </div>
-        <div class="analysis-card">
-          <h3>🔀 מודולציות</h3>
-          <div class="value" id="modulationCount">—</div>
-        </div>
-      </div>
-      
-      <h3 style="margin-top:16px">🎻 אקורדים טבעיים בסולם (Circle of Fifths)</h3>
-      <div id="circleOfFifths" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">—</div>
-    </section>
-
-    <section class="panel">
-      <h2>תצוגה חיה</h2>
-      <audio id="player" controls preload="auto" crossorigin="anonymous" style="width:100%"></audio>
-      <div class="live">
-        <div style="flex:1">
-          <div class="title">האקורד כרגע</div>
-          <div class="ch" id="liveChord">—</div>
-          <div class="func" id="liveFunction">—</div>
-          <div class="lyric" id="liveLyric">—</div>
-        </div>
-        <div style="text-align:left">
-          <span id="ornamentChip" class="chip ornament" style="display:none">קישוט</span>
-          <span id="structuralChip" class="chip structural" style="display:none">מבני</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>📝 דף נגינה – זמן אמת</h2>
-      <div id="liveSheet" class="synced-sheet">—</div>
-      <div class="row" style="margin-top:8px">
-        <button id="resetSheet">אפס דף</button>
-      </div>
-    </section>
-  </div>
-
-<script src="ChordEngineEnhanced_v14.36_UltimateMinorDetection.js?v=2"></script>
-<script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded')"></script>
-<script src="hebrew-spell-checker.js"></script>
-
-<script>
-let engine;
-window.addEventListener('DOMContentLoaded', () => {
-  if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngineEnhanced_v14.36_UltimateMinorDetection.js לא נטען!');
-    throw new Error('Engine not loaded');
+class ChordEngineEnhanced {
+  constructor() {
+    this.NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    this.NOTES_FLAT  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+    this.MAJOR_SCALE = [0,2,4,5,7,9,11];
+    this.MINOR_SCALE = [0,2,3,5,7,8,10];
+    this._hannCache = {};
   }
-  try {
-    engine = new ChordEngineEnhanced();
-    console.log('✅ Engine v14.36 Ultimate Minor Detection initialized');
-  } catch(e) {
-    alert('❌ שגיאה ביצירת Engine: ' + e.message);
-    throw e;
-  }
-});
 
-const SERVER = window.location.origin;
-let selectedYouTubeVideo = null;
-let currentTab = 'file';
-let WHISPER_SEGMENTS = [];
-let WHISPER_WORDS = [];
-let WHISPER_TEXT = '';
-let WHISPER_RUNNING = false;
-let DETECTED_LANGUAGE = 'en';
-let LIVE_STREAM = [];
-let LIVE_POINTER = 0;
-
-const fileEl=document.getElementById('file');
-const analyzeBtn=document.getElementById('analyzeBtn');
-const playBtn=document.getElementById('playBtn');
-const statusEl=document.getElementById('status');
-const errorEl=document.getElementById('error');
-const whisperStatusEl=document.getElementById('whisperStatus');
-const fullTranscriptEl=document.getElementById('fullTranscript');
-const fullSheetEl=document.getElementById('fullSheet');
-const gateChip=document.getElementById('gateChip');
-const player=document.getElementById('player');
-const bpmEl=document.getElementById('bpm');
-const durEl=document.getElementById('dur');
-const capoEl=document.getElementById('capo');
-const keyBadge=document.getElementById('keyBadge');
-const modeBadge=document.getElementById('modeBadge');
-const liveChordEl=document.getElementById('liveChord');
-const liveFunctionEl=document.getElementById('liveFunction');
-const liveLyricEl=document.getElementById('liveLyric');
-const liveSheetEl=document.getElementById('liveSheet');
-const resetSheetBtn=document.getElementById('resetSheet');
-const exportBtn=document.getElementById('exportBtn');
-const copyBtn=document.getElementById('copyBtn');
-const structuralCountEl=document.getElementById('structuralCount');
-const ornamentCountEl=document.getElementById('ornamentCount');
-const secDomCountEl=document.getElementById('secDomCount');
-const modalBorrowCountEl=document.getElementById('modalBorrowCount');
-const modulationCountEl=document.getElementById('modulationCount');
-const ornamentChip=document.getElementById('ornamentChip');
-const structuralChip=document.getElementById('structuralChip');
-const ytSearchEl=document.getElementById('ytSearch');
-const ytSearchBtn=document.getElementById('ytSearchBtn');
-const ytResultsEl=document.getElementById('ytResults');
-const bassSensEl = document.getElementById('bassSens');
-const extSensEl = document.getElementById('extSens');
-const bassSensTxt = document.getElementById('bassSensTxt');
-const extSensTxt = document.getElementById('extSensTxt');
-const ytStatusEl=document.getElementById('ytStatus');
-const ytUrlEl=document.getElementById('ytUrl');
-const ytUrlBtn=document.getElementById('ytUrlBtn');
-
-bassSensEl.oninput = () => { bassSensTxt.textContent = Number(bassSensEl.value).toFixed(1); };
-extSensEl.oninput = () => { extSensTxt.textContent = Number(extSensEl.value).toFixed(1); };
-
-function refreshSheetTabView(){
-  if(typeof SyncEngine !== 'undefined') {
-    SyncEngine.refreshSheetTabView(window.__STATE, WHISPER_WORDS, WHISPER_TEXT, DETECTED_LANGUAGE, capoEl.value, sanitizeLabel, applyCapoToLabel, fullSheetEl);
-  }
-}
-
-function initTabs() {
-  const tabs = document.querySelectorAll('.tab');
-  const tabContents = document.querySelectorAll('.tab-content');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', function() {
-      const tabName = this.getAttribute('data-tab');
-      currentTab = tabName;
-      tabs.forEach(t => t.classList.remove('active'));
-      this.classList.add('active');
-      tabContents.forEach(content => content.classList.remove('active'));
-      const targetContent = document.getElementById(tabName + 'Tab');
-      if(targetContent) targetContent.classList.add('active');
-      if(tabName === 'sheet') refreshSheetTabView();
-    });
-  });
-}
-initTabs();
-
-async function correctHebrewWords(words, fullText) {
-  if(typeof HebrewSpellChecker === 'undefined') return words;
-  const corrected = HebrewSpellChecker.correctWords(words);
-  const corrections = corrected.filter(w => w.original).length;
-  if (corrections > 0) console.log(`✅ Fixed ${corrections} Hebrew words`);
-  return corrected;
-}
-
-async function runWhisperInBackground(videoId) {
-  if(WHISPER_RUNNING) return;
-  WHISPER_RUNNING = true;
-  whisperStatusEl.style.display = 'inline-flex';
-  whisperStatusEl.textContent = 'טוען Groq Whisper...';
-  
-  try {
-    const url = `${SERVER}/api/groq-transcribe`;
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ videoId: videoId })
-    });
-    
-    if(!r.ok) throw new Error(`Failed: ${r.status}`);
-    
-    const data = await r.json();
-    
-    if(data.success) {
-      WHISPER_SEGMENTS = data.segments || [];
-      WHISPER_WORDS = data.words || [];
-      WHISPER_TEXT = data.text || '';
-      DETECTED_LANGUAGE = data.language || 'en';
-      
-      if (DETECTED_LANGUAGE === 'he' && WHISPER_WORDS.length > 0) {
-        WHISPER_WORDS = await correctHebrewWords(WHISPER_WORDS, WHISPER_TEXT);
-      }
-      
-      whisperStatusEl.textContent = '✅ Groq Whisper';
-      whisperStatusEl.classList.remove('warn');
-      whisperStatusEl.classList.add('ok');
-      if(window.__STATE && window.__STATE.timeline) {
-        syncChordsWithLyrics();
-        displayWhisperResult();
-        refreshSheetTabView();
-        const isRTL = DETECTED_LANGUAGE === 'he';
-        buildFullLyricsSheet(isRTL);
-      }
-      setTimeout(() => whisperStatusEl.style.display = 'none', 2500);
-    } else throw new Error(data.error || 'Failed');
-  } catch(e) {
-    whisperStatusEl.textContent = '❌ שגיאה';
-    whisperStatusEl.classList.add('err');
-    setTimeout(() => whisperStatusEl.style.display = 'none', 4000);
-  } finally {
-    WHISPER_RUNNING = false;
-  }
-}
-
-function syncChordsWithLyrics(){
-  if(typeof SyncEngine !== 'undefined') {
-    LIVE_STREAM = SyncEngine.syncChordsWithLyrics(window.__STATE, WHISPER_WORDS, capoEl.value, sanitizeLabel, applyCapoToLabel);
-    LIVE_POINTER = 0;
-  }
-}
-
-function displayWhisperResult() {
-  if(!WHISPER_TEXT || WHISPER_TEXT.trim() === '') {
-    fullTranscriptEl.textContent = '💬 תמלול לא זמין';
-    return;
-  }
-  const lang = DETECTED_LANGUAGE === 'he' ? 'עברית' : (DETECTED_LANGUAGE === 'en' ? 'English' : DETECTED_LANGUAGE);
-  fullTranscriptEl.textContent = `🎙️ [Groq Whisper - ${lang}]\n\n${WHISPER_TEXT}`;
-}
-
-ytSearchBtn.onclick = async () => {
-  const query = ytSearchEl.value.trim();
-  if (!query) return showYtStatus('הזן שם שיר', 'warn');
-  showYtStatus('מחפש...', 'warn');
-  ytResultsEl.style.display = 'none';
-  try {
-    const r = await fetch(`${SERVER}/api/yt?q=${encodeURIComponent(query)}`);
-    const data = await r.json();
-    if (!data || !data.length) return showYtStatus('לא נמצא', 'warn');
-    displayYouTubeResults(data.map(v => ({
-      videoId: v.id, title: v.title, author: v.author || v.channel, thumbnail: v.thumbnail
-    })));
-    ytStatusEl.style.display = 'none';
-    ytResultsEl.style.display = 'block';
-  } catch (e) {
-    showYtStatus('שגיאה בחיפוש', 'err');
-  }
-};
-
-ytSearchEl.onkeydown = (e) => { if(e.key === 'Enter') ytSearchBtn.click(); };
-
-ytUrlBtn.onclick = async () => {
-  const url = ytUrlEl.value.trim();
-  if(!url) return showYtStatus('הזן קישור', 'warn');
-  const videoId = extractYouTubeId(url);
-  if(!videoId) return showYtStatus('קישור לא תקין', 'err');
-  selectedYouTubeVideo = { id: videoId, title: 'YouTube Video', url: `https://www.youtube.com/watch?v=${videoId}` };
-  showYtStatus('✅ נבחר', 'ok');
-  ytResultsEl.style.display = 'none';
-};
-
-function extractYouTubeId(url) {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-    /^([a-zA-Z0-9_-]{11})$/
-  ];
-  for(const pattern of patterns) {
-    const match = url.match(pattern);
-    if(match) return match[1];
-  }
-  return null;
-}
-
-function showYtStatus(msg, type) {
-  ytStatusEl.textContent = msg;
-  ytStatusEl.className = `pill ${type}`;
-  ytStatusEl.style.display = 'inline-flex';
-}
-
-function displayYouTubeResults(results) {
-  ytResultsEl.innerHTML = '';
-  results.forEach((video) => {
-    if(!video.videoId) return;
-    const div = document.createElement('div');
-    div.className = 'yt-result';
-    div.innerHTML = `
-      <img class="thumb" src="${video.thumbnail}" alt="" />
-      <div class="info">
-        <div class="title">${escapeHtml(video.title || 'Unknown')}</div>
-        <div class="channel">${escapeHtml(video.author || 'Unknown')}</div>
-      </div>
-    `;
-    div.onclick = () => {
-      document.querySelectorAll('.yt-result').forEach(r => r.classList.remove('selected'));
-      div.classList.add('selected');
-      selectedYouTubeVideo = { id: video.videoId, title: video.title, url: `https://www.youtube.com/watch?v=${video.videoId}` };
-      ytUrlEl.value = selectedYouTubeVideo.url;
-      showYtStatus('✅ נבחר', 'ok');
+  async detect(audioBuffer, options = {}) {
+    const opts = {
+      harmonyMode: options.harmonyMode || 'jazz',
+      bassMultiplier: options.bassMultiplier || 1.2,
+      extensionMultiplier: options.extensionMultiplier || 1.0,
+      validationMultiplier: options.validationMultiplier || 1.0,
+      bassSensitivity: options.bassSensitivity || 1.0,
+      extensionSensitivity: options.extensionSensitivity || 1.0,
+      filterWeakChords: options.filterWeakChords !== false,
+      channelData: options.channelData || null,
+      sampleRate: options.sampleRate || null,
+      tonicRerunThreshold: options.tonicRerunThreshold !== undefined ? options.tonicRerunThreshold : 75,
+      progressCallback: typeof options.progressCallback === 'function' ? options.progressCallback : null
     };
-    ytResultsEl.appendChild(div);
-  });
-}
 
-function escapeHtml(text) { 
-  const div = document.createElement('div'); 
-  div.textContent = text; 
-  return div.innerHTML; 
-}
+    const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const timings = {};
+    const startTotal = now();
 
-function showAnalyzing(stepText){ 
-  statusEl.innerHTML='<span class="spin"></span> '+stepText; 
-  statusEl.className='pill warn'; 
-  statusEl.style.display='inline-flex'; 
-}
+    const tAudio = now();
+    const audioData = this.processAudio(audioBuffer, opts.channelData, opts.sampleRate);
+    timings.audioProcessing = now() - tAudio;
 
-function ok(msg){ 
-  statusEl.textContent=msg; 
-  statusEl.className='pill ok'; 
-  statusEl.style.display='inline-flex'; 
-}
+    if (opts.progressCallback) opts.progressCallback({ stage: 'extracting', progress: 0.1 });
 
-function err(msg){ 
-  errorEl.textContent=msg; 
-  errorEl.style.display='inline-flex'; 
-}
+    const tFeat = now();
+    const feats = this.extractFeatures(audioData);
+    timings.featureExtraction = now() - tFeat;
 
-function hideAlerts(){ 
-  statusEl.style.display='none'; 
-  errorEl.style.display='none'; 
-  gateChip.style.display='none'; 
-}
+    if (opts.progressCallback) opts.progressCallback({ stage: 'detecting_key', progress: 0.3 });
 
-function parseRoot(label){ 
-  const m=label?.match?.(/^([A-G](?:#|b)?)/); 
-  if(!m) return -1; 
-  const nm=m[1].replace('b','#'); 
-  return engine.NOTES_SHARP.indexOf(nm); 
-}
+    const tKey = now();
+    let key = this.detectKeyEnhanced(feats);
+    timings.keyDetection = now() - tKey;
 
-function applyCapoToLabel(label, capo){
-  capo = parseInt(capo);
-  if(!capo || capo === 0) return label;
-  
-  const NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  const NOTES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-  
-  function transposeNote(noteStr, semitones) {
-    const normalized = noteStr.replace('b', '#');
-    const idx = NOTES_SHARP.indexOf(normalized);
-    if(idx < 0) return noteStr;
-    const newPc = ((idx - semitones) % 12 + 12) % 12;
-    return NOTES_FLAT[newPc];
-  }
-  
-  if(label.includes('/')) {
-    const parts = label.split('/');
-    const rootPart = parts[0];
-    const bassPart = parts[1];
-    
-    const rootMatch = rootPart.match(/^([A-G](?:#|b)?)(.*)$/);
-    if(!rootMatch) return label;
-    const transposedRoot = transposeNote(rootMatch[1], capo) + (rootMatch[2] || '');
-    
-    const bassMatch = bassPart.match(/^([A-G](?:#|b)?)(.*)$/);
-    if(!bassMatch) return transposedRoot;
-    const transposedBass = transposeNote(bassMatch[1], capo) + (bassMatch[2] || '');
-    
-    return transposedRoot + '/' + transposedBass;
-  }
-  
-  const m = label.match(/^([A-G](?:#|b)?)(.*)$/);
-  if(!m) return label;
-  
-  return transposeNote(m[1], capo) + (m[2] || '');
-}
-
-function sanitizeLabel(lbl){ 
-  if(!lbl) return lbl; 
-  return lbl.replace(/[^A-Ga-g#bm79sus246()/\s+altdim]/g,'').trim(); 
-}
-
-function smartEnharmonic(label, key) {
-  if (!label || !key || !engine) return label;
-  
-  const keySignatures = {
-    'G': 1, 'D': 2, 'A': 3, 'E': 4, 'B': 5, 'F#': 6, 'C#': 7,
-    'Em': 1, 'Bm': 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, 'A#m': 7,
-    'F': -1, 'Bb': -2, 'Eb': -3, 'Ab': -4, 'Db': -5, 'Gb': -6, 'Cb': -7,
-    'Dm': -1, 'Gm': -2, 'Cm': -3, 'Fm': -4, 'Bbm': -5, 'Ebm': -6, 'Abm': -7,
-    'C': 0, 'Am': 0
-  };
-  
-  const keyName = engine.NOTES_SHARP[engine.toPc(key.root)] + (key.minor ? 'm' : '');
-  const signature = keySignatures[keyName] || 0;
-  const useFlats = signature < 0;
-  
-  const match = label.match(/^([A-G][#b]?)(.*)$/);
-  if (!match) return label;
-  
-  const root = match[1];
-  const quality = match[2];
-  
-  const enharmonicMap = {
-    'C#': useFlats ? 'Db' : 'C#',
-    'Db': useFlats ? 'Db' : 'C#',
-    'D#': useFlats ? 'Eb' : 'D#',
-    'Eb': useFlats ? 'Eb' : 'D#',
-    'F#': useFlats ? 'Gb' : 'F#',
-    'Gb': useFlats ? 'Gb' : 'F#',
-    'G#': useFlats ? 'Ab' : 'G#',
-    'Ab': useFlats ? 'Ab' : 'G#',
-    'A#': useFlats ? 'Bb' : 'A#',
-    'Bb': useFlats ? 'Bb' : 'A#'
-  };
-  
-  const newRoot = enharmonicMap[root] || root;
-  return newRoot + quality;
-}
-
-function displayChord(label, capo) {
-  if (!label) return label;
-  let clean = sanitizeLabel(label);
-  const key = window.__STATE ? window.__STATE.key : null;
-  if (key) clean = smartEnharmonic(clean, key);
-  clean = applyCapoToLabel(clean, capo);
-  return clean;
-}
-
-function mergeStereoResults(leftResult, rightResult) {
-  const leftChords = leftResult.chords;
-  const rightChords = rightResult.chords;
-  const merged = [];
-  
-  for (let i = 0; i < leftChords.length; i++) {
-    const leftChord = leftChords[i];
-    const time = leftChord.t;
-    const rightChord = rightChords.find(rc => Math.abs(rc.t - time) < 0.5);
-    
-    if (rightChord && leftChord.label === rightChord.label) {
-      merged.push({ ...leftChord, confidence: 'high' });
-    } else if (rightChord) {
-      merged.push({ ...leftChord, confidence: 'medium', rightChannelSays: rightChord.label });
-    } else {
-      merged.push({ ...leftChord, confidence: 'medium' });
+    if (opts.progressCallback) {
+      opts.progressCallback({
+        stage: 'key_detected',
+        progress: 0.4,
+        key: this.getNoteName(key.root, key) + (key.minor ? 'm' : ''),
+        confidence: key.confidence
+      });
     }
-  }
-  
-  return {
-    chords: merged,
-    key: leftResult.key,
-    mode: leftResult.mode,
-    stats: leftResult.stats,
-    bpm: leftResult.bpm,
-    tonic: leftResult.tonic,
-    modulations: leftResult.modulations
-  };
-}
 
-analyzeBtn.onclick=async()=>{
-  hideAlerts();
-  liveChordEl.textContent='—'; 
-  liveFunctionEl.textContent='—';
-  liveLyricEl.textContent='—';
-  liveSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
-  fullSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
-  fullTranscriptEl.textContent='ממתין...';
-  LIVE_STREAM=[]; 
-  LIVE_POINTER=0;
-  WHISPER_SEGMENTS = [];
-  WHISPER_WORDS = [];
-  WHISPER_TEXT = '';
-  DETECTED_LANGUAGE = 'en';
-  window.__STATE = null;
-  playBtn.disabled=true; 
-  keyBadge.textContent=''; 
-  modeBadge.textContent='';
-  structuralCountEl.textContent=''; 
-  ornamentCountEl.textContent=''; 
-  secDomCountEl.textContent=''; 
-  modalBorrowCountEl.textContent='';
-  modulationCountEl.textContent='';
-  if(!WHISPER_TEXT) fullTranscriptEl.textContent = 'ממתין...';
-  
-  let audioSource = null;
-  if(currentTab === 'file') {
-    const f=fileEl.files?.[0]; 
-    if(!f){ err('בחר קובץ'); return; }
-    audioSource = { type: 'file', data: f };
-  } else {
-    if(!selectedYouTubeVideo) { err('בחר סרטון'); return; }
-    audioSource = { type: 'youtube', data: selectedYouTubeVideo };
-  }
-  
-  try{
-    showAnalyzing('שלב 1/3: טעינת אודיו');
-    const audioData = await decodeAudio(audioSource);
-    
-    bpmEl.textContent = audioData.bpm; 
-    durEl.textContent = audioData.duration.toFixed(1)+'s';
-    if(audioData.url) player.src = audioData.url;
-    
-    showAnalyzing('שלב 2/3: זיהוי אקורדים (Ultimate Minor Detection)');
-    
-    let timeline, key, mode, stats, result;
-    
-    if (audioData.isStereo) {
-      const leftResult = await engine.detect(audioData.audioBuffer, {
-        harmonyMode: document.getElementById('extMode').value,
-        bassMultiplier: parseFloat(bassSensEl.value),
-        extensionMultiplier: parseFloat(extSensEl.value),
-        channelData: audioData.xLeft,
-        sampleRate: audioData.sr
+    const useFullHMM = key.confidence > 0.80;
+
+    if (opts.progressCallback) {
+      opts.progressCallback({
+        stage: useFullHMM ? 'analyzing_full' : 'analyzing_simple',
+        progress: 0.5
       });
-      
-      const rightResult = await engine.detect(audioData.audioBuffer, {
-        harmonyMode: document.getElementById('extMode').value,
-        bassMultiplier: parseFloat(bassSensEl.value),
-        extensionMultiplier: parseFloat(extSensEl.value),
-        channelData: audioData.xRight,
-        sampleRate: audioData.sr
-      });
-      
-      const merged = mergeStereoResults(leftResult, rightResult);
-      result = merged;
-      timeline = merged.chords;
-      key = merged.key;
-      mode = merged.mode;
-      stats = merged.stats;
-    } else {
-      result = await engine.detect(audioData.audioBuffer, {
-        harmonyMode: document.getElementById('extMode').value,
-        bassMultiplier: parseFloat(bassSensEl.value),
-        extensionMultiplier: parseFloat(extSensEl.value)
-      });
-      timeline = result.chords;
-      key = result.key;
-      mode = result.mode;
-      stats = result.stats;
     }
-    
-    showAnalyzing('שלב 3/3: עיבוד...');
-    
-    timeline.forEach(ev => {
-      if (!ev || !ev.label) return; // ✅ CRITICAL: Safety check
-      ev.label = sanitizeLabel(ev.label);
-      ev.words = ev.words || [];
+
+    const tHmm = now();
+    let timeline = this.chordTrackingHMMHybrid(feats, key, opts.bassMultiplier, useFullHMM);
+    timings.hmmTracking = now() - tHmm;
+
+    if (opts.progressCallback) opts.progressCallback({ stage: 'refining', progress: 0.7 });
+
+    timeline = this.finalizeTimeline(timeline, key, audioData.bpm, feats);
+    const validatedKey = this.validateKeyFromChords(timeline, key, feats);
+
+    if (validatedKey.root !== key.root || validatedKey.minor !== key.minor) {
+      key = validatedKey;
+      const tRe = now();
+      timeline = this.chordTrackingHMMHybrid(feats, key, opts.bassMultiplier, true);
+      timeline = this.finalizeTimeline(timeline, key, audioData.bpm, feats);
+      timings.rerunKeyValidation = now() - tRe;
+    }
+
+    if (opts.progressCallback) opts.progressCallback({ stage: 'decorating', progress: 0.8 });
+
+    const tPost = now();
+    timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
+    timings.postProcessing = now() - tPost;
+
+    const tonic = this.detectTonicMusically(timeline, key, audioData.duration);
+
+    if (tonic.root !== key.root && tonic.confidence >= opts.tonicRerunThreshold) {
+      const tRe2 = now();
+      key = { root: tonic.root, minor: key.minor, confidence: Math.max(key.confidence, tonic.confidence / 100) };
+      timeline = this.chordTrackingHMMHybrid(feats, key, opts.bassMultiplier, true);
+      timeline = this.finalizeTimeline(timeline, key, audioData.bpm, feats);
+      timeline = this.applyPostProcessing(timeline, key, feats, audioData.bpm, opts);
+      timings.rerunTonic = now() - tRe2;
+    }
+
+    timings.total = now() - startTotal;
+
+    if (opts.progressCallback) opts.progressCallback({ stage: 'complete', progress: 1.0 });
+
+    const modulations = this.quickModulationCheck(timeline, key);
+
+    // ✅ CRITICAL: Multiple safety checks for timeline filtering
+    timeline = timeline.filter(ev => {
+      if (!ev) return false;
+      if (!ev.label || typeof ev.label !== 'string') return false;
+      if (ev.label.trim() === '') return false;
+      return true;
     });
-    
-    window.__STATE = { 
-      bpm: audioData.bpm, 
-      duration: audioData.duration, 
-      timeline: timeline, 
-      key, 
-      mode,
-      gateTime: 0,
-      stats: stats
+
+    const stats = {
+      totalChords: timeline.length,
+      structural: timeline.filter(e => e.ornamentType === 'structural').length,
+      ornaments: timeline.filter(e => e.ornamentType && e.ornamentType !== 'structural').length,
+      secondaryDominants: timeline.filter(e => e.modalContext === 'secondary_dominant').length,
+      modalBorrowings: timeline.filter(e => e.modalContext && e.modalContext !== 'secondary_dominant').length,
+      inversions: timeline.filter(e => e.label.includes('/')).length,
+      extensions: timeline.filter(e => /[679]|11|13|sus|dim|aug/.test(e.label)).length,
+      modulations,
+      predictionAccuracy: this.computePredictionAccuracy(timeline)
     };
-    
-    const capo=parseInt(capoEl.value||'0',10);
-    
-    if (!engine || !engine.NOTES_SHARP) {
-      console.error('Engine not properly initialized!');
-      showError('שגיאה: Engine לא הוגדר נכון');
-      return;
-    }
-    
-    const updateKeyDisplay = () => {
-      const currentKey = window.__STATE ? window.__STATE.key : key;
-      const displayKey = applyCapoToLabel(engine.NOTES_SHARP[engine.toPc(currentKey.root)]+(currentKey.minor?'m':''), capo);
-      if (keyBadge.textContent !== displayKey) {
-        keyBadge.textContent = displayKey;
-      }
+
+    return {
+      chords: timeline,
+      key,
+      tonic,
+      bpm: audioData.bpm,
+      duration: audioData.duration,
+      stats,
+      mode: key.minor ? 'Natural Minor (Aeolian)' : 'Major (Ionian)',
+      timings
     };
+  }
+
+  applyPostProcessing(timeline, key, feats, bpm, opts) {
+    timeline = this.enforceEarlyDiatonic(timeline, key, feats, bpm);
+    timeline = this.decorateQualitiesUltimate(timeline, feats, key, opts.harmonyMode, opts.extensionMultiplier, opts.extensionSensitivity);
+    timeline = this.adjustMinorMajors(timeline, feats, key);
+    timeline = this.addInversionsUltimate(timeline, feats, key, opts.bassMultiplier);
+    timeline = this.validateAndRefine(timeline, key, feats, opts.validationMultiplier);
+    timeline = this.classifyOrnaments(timeline, bpm, feats);
+    timeline = this.analyzeModalContext(timeline, key);
+    timeline = this.enrichTimelineWithTheory(timeline, feats, key);
+    return timeline;
+  }
+
+  // ✅✅✅ THIS IS THE FIX! ✅✅✅
+  processAudio(audioBuffer, channelData, sampleRate) {
+    // Case 1: Pre-resampled data from YouTube (HTML sends channelData + sampleRate)
+    if (channelData && sampleRate) {
+      console.log('✅ Engine: using pre-resampled YouTube data');
+      const x = channelData;
+      const sr = sampleRate;
+      const bpm = this.estimateTempo(x, sr);
+      return { x, sr, bpm, duration: x.length / sr };
+    }
+
+    // Case 2: No audioBuffer provided - error
+    if (!audioBuffer) {
+      throw new Error('❌ Engine requires either audioBuffer or (channelData + sampleRate)');
+    }
+
+    // Case 3: File upload - process AudioBuffer normally
+    console.log('✅ Engine: processing uploaded file AudioBuffer');
+    const channels = audioBuffer.numberOfChannels || 1;
+    const mono = (channels === 1) 
+      ? audioBuffer.getChannelData(0) 
+      : this.mixStereo(audioBuffer);
     
-    updateKeyDisplay();
+    const sr0 = audioBuffer.sampleRate || 44100;
+    const sr = 22050;
+    const x = this.resampleLinear(mono, sr0, sr);
+    const bpm = this.estimateTempo(x, sr);
     
-    let pollCount = 0;
-    const pollInterval = setInterval(() => {
-      updateKeyDisplay();
-      pollCount++;
-      if (pollCount >= 20) clearInterval(pollInterval);
-    }, 100);
-    
-    modeBadge.textContent = mode;
-    
-    const tonic = engine.NOTES_SHARP[engine.toPc(key.root)];
-    const keyMode = key.minor ? 'minor' : 'major';
-    const diatonicChords = engine.getDiatonicChords(tonic, keyMode);
-    const circleEl = document.getElementById('circleOfFifths');
-    circleEl.innerHTML = diatonicChords.map(name => {
-      const displayLabel = applyCapoToLabel(name, capo);
-      return `<span class="tag" style="background:#1a2332;border-color:#38bdf8">${displayLabel}</span>`;
-    }).join('');
-    
-    const structural = timeline.filter(e=>e.ornamentType==='structural').length;
-    const ornaments = timeline.filter(e=>e.ornamentType!=='structural').length;
-    let secDom = 0;
-    let modalBorrow = 0;
-    
-    if (result.stats && result.stats.secondaryDominants !== undefined) {
-      secDom = result.stats.secondaryDominants;
-      modalBorrow = result.stats.modalBorrowings || 0;
-    } else {
-      for(let i=0; i<timeline.length; i++){
-        if(timeline[i].isSecondaryDominant) secDom++;
-        if(timeline[i].isModalBorrowing) modalBorrow++;
+    return { x, sr, bpm, duration: x.length / sr };
+  }
+
+  estimateTempo(x, sr) {
+    const hop = Math.floor(0.1 * sr);
+    const frames = [];
+    for (let s = 0; s + 4096 <= x.length; s += hop) {
+      let e = 0;
+      for (let i = 0; i < 4096; i++) e += x[s + i] * x[s + i];
+      frames.push(e);
+    }
+    if (frames.length < 4) return 120;
+
+    const minLag = Math.floor(0.3 / (hop / sr));
+    const maxLag = Math.floor(2.0 / (hop / sr));
+    let bestLag = minLag;
+    let bestR = -Infinity;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let r = 0;
+      for (let i = 0; i < frames.length - lag; i++) {
+        r += frames[i] * frames[i + lag];
+      }
+      if (r > bestR) {
+        bestR = r;
+        bestLag = lag;
       }
     }
-    
-    structuralCountEl.textContent = structural;
-    ornamentCountEl.textContent = ornaments;
-    secDomCountEl.textContent = secDom;
-    modalBorrowCountEl.textContent = modalBorrow;
-    modulationCountEl.textContent = result.stats && result.stats.modulations !== undefined ? result.stats.modulations : 0;
-    
-    if(WHISPER_WORDS && WHISPER_WORDS.length > 0) {
-      syncChordsWithLyrics();
-      displayWhisperResult();
-      refreshSheetTabView();
-    } else {
-      const isRTL = DETECTED_LANGUAGE === 'he';
-      buildFullLyricsSheet(isRTL);
+
+    const bpm = 60 / (bestLag * (hop / sr));
+    if (!isFinite(bpm)) return 120;
+    return Math.max(60, Math.min(200, Math.round(bpm)));
+  }
+
+  extractFeatures(audioData) {
+    const { x, sr } = audioData;
+    const hop = Math.floor(0.10 * sr);
+    const win = 4096;
+
+    if (!this._hannCache[win]) {
+      const hann = new Float32Array(win);
+      for (let i = 0; i < win; i++) {
+        hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (win - 1)));
+      }
+      this._hannCache[win] = hann;
     }
-    
-    const detectionMode = document.getElementById('extMode').value.toUpperCase();
-    ok(`✅ ${detectionMode} Ultimate Minor Detection - ${timeline.length} אקורדים`);
-    hookPlaybackLive(); 
-    refreshSheetTabView();
-    playBtn.disabled=false; 
-  }catch(e){ 
-    err('שגיאה: '+e.message); 
+    const hann = this._hannCache[win];
+
+    const frames = [];
+    for (let s = 0; s + win <= x.length; s += hop) {
+      frames.push(x.subarray(s, s + win));
+    }
+
+    const chroma = [];
+    const bassPc = [];
+    const frameE = [];
+
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      const windowed = new Float32Array(win);
+      for (let k = 0; k < win; k++) {
+        windowed[k] = frame[k] * hann[k];
+      }
+
+      let en = 0;
+      for (let k = 0; k < win; k++) en += windowed[k] * windowed[k];
+      frameE.push(en);
+
+      const { mags, N } = this.fft(windowed);
+      const c = new Float32Array(12);
+
+      for (let b = 1; b < mags.length; b++) {
+        const f = b * sr / N;
+        if (f < 80 || f > 5000) continue;
+        const midi = 69 + 12 * Math.log2(f / 440);
+        const pc = ((Math.round(midi) % 12) + 12) % 12;
+        c[pc] += mags[b];
+      }
+
+      const sum = c.reduce((a, b) => a + b, 0);
+      if (sum > 0) {
+        for (let k = 0; k < 12; k++) c[k] /= sum;
+      }
+
+      chroma.push(c);
+      bassPc.push(this.estimateBassF0(mags, sr, N));
+    }
+
+    const thrE = this.percentile(frameE, 40);
+    for (let i = 1; i < bassPc.length - 1; i++) {
+      const v = bassPc[i];
+      if (v < 0 || frameE[i] < thrE || (bassPc[i - 1] !== v && bassPc[i + 1] !== v)) {
+        bassPc[i] = -1;
+      }
+    }
+
+    const introSkipFrames = this.computeDynamicIntroSkip(frameE, hop, sr);
+    const percentiles = {
+      p30: this.percentile(frameE, 30),
+      p40: this.percentile(frameE, 40),
+      p50: this.percentile(frameE, 50),
+      p70: this.percentile(frameE, 70),
+      p75: this.percentile(frameE, 75),
+      p80: this.percentile(frameE, 80)
+    };
+
+    return { chroma, bassPc, frameE, hop, sr, introSkipFrames, percentiles };
   }
-};
 
-playBtn.onclick=async()=>{ 
-  try{ await player.play(); } 
-  catch(e){ alert('לחץ ▶️'); } 
-};
+  estimateBassF0(mags, sr, N) {
+    const fmin = 40;
+    const fmax = 250;
+    const win = N;
+    const yLP = new Float32Array(win);
 
-async function decodeAudio(source){
-  if(source.type === 'file') return await decodeAudioFile(source.data);
-  else return await decodeYouTubeAudio(source.data);
-}
+    for (let b = 1; b < mags.length; b++) {
+      const f = b * sr / N;
+      if (f <= fmax) {
+        const omega = 2 * Math.PI * f / sr;
+        for (let n = 0; n < win; n++) {
+          yLP[n] += mags[b] * Math.cos(omega * n);
+        }
+      }
+    }
 
-async function decodeAudioFile(file){
-  const AC = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AC(); 
-  try{ await ctx.resume(); }catch{}
-  const arr = await file.arrayBuffer();
-  try{
-    const buf = await ctx.decodeAudioData(arr.slice(0));
-    return postDecode(buf, URL.createObjectURL(file));
-  }catch(e1){
-    try{
-      const buf = await new Promise((resolve,reject)=>{ 
-        ctx.decodeAudioData(arr.slice(0), b=>resolve(b), err=>reject(err)); 
-      });
-      return postDecode(buf, URL.createObjectURL(file));
-    }catch(e2){ throw e2||e1; }
+    const f0minLag = Math.floor(sr / fmax);
+    const f0maxLag = Math.floor(sr / fmin);
+    let bestLag = -1;
+    let bestR = -1;
+
+    let mean = 0;
+    for (let n = 0; n < win; n++) mean += yLP[n];
+    mean /= win || 1;
+
+    let denom = 0;
+    for (let n = 0; n < win; n++) {
+      const d = yLP[n] - mean;
+      denom += d * d;
+    }
+    denom = denom || 1e-9;
+
+    for (let lag = f0minLag; lag <= f0maxLag; lag++) {
+      let r = 0;
+      for (let n = 0; n < win - lag; n++) {
+        const a = yLP[n] - mean;
+        const b = yLP[n + lag] - mean;
+        r += a * b;
+      }
+      r /= denom;
+      if (r > bestR) {
+        bestR = r;
+        bestLag = lag;
+      }
+    }
+
+    if (bestLag > 0) {
+      const f0 = sr / bestLag;
+      if (f0 >= fmin && f0 <= fmax) {
+        const midiF0 = 69 + 12 * Math.log2(f0 / 440);
+        return ((Math.round(midiF0) % 12) + 12) % 12;
+      }
+    }
+
+    return -1;
   }
-  
-  function postDecode(buf, url){
-    const audioMode = document.getElementById('audioMode').value;
+
+  fft(input) {
+    let n = input.length;
+    let N = 1;
+    while (N < n) N <<= 1;
+
+    const re = new Float32Array(N);
+    const im = new Float32Array(N);
+    re.set(input);
+
+    let j = 0;
+    for (let i = 0; i < N; i++) {
+      if (i < j) {
+        [re[i], re[j]] = [re[j], re[i]];
+        [im[i], im[j]] = [im[j], im[i]];
+      }
+      let m = N >> 1;
+      while (m >= 1 && j >= m) {
+        j -= m;
+        m >>= 1;
+      }
+      j += m;
+    }
+
+    for (let len = 2; len <= N; len <<= 1) {
+      const ang = -2 * Math.PI / len;
+      const wlr = Math.cos(ang);
+      const wli = Math.sin(ang);
+      for (let i = 0; i < N; i += len) {
+        let wr = 1;
+        let wi = 0;
+        for (let k = 0; k < (len >> 1); k++) {
+          const uRe = re[i + k];
+          const uIm = im[i + k];
+          const vRe = re[i + k + (len >> 1)] * wr - im[i + k + (len >> 1)] * wi;
+          const vIm = re[i + k + (len >> 1)] * wi + im[i + k + (len >> 1)] * wr;
+
+          re[i + k] = uRe + vRe;
+          im[i + k] = uIm + vIm;
+          re[i + k + (len >> 1)] = uRe - vRe;
+          im[i + k + (len >> 1)] = uIm - vIm;
+
+          const nwr = wr * wlr - wi * wli;
+          wi = wr * wli + wi * wlr;
+          wr = nwr;
+        }
+      }
+    }
+
+    const mags = new Float32Array(N >> 1);
+    for (let k = 0; k < mags.length; k++) {
+      mags[k] = Math.hypot(re[k], im[k]);
+    }
+
+    return { mags, N };
+  }
+
+  computeDynamicIntroSkip(frameE, hop, sr) {
+    const thr = this.percentile(frameE, 70);
+    let stable = 0;
+    let i = 0;
+
+    for (; i < frameE.length; i++) {
+      if (frameE[i] >= thr) stable++;
+      else stable = 0;
+      if (stable * hop / sr >= 0.5) break;
+    }
+
+    const hardCapSec = 8.0;
+    const hardCapFrames = Math.floor((hardCapSec * sr) / hop);
+    return Math.min(i, hardCapFrames);
+  }
+
+  detectTonicFromBass(feats) {
+    const { bassPc, frameE, introSkipFrames, percentiles } = feats;
+    const threshold = (percentiles && percentiles.p80) || this.percentile(frameE, 80);
+    const bassHist = new Array(12).fill(0);
+    const start = introSkipFrames || 0;
+
+    for (let i = start; i < bassPc.length; i++) {
+      const bp = bassPc[i];
+      if (bp >= 0 && frameE[i] >= threshold) {
+        const w = frameE[i] / threshold;
+        bassHist[bp] += w;
+      }
+    }
+
+    let tonicPc = 0;
+    let maxVal = 0;
+    for (let pc = 0; pc < 12; pc++) {
+      if (bassHist[pc] > maxVal) {
+        maxVal = bassHist[pc];
+        tonicPc = pc;
+      }
+    }
+
+    const total = bassHist.reduce((a, b) => a + b, 0) || 1;
+    const confidence = maxVal / total;
+    const root = tonicPc;
     
-    if (audioMode === 'stereo' && buf.numberOfChannels === 2) {
-      const left = buf.getChannelData(0);
-      const right = buf.getChannelData(1);
-      const sr0 = buf.sampleRate, sr = 22050;
+    const toPc = n => ((n % 12) + 12) % 12;
+    
+    const m3_bass = bassHist[toPc(root + 3)] / total;
+    const M3_bass = bassHist[toPc(root + 4)] / total;
+    const m6_bass = bassHist[toPc(root + 8)] / total;
+    const M6_bass = bassHist[toPc(root + 9)] / total;
+    const m7_bass = bassHist[toPc(root + 10)] / total;
+    const M7_bass = bassHist[toPc(root + 11)] / total;
+
+    let minorBassScore = 0;
+    let majorBassScore = 0;
+
+    if (m6_bass > 0.05) minorBassScore += 3.0;
+    if (m7_bass > 0.05) minorBassScore += 2.5;
+    if (m3_bass > 0.04) minorBassScore += 2.0;
+    
+    if (M6_bass > 0.05) majorBassScore += 3.0;
+    if (M7_bass > 0.05) majorBassScore += 2.5;
+    if (M3_bass > 0.04) majorBassScore += 2.0;
+
+    if (m6_bass > M6_bass * 1.5 && m6_bass > 0.03) minorBassScore += 2.0;
+    if (M6_bass > m6_bass * 1.5 && M6_bass > 0.03) majorBassScore += 2.0;
+
+    if (m7_bass > M7_bass * 1.5 && m7_bass > 0.03) minorBassScore += 1.5;
+    if (M7_bass > m7_bass * 1.5 && M7_bass > 0.03) majorBassScore += 1.5;
+
+    if (m3_bass > M3_bass * 1.5 && m3_bass > 0.03) minorBassScore += 1.5;
+    if (M3_bass > m3_bass * 1.5 && M3_bass > 0.03) majorBassScore += 1.5;
+
+    let minorHint = undefined;
+    let bassMinorConfidence = 0;
+
+    if (minorBassScore > 2.0 || majorBassScore > 2.0) {
+      minorHint = minorBassScore > majorBassScore;
+      bassMinorConfidence = Math.min(1.0, Math.abs(minorBassScore - majorBassScore) / 8.0);
+    }
+
+    return { root: tonicPc, confidence, minorHint, bassMinorConfidence };
+  }
+
+  detectKeyEnhanced(feats) {
+    const { chroma, frameE, introSkipFrames, percentiles } = feats;
+    if (!chroma || !chroma.length) return { root: 0, minor: false, confidence: 0.5 };
+
+    const bassTonic = this.detectTonicFromBass(feats);
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    if (bassTonic.confidence > 0.25) {
+      const root = bassTonic.root;
+      const start = introSkipFrames || 0;
+      const thr = (percentiles && percentiles.p80) || this.percentile(frameE, 80);
+
+      const agg = new Array(12).fill(0);
+      let totalW = 0;
+
+      const opening = new Array(12).fill(0);
+      const closing = new Array(12).fill(0);
+      let openingW = 0;
+      let closingW = 0;
+
+      for (let i = start; i < chroma.length; i++) {
+        if (frameE[i] >= thr) {
+          const w = frameE[i] / thr;
+          const c = chroma[i];
+          
+          for (let p = 0; p < 12; p++) agg[p] += c[p] * w;
+          totalW += w;
+
+          if (i < start + 5) {
+            for (let p = 0; p < 12; p++) opening[p] += c[p] * w * 3.0;
+            openingW += w * 3.0;
+          }
+
+          if (i >= chroma.length - 5) {
+            for (let p = 0; p < 12; p++) closing[p] += c[p] * w * 3.0;
+            closingW += w * 3.0;
+          }
+        }
+      }
+
+      if (totalW > 0) for (let p = 0; p < 12; p++) agg[p] /= totalW;
+      if (openingW > 0) for (let p = 0; p < 12; p++) opening[p] /= openingW;
+      if (closingW > 0) for (let p = 0; p < 12; p++) closing[p] /= closingW;
+
+      const m3 = agg[toPc(root + 3)] || 0;
+      const M3 = agg[toPc(root + 4)] || 0;
+      const m6 = agg[toPc(root + 8)] || 0;
+      const M6 = agg[toPc(root + 9)] || 0;
+      const m7 = agg[toPc(root + 10)] || 0;
+      const M7 = agg[toPc(root + 11)] || 0;
+
+      const opening_m3 = opening[toPc(root + 3)] || 0;
+      const opening_M3 = opening[toPc(root + 4)] || 0;
+      const closing_m3 = closing[toPc(root + 3)] || 0;
+      const closing_M3 = closing[toPc(root + 4)] || 0;
+
+      let minorScore = 0;
+      let majorScore = 0;
+
+      const thirdRatio = (m3 + 0.0001) / (M3 + 0.0001);
+      if (thirdRatio >= 1.03) minorScore += 5.0 * Math.min(3.0, thirdRatio - 1.0);
+      else if (thirdRatio <= 0.97) majorScore += 5.0 * Math.min(3.0, 1.0 / thirdRatio - 1.0);
+
+      const sixthRatio = (m6 + 0.0001) / (M6 + 0.0001);
+      if (sixthRatio >= 1.08) minorScore += 3.0 * Math.min(2.5, sixthRatio - 1.0);
+      else if (sixthRatio <= 0.93) majorScore += 3.0 * Math.min(2.5, 1.0 / sixthRatio - 1.0);
+
+      const seventhRatio = (m7 + 0.0001) / (M7 + 0.0001);
+      if (seventhRatio >= 1.08) minorScore += 2.0 * Math.min(2.0, seventhRatio - 1.0);
+      else if (seventhRatio <= 0.93) majorScore += 2.0 * Math.min(2.0, 1.0 / seventhRatio - 1.0);
+
+      const openingThirdRatio = (opening_m3 + 0.0001) / (opening_M3 + 0.0001);
+      if (openingThirdRatio > 1.05) minorScore += 4.0;
+      else if (openingThirdRatio < 0.95) majorScore += 4.0;
+
+      const closingThirdRatio = (closing_m3 + 0.0001) / (closing_M3 + 0.0001);
+      if (closingThirdRatio > 1.05) minorScore += 4.0;
+      else if (closingThirdRatio < 0.95) majorScore += 4.0;
+
+      if (bassTonic.minorHint !== undefined) {
+        if (bassTonic.minorHint) minorScore += bassTonic.bassMinorConfidence * 3.0;
+        else majorScore += bassTonic.bassMinorConfidence * 3.0;
+      }
+
+      if (Math.abs(minorScore - majorScore) < 2.0) {
+        if (m6 > 0.08 && m6 >= M6) minorScore += 2.0;
+        if (m3 > 0.10 && m3 >= M3 * 0.95) minorScore += 1.5;
+      }
+
+      const isMinor = minorScore > majorScore;
+      const separation = Math.abs(minorScore - majorScore);
+      const spread = Math.abs(m3 - M3) + Math.abs(m6 - M6) + Math.abs(m7 - M7);
+      let confidence = 0.25 + bassTonic.confidence * 0.25 + separation * 0.15 + spread * 0.8;
+      confidence = Math.min(1.0, confidence);
+
+      return { root, minor: !!isMinor, confidence };
+    }
+
+    const KS_MAJOR = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+    const KS_MINOR = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+
+    const agg = new Array(12).fill(0);
+
+    for (let i = 0; i < chroma.length; i++) {
+      const pos = i / chroma.length;
+      let w = 1.0;
+      if (pos < 0.10) w = 5.0;
+      else if (pos > 0.90) w = 3.0;
+
+      const c = chroma[i];
+      for (let p = 0; p < 12; p++) agg[p] += c[p] * w;
+    }
+
+    const sum = agg.reduce((a, b) => a + b, 0) || 1;
+    for (let p = 0; p < 12; p++) agg[p] /= sum;
+
+    let best = { score: -Infinity, root: 0, minor: false };
+
+    for (let r = 0; r < 12; r++) {
+      let scoreMaj = 0;
+      let scoreMin = 0;
+      for (let i = 0; i < 12; i++) {
+        const idx = toPc(r + i);
+        scoreMaj += agg[idx] * KS_MAJOR[i];
+        scoreMin += agg[idx] * KS_MINOR[i];
+      }
+      if (scoreMaj > best.score) best = { score: scoreMaj, root: r, minor: false };
+      if (scoreMin > best.score) best = { score: scoreMin, root: r, minor: true };
+    }
+
+    const confidence = Math.min(1.0, best.score / 10);
+    return { root: best.root, minor: best.minor, confidence };
+  }
+
+  chordTrackingHMMHybrid(feats, key, bassMultiplier, useFullMode = true) {
+    const { chroma, bassPc, hop, sr, frameE, percentiles } = feats;
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const diatonicPcs = scale.map(s => toPc(key.root + s));
+
+    const candidates = [];
+
+    for (const r of diatonicPcs) {
+      const noteName = this.getNoteName(r, key);
+      candidates.push({ root: r, label: noteName, type: 'major', borrowed: false });
+      candidates.push({ root: r, label: noteName + 'm', type: 'minor', borrowed: false });
+    }
+
+    if (!key.minor) {
+      const bVII = toPc(key.root + 10);
+      const bVI = toPc(key.root + 8);
+      const bIII = toPc(key.root + 3);
+      const iv = toPc(key.root + 5);
+
+      candidates.push({ root: bVII, label: this.getNoteName(bVII, key), type: 'major', borrowed: true });
+      candidates.push({ root: bVI, label: this.getNoteName(bVI, key), type: 'major', borrowed: true });
+      candidates.push({ root: bIII, label: this.getNoteName(bIII, key), type: 'major', borrowed: true });
+      candidates.push({ root: iv, label: this.getNoteName(iv, key) + 'm', type: 'minor', borrowed: true });
+    } else {
+      const V = toPc(key.root + 7);
+      const IV = toPc(key.root + 5);
+      const VII = toPc(key.root + 11);
+
+      candidates.push({ root: V, label: this.getNoteName(V, key), type: 'major', borrowed: true });
+      candidates.push({ root: IV, label: this.getNoteName(IV, key), type: 'major', borrowed: true });
+      candidates.push({ root: VII, label: this.getNoteName(VII, key), type: 'major', borrowed: true });
+      candidates.push({ root: key.root, label: this.getNoteName(key.root, key), type: 'major', borrowed: true });
+    }
+
+    const maskVec = (root, intervals) => {
+      const v = new Array(12).fill(0);
+      for (const iv of intervals) v[toPc(root + iv)] = 1;
+      return v;
+    };
+
+    const dot = (a, b) => {
+      let s = 0;
+      for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+      return s;
+    };
+
+    const norm = (a) => {
+      let s = 0;
+      for (let i = 0; i < a.length; i++) s += a[i] * a[i];
+      return Math.sqrt(s) || 1;
+    };
+
+    const chordTemplates = new Map();
+    for (const cand of candidates) {
+      const intervals = cand.type === 'minor' ? [0,3,7] : [0,4,7];
+      const mask = maskVec(cand.root, intervals);
+      const maskNorm = norm(mask);
+      chordTemplates.set(cand.label, { mask, maskNorm });
+    }
+
+    const chromaNorms = chroma.map(c => norm(c));
+    const lowE = (percentiles && percentiles.p30) || this.percentile(frameE, 30);
+
+    const emitScore = (i, cand) => {
+      const c = chroma[i];
+      if (!c) return -Infinity;
+      const tmpl = chordTemplates.get(cand.label);
+      if (!tmpl) return -Infinity;
+
+      let score = dot(c, tmpl.mask) / (chromaNorms[i] * tmpl.maskNorm);
+
+      if (score < 0.35) return -Infinity;
+
+      if (!cand.borrowed) score += 0.20;
+      else score -= 0.25;
+
+      if (bassPc[i] >= 0 && cand.root === bassPc[i]) score += 0.15 * bassMultiplier;
       
-      const leftResampled = engine.resampleLinear(left, sr0, sr);
-      const rightResampled = engine.resampleLinear(right, sr0, sr);
-      
-      const bpm = engine.estimateTempo(leftResampled, sr);
-      
+      if (frameE[i] < lowE) score -= 0.30;
+
+      return score;
+    };
+
+    const transitionCost = (a, b) => {
+      if (a.label === b.label) return 0.0;
+
+      const circle = [0,7,2,9,4,11,6,1,8,3,10,5];
+      const posA = circle.indexOf(a.root);
+      const posB = circle.indexOf(b.root);
+
+      let circleDist = Math.abs(posA - posB);
+      if (circleDist > 6) circleDist = 12 - circleDist;
+
+      const chromDist = Math.min((b.root - a.root + 12) % 12, (a.root - b.root + 12) % 12);
+
+      let dist = circleDist * 0.85 + chromDist * 0.15;
+      let cost = 0.4 + 0.08 * dist;
+
+      if (a.type !== b.type) cost += 0.05;
+
+      if (a.borrowed && b.borrowed) cost += 0.30;
+      else if (a.borrowed || b.borrowed) cost += 0.18;
+
+      if (!a.borrowed && !b.borrowed) cost -= 0.12;
+
+      const localScale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+      const I = key.root;
+      const V = toPc(key.root + localScale[4]);
+      const IV = toPc(key.root + localScale[3]);
+      const II = toPc(key.root + localScale[1]);
+
+      if (a.root === V && b.root === I) cost -= 0.15;
+      if (a.root === IV && b.root === V) cost -= 0.12;
+      if (a.root === II && b.root === V) cost -= 0.12;
+      if (a.root === IV && b.root === I) cost -= 0.10;
+
+      if (toPc(b.root - a.root) === 7) cost -= 0.08;
+
+      return Math.max(0.0, cost);
+    };
+
+    const N = candidates.length;
+    const M = chroma.length;
+    if (!M || !N) return [];
+
+    const dp = new Array(N);
+    const backptr = Array.from({ length: M }, () => new Array(N).fill(-1));
+    const BEAM_WIDTH = useFullMode ? 8 : 4;
+
+    for (let s = 0; s < N; s++) dp[s] = emitScore(0, candidates[s]);
+
+    for (let i = 1; i < M; i++) {
+      const newdp = new Array(N).fill(-Infinity);
+
+      const prevBeam = dp
+        .map((score, idx) => ({ score, idx }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, BEAM_WIDTH);
+
+      for (let s = 0; s < N; s++) {
+        let bestVal = -Infinity;
+        let bestJ = -1;
+
+        for (const { score: prevScore, idx: j } of prevBeam) {
+          const val = prevScore - transitionCost(candidates[j], candidates[s]);
+          if (val > bestVal) {
+            bestVal = val;
+            bestJ = j;
+          }
+        }
+
+        newdp[s] = bestVal + emitScore(i, candidates[s]);
+        backptr[i][s] = bestJ;
+      }
+
+      for (let s = 0; s < N; s++) dp[s] = newdp[s];
+    }
+
+    let bestS = 0;
+    let bestVal = -Infinity;
+    for (let s = 0; s < N; s++) {
+      if (dp[s] > bestVal) {
+        bestVal = dp[s];
+        bestS = s;
+      }
+    }
+
+    const states = new Array(M);
+    states[M - 1] = bestS;
+    for (let i = M - 1; i > 0; i--) {
+      states[i - 1] = backptr[i][states[i]];
+    }
+
+    const timeline = [];
+    const secPerHop = hop / sr;
+    let cur = states[0];
+    let start = 0;
+
+    for (let i = 1; i < M; i++) {
+      if (states[i] !== cur) {
+        timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+        cur = states[i];
+        start = i;
+      }
+    }
+
+    timeline.push({ t: start * secPerHop, label: candidates[cur].label, fi: start });
+
+    return timeline;
+  }
+
+  validateKeyFromChords(timeline, currentKey, feats) {
+    if (!timeline || timeline.length < 3) return currentKey;
+
+    const toPc = n => ((n % 12) + 12) % 12;
+    const chordRoots = [];
+    for (const chord of timeline) {
+      const root = this.parseRoot(chord.label);
+      if (root >= 0) {
+        const isMinor = /m(?!aj)/.test(chord.label);
+        const isDim = /dim/.test(chord.label);
+        chordRoots.push({ root, isMinor, isDim });
+      }
+    }
+    if (!chordRoots.length) return currentKey;
+
+    const candidates = [];
+
+    for (let keyRoot = 0; keyRoot < 12; keyRoot++) {
+      for (const keyMinor of [false, true]) {
+        const scale = keyMinor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+        const qualities = keyMinor ? ['m','dim','','m','m','',''] : ['','m','m','','','m','dim'];
+
+        const diatonicChords = scale.map((deg, i) => ({
+          root: toPc(keyRoot + deg),
+          quality: qualities[i]
+        }));
+
+        let matchCount = 0;
+        for (const sChord of chordRoots) {
+          const found = diatonicChords.some(dc => {
+            if (dc.root !== sChord.root) return false;
+            if (sChord.isDim) return dc.quality === 'dim';
+            if (sChord.isMinor) return dc.quality === 'm';
+            return dc.quality === '';
+          });
+          if (found) matchCount++;
+        }
+
+        const ratio = matchCount / chordRoots.length;
+        if (ratio >= 0.6) {
+          let score = ratio * 100;
+
+          const firstRoot = chordRoots[0].root;
+          if (firstRoot === keyRoot) score += 20;
+
+          const lastRoot = chordRoots[chordRoots.length - 1].root;
+          if (lastRoot === keyRoot) score += 15;
+
+          const harmScore = this.analyzeHarmonicProgressions(feats, keyRoot, keyMinor).score;
+          score += harmScore;
+
+          candidates.push({ root: keyRoot, minor: keyMinor, score });
+        }
+      }
+    }
+
+    if (!candidates.length) return currentKey;
+
+    let best = candidates[0];
+    for (const c of candidates) {
+      if (c.score > best.score) best = c;
+    }
+
+    const current = candidates.find(c => c.root === currentKey.root && c.minor === currentKey.minor);
+    const currentScore = current ? current.score : 0;
+
+    if (best.minor !== currentKey.minor) return currentKey;
+
+    if (!current || best.score > currentScore + 40) {
+      const newConf = Math.min(0.99, Math.max(currentKey.confidence || 0.5, 0.6 + best.score / 200));
+      return { root: best.root, minor: best.minor, confidence: newConf };
+    }
+
+    return currentKey;
+  }
+
+  detectTonicMusically(timeline, key, duration) {
+    if (!timeline || timeline.length < 3) {
       return {
-        x: leftResampled,
-        xLeft: leftResampled,
-        xRight: rightResampled,
-        sr,
-        bpm,
-        duration: leftResampled.length / sr,
-        url,
-        audioBuffer: buf,
-        isStereo: true
-      };
-    } else {
-      const mono = (buf.numberOfChannels===1)? buf.getChannelData(0) : engine.mixStereo(buf);
-      const sr0=buf.sampleRate, sr=22050;
-      const x = engine.resampleLinear(mono, sr0, sr);
-      const bpm = engine.estimateTempo(x, sr);
-      return { 
-        x, 
-        sr, 
-        bpm, 
-        duration: x.length/sr, 
-        url,
-        audioBuffer: buf
+        root: key.root,
+        label: this.getNoteName(key.root, key) + (key.minor ? 'm' : ''),
+        confidence: 50
       };
     }
-  }
-}
 
-async function decodeYouTubeAudio(video){
-  showAnalyzing('מוריד שמע מיוטיוב...');
-  try {
-    const url = `${SERVER}/api/youtube-download?videoId=${video.id}`;
-    const r = await fetch(url);
-    
-    if (!r.ok) {
-      const errorText = await r.text();
-      throw new Error(`Error: ${r.status} - ${errorText}`);
-    }
-    
-    showAnalyzing('מעבד אודיו...');
-    const audioBlob = await r.blob();
-    const file = new File([audioBlob], 'audio.mp3', { type: 'audio/mpeg' });
-    
-    if (!WHISPER_RUNNING) {
-      runWhisperInBackground(video.id);
-    }
-    
-    return await decodeAudioFile(file);
-  } catch (err) {
-    throw new Error('לא הצלחתי להוריד: ' + err.message);
-  }
-}
+    const candidates = {};
+    let totalDuration = 0;
 
-function getHarmonicFunction(label, key){
-  const rootPc = parseRoot(label); 
-  if(rootPc<0) return '—';
-  const rel = engine.toPc(rootPc - key.root);
-  const scale = key.minor? engine.MINOR_SCALE : engine.MAJOR_SCALE;
-  let bestDeg = null, bestDist=999;
-  for(let d=0; d<scale.length; d++){
-    const dist = Math.min((rel-scale[d]+12)%12,(scale[d]-rel+12)%12);
-    if(dist<bestDist){ bestDist=dist; bestDeg=d; }
-  }
-  if(bestDeg===null) return '—';
-  const funcNames = key.minor ? ['i','ii°','III','iv','v','VI','VII'] : ['I','ii','iii','IV','V','vi','vii°'];
-  return funcNames[bestDeg] || '—';
-}
+    for (let i = 0; i < timeline.length; i++) {
+      const chord = timeline[i];
+      const root = this.parseRoot(chord.label);
+      if (root < 0) continue;
 
-function hookPlaybackLive(){
-  const st=window.__STATE; 
-  if(!st) return;
-  const isRTL = DETECTED_LANGUAGE === 'he';
-  liveSheetEl.className = `synced-sheet ${isRTL ? 'rtl' : 'ltr'}`;
-  gateChip.style.display='inline-flex';
-  LIVE_POINTER=0;
-  buildFullLyricsSheet(isRTL);
-  
-  player.ontimeupdate=()=>{
-    const t=player.currentTime;
-    if(t < (st.gateTime || 0)){ 
-      liveChordEl.textContent='—'; 
-      liveFunctionEl.textContent='—';
-      liveLyricEl.textContent='—';
-      return; 
-    }
-    if(gateChip.style.display!=='none') gateChip.style.display='none';
-    
-    const gateOffset = st.gateTime || 0;
-    let chordIdx = st.timeline.findIndex(x => (x.t + gateOffset) > t);
-    if(chordIdx === -1) chordIdx = st.timeline.length;
-    const ev = st.timeline[chordIdx - 1] || st.timeline[0];
-    if(!ev || !ev.label) return; // ✅ Safety check
-    
-    const capo=parseInt(capoEl.value||'0',10);
-    const shown = displayChord(ev.label, capo);
-    
-    liveChordEl.textContent = shown;
-    liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
-    
-    const currentWord = WHISPER_WORDS.find(w => {
-      const wordStart = w.start + gateOffset;
-      const wordEnd = (w.end ? w.end : w.start + 0.3) + gateOffset;
-      return t >= wordStart && t < wordEnd;
-    });
-    
-    if(currentWord) {
-      liveLyricEl.textContent = currentWord.word || currentWord.text || '';
-    } else {
-      liveLyricEl.textContent = '';
-    }
-    
-    if(ev.ornamentType === 'structural'){
-      structuralChip.style.display='inline-flex';
-      ornamentChip.style.display='none';
-    } else {
-      structuralChip.style.display='none';
-      ornamentChip.style.display='inline-flex';
-    }
-    
-    highlightCurrentChord(t);
-  };
-  
-  resetSheetBtn.onclick=()=>{ 
-    LIVE_POINTER=0; 
-    buildFullLyricsSheet(isRTL);
-  };
-}
+      const dur = this.getChordDuration(chord, timeline, duration);
+      totalDuration += dur;
 
-function buildFullLyricsSheet(isRTL) {
-  const st = window.__STATE;
-  if(!st || !st.timeline) {
-    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">ממתין...אקורדים...</div>';
-    return;
-  }
-  if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
-    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">ממתין...מילים... (אקורדים זוהו)</div>';
-    return;
-  }
-  
-  const capo = parseInt(capoEl.value || '0', 10);
-  const gateOffset = st.gateTime || 0;
-  
-  const isHebrew = (typeof DETECTED_LANGUAGE !== 'undefined' && 
-                    (DETECTED_LANGUAGE === 'he' || DETECTED_LANGUAGE === 'Hebrew' || DETECTED_LANGUAGE === 'hebrew'));
-  
-  if (isHebrew) {
-    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;overflow-y:auto;max-height:500px" dir="rtl">';
-    html += '<div style="color:#38bdf8;font-weight:700;font-size:18px;margin-bottom:15px;text-align:center">🎸 אקורדים בלבד</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">';
-    
-    const firstLyricTime = WHISPER_WORDS.length > 0 ? (WHISPER_WORDS[0].start + gateOffset) : Infinity;
-    let skipFirstChord = false;
-    
-    if (st.timeline[0]) {
-      const firstChordTime = st.timeline[0].t + gateOffset;
-      const firstChordLabel = st.timeline[0].label || '';
-      const keyRoot = st.key ? st.key.root : null;
-      
-      const getChordRoot = (noteName) => {
-        const noteMap = {'C':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'F':5,'F#':6,'Gb':6,'G':7,'G#':8,'Ab':8,'A':9,'A#':10,'Bb':10,'B':11};
-        return noteMap[noteName] || null;
-      };
-      
-      const chordRootMatch = firstChordLabel.match(/^([A-G][#b]?)/);
-      const chordRoot = chordRootMatch ? chordRootMatch[1] : null;
-      
-      const isTonic = (keyRoot !== null && chordRoot && getChordRoot(chordRoot) === keyRoot);
-      const isRelativeMinor = (keyRoot !== null && chordRoot && getChordRoot(chordRoot) === (keyRoot + 9) % 12);
-      
-      const isNoise = (firstChordTime < 1.5) && (firstChordTime < firstLyricTime - 3.0);
-      skipFirstChord = isNoise && !isTonic && !isRelativeMinor;
+      if (!candidates[root]) {
+        candidates[root] = { duration: 0, openingScore: 0, closingScore: 0, cadenceScore: 0 };
+      }
+      candidates[root].duration += dur;
     }
-    
-    st.timeline.forEach((ch, idx) => {
-      if (idx === 0 && skipFirstChord) return;
-      if (!ch || !ch.label) return; // ✅ Safety check
-      
-      const displayLabel = displayChord(ch.label, capo);
-      html += `<span class="chord-marker" data-time="${ch.t}" style="color:#38bdf8;font-weight:700;font-size:20px;padding:6px 12px;background:#0b1221;border-radius:8px">${escapeHtml(displayLabel)}</span>`;
-    });
-    
-    html += '</div></div>';
-    liveSheetEl.innerHTML = html;
-    return;
-  }
-  
-  const lines = [];
-  let currentLine = [];
-  const maxWords = 8;
-  
-  WHISPER_WORDS.forEach((w, idx) => {
-    const text = (w.word || w.text || '').trim();
-    if(!text) return;
-    currentLine.push({
-      text: text,
-      time: w.start + gateOffset,
-      end: (w.end || w.start) + gateOffset,
-      id: `word-${idx}`
-    });
-    const endsWithPunct = /[.!?,;،؟]$/.test(text);
-    if(endsWithPunct || currentLine.length >= maxWords || idx === WHISPER_WORDS.length - 1) {
-      if(currentLine.length > 0) {
-        lines.push([...currentLine]);
-        currentLine = [];
+
+    let realStart = 0;
+    for (let i = 0; i < timeline.length; i++) {
+      if (timeline[i].t >= 1.5) {
+        realStart = i;
+        break;
       }
     }
-  });
-  
-  let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
-  for(const line of lines) {
-    const words = line;
-    const lineStart = words[0].time;
-    const lineEnd = words[words.length - 1].end;
-    const lineChords = st.timeline.filter(ch => {
-      const chordTimeWithGate = ch.t + gateOffset;
-      return chordTimeWithGate >= lineStart && chordTimeWithGate <= lineEnd;
-    });
-    const lyricText = words.map(w => w.text).join(' ');
-    const chordPositions = [];
-    for(const chord of lineChords) {
-      if (!chord || !chord.label) continue; // ✅ Safety check
+    
+    const opening = timeline.slice(realStart, Math.min(realStart + 3, timeline.length));
+    
+    for (let i = 0; i < opening.length; i++) {
+      const root = this.parseRoot(opening[i].label);
+      if (root >= 0 && candidates[root]) {
+        const w = i === 0 ? 60 : (3 - i) * 8;
+        candidates[root].openingScore += w;
+      }
+    }
+
+    const closing = timeline.slice(Math.max(0, timeline.length - 3));
+    for (let i = 0; i < closing.length; i++) {
+      const root = this.parseRoot(closing[i].label);
+      if (root >= 0 && candidates[root]) {
+        candidates[root].closingScore += (i + 1) * 12;
+      }
+    }
+
+    const toPc = n => ((n % 12) + 12) % 12;
+    for (let i = 0; i < timeline.length - 1; i++) {
+      const r1 = this.parseRoot(timeline[i].label);
+      const r2 = this.parseRoot(timeline[i + 1].label);
+      if (r1 < 0 || r2 < 0) continue;
+      const interval = toPc(r2 - r1);
+      if ((interval === 5 || interval === 7) && candidates[r2]) {
+        const dur = this.getChordDuration(timeline[i + 1], timeline, duration);
+        candidates[r2].cadenceScore += 3 * dur;
+      }
+    }
+
+    let bestRoot = key.root;
+    let bestScore = -Infinity;
+
+    for (const rootStr in candidates) {
+      const root = parseInt(rootStr, 10);
+      const c = candidates[root];
+      const durScore = (c.duration / (totalDuration || 1)) * 40;
+      const score = durScore + c.openingScore + c.closingScore + c.cadenceScore;
+      if (score > bestScore) {
+        bestScore = score;
+        bestRoot = root;
+      }
+    }
+
+    const confidence = Math.max(30, Math.min(100, bestScore));
+    return {
+      root: bestRoot,
+      label: this.NOTES_SHARP[((bestRoot % 12) + 12) % 12] + (key.minor ? 'm' : ''),
+      confidence
+    };
+  }
+
+  getChordDuration(chord, timeline, totalDuration) {
+    const idx = timeline.indexOf(chord);
+    if (idx < 0) return 0.5;
+    const next = timeline[idx + 1];
+    if (next) return Math.max(0.1, next.t - chord.t);
+    return Math.max(0.5, totalDuration - chord.t);
+  }
+
+  finalizeTimeline(timeline, key, bpm, feats) {
+    if (!timeline.length) return timeline;
+
+    const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
+    const minDur = Math.max(0.5, 0.50 * spb);
+    const energyMedian = this.percentile(feats.frameE, 50);
+
+    const filtered = [];
+
+    for (let i = 0; i < timeline.length; i++) {
+      const a = timeline[i];
+      const b = timeline[i + 1];
+      const dur = b ? (b.t - a.t) : minDur;
+      const energy = feats.frameE[a.fi] || 0;
+      const isWeak = energy < energyMedian * 0.85;
+
+      const r = this.parseRoot(a.label);
+      const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
+
+      if (dur < minDur && filtered.length > 0 && (isWeak || !isDiatonic)) continue;
       
-      const chordTimeWithGate = chord.t + gateOffset;
-      let position = 0;
-      let found = false;
-      for(let i = 0; i < words.length; i++) {
-        const word = words[i];
-        const wordEnd = word.end || (word.time + 0.3);
-        if(chordTimeWithGate >= word.time && chordTimeWithGate <= wordEnd) {
-          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
-          position = beforeText.length;
-          if(position > 0) position += 1;
-          found = true;
-          break;
+      if (dur < minDur * 0.6 && isWeak) continue;
+
+      filtered.push(a);
+    }
+
+    const snapped = [];
+    for (const ev of filtered) {
+      const raw = ev.t;
+      const grid = Math.round(raw / spb) * spb;
+      const snapTol = 0.35 * spb;
+
+      const t = (Math.abs(grid - raw) <= snapTol) ? grid : raw;
+
+      if (!snapped.length || snapped[snapped.length - 1].label !== ev.label) {
+        snapped.push({ t: Math.max(0, t), label: ev.label, fi: ev.fi });
+      }
+    }
+
+    return snapped;
+  }
+
+  enforceEarlyDiatonic(timeline, key, feats, bpm) {
+    if (!timeline || !timeline.length) return timeline;
+
+    const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
+    
+    const earlyWindow = Math.max(15.0, 6 * spb);
+    
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const diatonicPcs = scale.map(s => toPc(key.root + s));
+    const qualities = key.minor ? ['m','dim','','m','m','',''] : ['','m','m','','','m','dim'];
+
+    const getQuality = pc => {
+      for (let i = 0; i < diatonicPcs.length; i++) {
+        if (diatonicPcs[i] === toPc(pc)) return qualities[i];
+      }
+      return '';
+    };
+
+    const snapToDiatonic = pc => {
+      let best = diatonicPcs[0];
+      let bestD = 99;
+      for (const d of diatonicPcs) {
+        const dist = Math.min((pc - d + 12) % 12, (d - pc + 12) % 12);
+        if (dist < bestD) {
+          bestD = dist;
+          best = d;
         }
       }
-      if(!found) {
-        position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
-      }
-      const chordLabel = displayChord(chord.label, capo);
-      chordPositions.push({ position, label: chordLabel, id: chord.t });
-    }
-    chordPositions.sort((a, b) => a.position - b.position);
-    let chordLine = '';
-    let lastPos = 0;
-    for(const cp of chordPositions) {
-      const spaces = Math.max(0, cp.position - lastPos);
-      chordLine += ' '.repeat(spaces);
-      chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
-      lastPos = cp.position + cp.label.length;
-    }
-    const dirAttr = isRTL ? 'dir="rtl"' : 'dir="ltr"';
-    html += `<div style="margin-bottom:25px" ${dirAttr}>`;
-    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${chordLine}</div>`;
-    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
-    html += `</div>`;
-  }
-  html += '</div>';
-  liveSheetEl.innerHTML = html;
-}
+      return best;
+    };
 
-function highlightCurrentChord(currentTime) {
-  const st = window.__STATE;
-  if(!st) return;
-  const gateOffset = st.gateTime || 0;
-  liveSheetEl.querySelectorAll('.chord-marker').forEach(el => {
-    el.style.background = 'transparent';
-    el.style.color = '#38bdf8';
-    el.style.padding = '0';
-    el.style.borderRadius = '0';
-  });
-  const currentChord = st.timeline.find((ch, idx) => {
-    const nextChord = st.timeline[idx + 1];
-    const chordTime = ch.t + gateOffset;
-    const nextChordTime = nextChord ? (nextChord.t + gateOffset) : Infinity;
-    return chordTime <= currentTime && currentTime < nextChordTime;
-  });
-  if(currentChord) {
-    const marker = liveSheetEl.querySelector(`.chord-marker[data-time="${currentChord.t}"]`);
-    if(marker) {
-      marker.style.background = '#1e3a5f';
-      marker.style.color = '#60d5fd';
-      marker.style.padding = '2px 6px';
-      marker.style.borderRadius = '4px';
-      marker.style.transition = 'all 0.2s';
-      const lyricsContainer = liveSheetEl.querySelector('.lyrics-container');
-      if(lyricsContainer) {
-        const markerRect = marker.getBoundingClientRect();
-        const containerRect = lyricsContainer.getBoundingClientRect();
-        const isAboveView = markerRect.top < containerRect.top;
-        const isBelowView = markerRect.bottom > containerRect.bottom;
-        const isLeftOfView = markerRect.left < containerRect.left;
-        const isRightOfView = markerRect.right > containerRect.right;
-        if(isAboveView || isBelowView || isLeftOfView || isRightOfView) {
-          const markerTop = markerRect.top - containerRect.top + lyricsContainer.scrollTop;
-          const markerLeft = markerRect.left - containerRect.left + lyricsContainer.scrollLeft;
-          const targetScrollTop = markerTop - (containerRect.height / 3);
-          const targetScrollLeft = markerLeft - (containerRect.width / 2);
-          lyricsContainer.scrollTo({
-            top: Math.max(0, targetScrollTop),
-            left: Math.max(0, targetScrollLeft),
-            behavior: 'smooth'
-          });
+    const out = [];
+
+    for (const ev of timeline) {
+      let label = ev.label;
+      if (ev.t <= earlyWindow) {
+        const r = this.parseRoot(label);
+        const inKey = r >= 0 && this.inKey(r, key.root, key.minor);
+        if (!inKey) {
+          const bp = feats.bassPc[ev.fi] ?? -1;
+          let newRoot = bp >= 0 ? snapToDiatonic(bp) : snapToDiatonic(r >= 0 ? r : key.root);
+          
+          if (ev.t < Math.min(3.0, 2.0 * spb)) {
+            newRoot = key.root;
+          }
+          
+          const q = getQuality(newRoot);
+          label = this.NOTES_SHARP[toPc(newRoot)] + q;
+        } else {
+          const q = getQuality(r);
+          label = this.NOTES_SHARP[toPc(r)] + q;
+        }
+      }
+      out.push({ ...ev, label });
+    }
+
+    return out;
+  }
+
+  decorateQualitiesUltimate(timeline, feats, key, mode, extensionMul, extensionSensitivity = 1.0) {
+    if (mode === 'basic') return timeline.map(e => ({ ...e }));
+
+    const mul = extensionMul / (extensionSensitivity || 1.0);
+    const out = [];
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    for (const ev of timeline) {
+      const root = this.parseRoot(ev.label);
+      if (root < 0) {
+        out.push(ev);
+        continue;
+      }
+
+      const isMinorTriad = /m(?!aj)/.test(ev.label);
+      let base = ev.label.replace(/(m|sus2|sus4|dim|aug|7|maj7|add9|9|11|13|6|m7b5|alt|b9|#9|b5|#5).*$/, '');
+      if (isMinorTriad) base += 'm';
+
+      const i0 = Math.max(0, ev.fi - 2);
+      const i1 = Math.min(feats.chroma.length - 1, ev.fi + 2);
+      const avg = new Float32Array(12);
+
+      for (let i = i0; i <= i1; i++) {
+        const c = feats.chroma[i];
+        for (let p = 0; p < 12; p++) avg[p] += c[p];
+      }
+
+      const len = i1 - i0 + 1 || 1;
+      for (let p = 0; p < 12; p++) avg[p] /= len;
+
+      const s = d => avg[toPc(root + d)] || 0;
+
+      const sR = s(0);
+      const sM3 = s(4);
+      const sm3 = s(3);
+      const s5 = s(7);
+      const s_b5 = s(6);
+      const s_sharp5 = s(8);
+      const s2 = s(2);
+      const s4 = s(5);
+      const s_b7 = s(10);
+      const s7 = s(11);
+      const s6 = s(9);
+
+      let label = base;
+
+      const thirdStrong = isMinorTriad ? sm3 > 0.13 * mul : sM3 > 0.13 * mul;
+
+      const sus2Strong = s2 > 0.22 / mul && s2 >= s4 * 0.9 && s5 > 0.10;
+      const sus4Strong = s4 > 0.22 / mul && s4 >= s2 * 0.9 && s5 > 0.10;
+
+      if (!isMinorTriad && !thirdStrong) {
+        if (sus4Strong) label = base.replace(/m$/, '') + 'sus4';
+        else if (sus2Strong) label = base.replace(/m$/, '') + 'sus2';
+      }
+
+      const sixthStrong = s6 > 0.18 / mul && s6 > s_b7 * 1.2;
+      if (sixthStrong && !/sus/.test(label) && (isMinorTriad ? sm3 : sM3) > 0.12 / mul) {
+        label = base + '6';
+      }
+
+      const degree = this.degreeOfChord(label, key);
+      const domLike = degree === 5;
+      const majContext = !/m$/.test(label) && !/sus/.test(label);
+      const b7Strong = s_b7 > 0.16 / mul && sR > 0.10 / mul;
+      const maj7Strong = majContext && s7 > 0.20 / mul && s7 > s_b7 * 1.2;
+
+      if (!/6$/.test(label)) {
+        if (maj7Strong) {
+          label = base.replace(/m$/, '') + 'maj7';
+        } else if (!/sus/.test(label) && (domLike ? s_b7 > 0.15 / mul : b7Strong)) {
+          if (!/7$|maj7$/.test(label)) label += '7';
+        }
+      }
+
+      const dimTriad = (isMinorTriad && s_b5 > 0.26 / mul && s5 < 0.12 * mul && sm3 > 0.14 / mul) ||
+                       (!isMinorTriad && s_b5 > 0.30 / mul && s5 < 0.10 * mul && sM3 < 0.08 * mul);
+
+      if (dimTriad) {
+        if (isMinorTriad && s_b7 > 0.18 / mul) {
+          label = base.replace(/m$/, 'm7b5');
+        } else {
+          label = base.replace(/m$/, '') + 'dim';
+        }
+      }
+
+      const augTriad = !isMinorTriad && s_sharp5 > 0.24 / mul && s5 < 0.10 * mul && sM3 > 0.12 / mul;
+
+      if (augTriad) {
+        label = base.replace(/m$/, '') + 'aug';
+      }
+
+      if (mode === 'jazz' || mode === 'pro') {
+        const has7 = /7$|maj7$/.test(label);
+        const nineStrong = s2 > 0.25 / mul && sR > 0.10 / mul;
+
+        if (has7 && nineStrong) {
+          label = label.replace(/7$/, '9');
+        } else if (!/sus/.test(label) && nineStrong && (isMinorTriad ? sm3 : sM3) > 0.10 / mul && !/maj7|7|9|add9/.test(label)) {
+          label += 'add9';
+        }
+      }
+
+      out.push({ ...ev, label });
+    }
+
+    return out;
+  }
+
+  adjustMinorMajors(timeline, feats, key) {
+    if (!key.minor) return timeline;
+
+    const out = [];
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    for (const ev of timeline) {
+      let label = ev.label;
+      const r = this.parseRoot(label);
+
+      if (r < 0 || /(sus|dim|aug|maj7|7|9|add9|m7b5|11|13|6|alt)/.test(label) || !/(^[A-G](?:#|b)?)(m)(?!aj)/.test(label)) {
+        out.push(ev);
+        continue;
+      }
+
+      const rel = toPc(r - key.root);
+      if (!(rel === this.MINOR_SCALE[2] || rel === this.MINOR_SCALE[4] || rel === this.MINOR_SCALE[6])) {
+        out.push(ev);
+        continue;
+      }
+
+      const i0 = Math.max(0, ev.fi - 2);
+      const i1 = Math.min(feats.chroma.length - 1, ev.fi + 2);
+      const avg = new Float32Array(12);
+
+      for (let i = i0; i <= i1; i++) {
+        const c = feats.chroma[i];
+        for (let p = 0; p < 12; p++) avg[p] += c[p];
+      }
+
+      const len = i1 - i0 + 1 || 1;
+      for (let p = 0; p < 12; p++) avg[p] /= len;
+
+      const M3 = avg[toPc(r + 4)] || 0;
+      const m3 = avg[toPc(r + 3)] || 0;
+
+      if (M3 > m3 * 1.25 && M3 > 0.08) {
+        label = label.replace(/m(?!aj)/, '');
+      }
+
+      out.push({ ...ev, label });
+    }
+
+    return out;
+  }
+
+  addInversionsUltimate(timeline, feats, key, bassMultiplier) {
+    const out = [];
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    for (const ev of timeline) {
+      const r = this.parseRoot(ev.label);
+      if (r < 0) {
+        out.push(ev);
+        continue;
+      }
+
+      const isMinor = /m(?!aj)/.test(ev.label);
+      const isSus2 = /sus2/.test(ev.label);
+      const isSus4 = /sus4/.test(ev.label);
+      const has7 = /7/.test(ev.label);
+      const hasMaj7 = /maj7/.test(ev.label);
+      const has9 = /9|add9/.test(ev.label);
+      const has6 = /6/.test(ev.label);
+
+      let tones = isSus2 ? [0,2,7] : isSus4 ? [0,5,7] : isMinor ? [0,3,7] : [0,4,7];
+
+      if (has7 && !hasMaj7) tones.push(10);
+      if (hasMaj7) tones.push(11);
+      if (has9) tones.push(2);
+      if (has6) tones.push(9);
+
+      const bass = feats.bassPc[ev.fi] ?? -1;
+      if (bass < 0 || bass === r) {
+        out.push(ev);
+        continue;
+      }
+
+      const rel = toPc(bass - r);
+      const inChord = tones.includes(rel);
+
+      if (inChord) {
+        const c = feats.chroma[ev.fi] || new Float32Array(12);
+        const bassStrength = c[bass] || 0;
+        const rootStrength = c[r] || 0;
+        const bassStrong = bassStrength > rootStrength * 0.7;
+
+        let stable = 0;
+        for (let j = Math.max(0, ev.fi - 2); j <= Math.min(feats.bassPc.length - 1, ev.fi + 2); j++) {
+          if (feats.bassPc[j] === bass) stable++;
+        }
+
+        if (bassStrength > 0.15 / Math.max(1, bassMultiplier) && stable >= 3 && bassStrong) {
+          const m = ev.label.match(/^([A-G](?:#|b)?)/);
+          const rootName = m ? m[1] : '';
+          const suffix = ev.label.slice(rootName.length);
+          const slash = this.getNoteName(bass, key);
+          out.push({ ...ev, label: rootName + suffix + '/' + slash });
+          continue;
+        }
+      }
+
+      out.push(ev);
+    }
+
+    return out;
+  }
+
+  validateAndRefine(timeline, key, feats) {
+    const out = [];
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    for (const ev of timeline) {
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ validateAndRefine: skipping invalid chord', ev);
+        continue;
+      }
+      
+      const r = this.parseRoot(ev.label);
+      if (r < 0) {
+        out.push(ev);
+        continue;
+      }
+
+      const c = feats.chroma[ev.fi] || new Float32Array(12);
+      const sR = c[toPc(r)] || 0;
+      const s5 = c[toPc(r + 7)] || 0;
+      const sM3 = c[toPc(r + 4)] || 0;
+      const sm3 = c[toPc(r + 3)] || 0;
+
+      if (sR > 0.15 && s5 > 0.15 && sM3 < 0.08 && sm3 < 0.08 && /m(?!aj)/.test(ev.label)) {
+        const m = ev.label.match(/^([A-G](?:#|b)?)/);
+        const base = m ? m[1] : '';
+        out.push({ ...ev, label: base });
+        continue;
+      }
+
+      out.push(ev);
+    }
+
+    return out;
+  }
+
+  classifyOrnaments(timeline, bpm, feats) {
+    const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
+    const out = [];
+
+    for (let i = 0; i < timeline.length; i++) {
+      const ev = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ classifyOrnaments: skipping invalid chord at', i, ev);
+        continue;
+      }
+      
+      const prev = i > 0 ? timeline[i - 1] : null;
+      const next = i < timeline.length - 1 ? timeline[i + 1] : null;
+      const dur = next ? (next.t - ev.t) : spb;
+
+      let ornamentType = 'structural';
+
+      if (dur < 0.35 * spb && prev && next) {
+        const rPrev = this.parseRoot(prev.label);
+        const r = this.parseRoot(ev.label);
+        const rNext = this.parseRoot(next.label);
+        if (rPrev >= 0 && r >= 0 && rNext >= 0) {
+          const d1 = Math.min((r - rPrev + 12) % 12, (rPrev - r + 12) % 12);
+          const d2 = Math.min((rNext - r + 12) % 12, (r - rNext + 12) % 12);
+          if (d1 <= 2 && d2 <= 2) {
+            ornamentType = 'passing';
+          }
+        }
+      }
+
+      if (dur < 0.4 * spb && prev && next && prev.label === next.label && ornamentType === 'structural') {
+        ornamentType = 'neighbor';
+      }
+
+      if (prev) {
+        const bassCur = feats.bassPc[ev.fi] ?? -1;
+        const bassPrev = feats.bassPc[prev.fi] ?? -1;
+        if (bassCur >= 0 && bassPrev >= 0 && bassCur === bassPrev) {
+          const rCur = this.parseRoot(ev.label);
+          const rPrev = this.parseRoot(prev.label);
+          if (rCur >= 0 && rPrev >= 0 && rCur !== rPrev) {
+            ornamentType = 'pedal';
+          }
+        }
+      }
+
+      out.push({ ...ev, ornamentType });
+    }
+
+    return out;
+  }
+
+  analyzeModalContext(timeline, key) {
+    const out = [];
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    for (let i = 0; i < timeline.length; i++) {
+      const ev = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ analyzeModalContext: skipping invalid chord at', i, ev);
+        continue;
+      }
+      
+      const r = this.parseRoot(ev.label);
+      if (r < 0) {
+        out.push({ ...ev, modalContext: null });
+        continue;
+      }
+
+      const rel = toPc(r - key.root);
+      let modalContext = null;
+
+      if (/7$/.test(ev.label) && !/maj7/.test(ev.label)) {
+        const targetRoot = toPc(r + 7);
+        const next = timeline[i + 1];
+        if (next) {
+          const nextRoot = this.parseRoot(next.label);
+          if (nextRoot >= 0 && nextRoot === targetRoot && this.inKey(targetRoot, key.root, key.minor)) {
+            modalContext = 'secondary_dominant';
+          }
+        }
+      }
+
+      if (!key.minor) {
+        if (rel === 8) modalContext = modalContext || 'borrowed_bVI';
+        if (rel === 10) modalContext = modalContext || 'borrowed_bVII';
+        if (rel === 5 && /m/.test(ev.label)) modalContext = modalContext || 'borrowed_iv';
+        if (rel === 3) modalContext = modalContext || 'borrowed_bIII';
+      } else {
+        if (rel === 5 && !/m/.test(ev.label)) modalContext = modalContext || 'borrowed_IV_major';
+      }
+
+      if (rel === 1 && !/m/.test(ev.label)) {
+        modalContext = modalContext || 'neapolitan';
+      }
+
+      out.push({ ...ev, modalContext });
+    }
+
+    return out;
+  }
+
+  analyzeHarmonicProgressions(feats, keyRoot, keyMinor) {
+    const { bassPc, frameE } = feats;
+    const threshold = this.percentile(frameE, 70);
+    const toPc = n => ((n % 12) + 12) % 12;
+
+    const bassTimeline = [];
+    let current = -1;
+    let start = 0;
+
+    for (let i = 0; i < bassPc.length; i++) {
+      const bp = bassPc[i];
+      if (bp >= 0 && frameE[i] >= threshold) {
+        if (bp !== current) {
+          if (current >= 0) {
+            bassTimeline.push({ root: current, start, end: i });
+          }
+          current = bp;
+          start = i;
         }
       }
     }
+    if (current >= 0) {
+      bassTimeline.push({ root: current, start, end: bassPc.length });
+    }
+
+    if (bassTimeline.length < 3) return { score: 0 };
+
+    const scale = keyMinor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const I = keyRoot;
+    const II = toPc(keyRoot + scale[1]);
+    const III = toPc(keyRoot + scale[2]);
+    const IV = toPc(keyRoot + scale[3]);
+    const V = toPc(keyRoot + scale[4]);
+    const VI = toPc(keyRoot + scale[5]);
+    const VII = toPc(keyRoot + scale[6]);
+
+    let score = 0;
+
+    for (let i = 0; i < bassTimeline.length - 1; i++) {
+      const a = bassTimeline[i].root;
+      const b = bassTimeline[i + 1].root;
+
+      if (a === V && b === I) score += 15;
+      if (a === IV && b === I) score += 8;
+      if (a === VII && b === I) score += 10;
+      if (a === III && b === I) score += 5;
+
+      if (i < bassTimeline.length - 2) {
+        const c = bassTimeline[i + 2].root;
+        if (a === II && b === V && c === I) score += 20;
+        if (a === IV && b === V && c === I) score += 18;
+        if (a === VI && b === V && c === I) score += 16;
+      }
+    }
+
+    return { score };
   }
-}
 
-copyBtn.onclick = () => {
-  const text = fullSheetEl.textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    copyBtn.textContent = '✅ הועתק!';
-    setTimeout(() => copyBtn.textContent = '📋 העתק דף', 1500);
-  });
-};
+  recognizeProgressionPattern(recentChords, key) {
+    if (!recentChords || recentChords.length < 2) return null;
 
-exportBtn.onclick=()=>{
-  const text = fullSheetEl.textContent || '';
-  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); 
-  a.href = url; 
-  a.download = 'chords.txt'; 
-  a.click(); 
-  URL.revokeObjectURL(url);
-};
+    const toPc = n => ((n % 12) + 12) % 12;
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const degrees = recentChords.map(chord => {
+      const root = this.parseRoot(chord.label);
+      if (root < 0) return null;
+      const rel = toPc(root - key.root);
+      for (let i = 0; i < scale.length; i++) {
+        if (toPc(scale[i]) === rel) return i + 1;
+      }
+      return null;
+    }).filter(d => d !== null);
 
-let transposeOffset = 0;
+    if (degrees.length < 2) return null;
 
-function transposeUp() {
-  if(!window.__STATE) return;
-  transposeOffset++;
-  applyTranspose();
-}
+    const pattern = degrees.join('-');
 
-function transposeDown() {
-  if(!window.__STATE) return;
-  transposeOffset--;
-  applyTranspose();
-}
+    const progressions = {
+      '1-4-5': { name: 'I-IV-V', next: 1, strength: 0.9 },
+      '1-5-6-4': { name: 'I-V-vi-IV', next: 1, strength: 0.85 },
+      '1-6-4-5': { name: 'I-vi-IV-V', next: 1, strength: 0.9 },
+      '2-5': { name: 'ii-V', next: 1, strength: 0.95 },
+      '2-5-1': { name: 'ii-V-I', next: null, strength: 1.0 },
+      '4-5': { name: 'IV-V', next: 1, strength: 0.9 },
+      '5-1': { name: 'V-I', next: null, strength: 1.0 },
+      '4-1': { name: 'IV-I', next: null, strength: 0.85 },
+      '1-4-5-1': { name: 'I-IV-V-I', next: null, strength: 1.0 },
+      '1-5-6-4-1': { name: 'I-V-vi-IV-I', next: null, strength: 0.95 }
+    };
 
-function applyTranspose() {
-  const st = window.__STATE;
-  if(!st) return;
-  const newRoot = engine.toPc(st.key.root + transposeOffset);
-  const keyLabel = engine.NOTES_SHARP[engine.toPc(newRoot)] + (st.key.minor ? 'm' : '');
-  const capo = parseInt(capoEl.value || '0', 10);
-  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
-  st.timeline.forEach(ev => {
-    if (!ev || !ev.label) return; // ✅ Safety check
-    const originalRoot = parseRoot(ev.label);
-    if(originalRoot < 0) return;
-    const quality = ev.label.replace(/^[A-G](?:#|b)?/, '');
-    const newChordRoot = engine.toPc(originalRoot + transposeOffset);
-    const newLabel = engine.NOTES_SHARP[engine.toPc(newChordRoot)] + quality;
-    if(!ev._originalLabel) ev._originalLabel = ev.label;
-    ev.label = newLabel;
-  });
-  refreshSheetTabView();
-  const circleChords = engine.buildCircleOfFifths({
-    root: engine.toPc(st.key.root + transposeOffset),
-    minor: st.key.minor
-  });
-  const circleEl = document.getElementById('circleOfFifths');
-  circleEl.innerHTML = circleChords.map(ch => {
-    const displayLabel = applyCapoToLabel(ch.label, capo);
-    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8" title="${ch.function}">${displayLabel}</span>`;
-  }).join('');
-}
+    for (let len = Math.min(5, degrees.length); len >= 2; len--) {
+      const slice = degrees.slice(-len).join('-');
+      if (progressions[slice]) {
+        const p = progressions[slice];
+        return { pattern: slice, ...p };
+      }
+    }
 
-function toggleMajorMinor() {
-  const st = window.__STATE;
-  if(!st) return;
-  st.key.minor = !st.key.minor;
-  const keyLabel = engine.NOTES_SHARP[engine.toPc(st.key.root)] + (st.key.minor ? 'm' : '');
-  const capo = parseInt(capoEl.value || '0', 10);
-  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
-  modeBadge.textContent = st.key.minor ? 'Natural Minor (Aeolian)' : 'Major (Ionian)';
-  const circleChords = engine.buildCircleOfFifths(st.key);
-  const circleEl = document.getElementById('circleOfFifths');
-  circleEl.innerHTML = circleChords.map(ch => {
-    const displayLabel = applyCapoToLabel(ch.label, capo);
-    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8" title="${ch.function}">${displayLabel}</span>`;
-  }).join('');
-}
+    return null;
+  }
 
-function refreshKeyDisplay() {
-  if(!window.__STATE) return;
-  const capo = parseInt(capoEl.value || '0', 10);
-  const keyLabel = engine.NOTES_SHARP[engine.toPc(window.__STATE.key.root)] + (window.__STATE.key.minor ? 'm' : '');
-  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
-}
+  predictNextChord(recentChords, key) {
+    if (!recentChords || !recentChords.length) return null;
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then(registration => {
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              if (confirm('🔄 גרסה חדשה זמינה! לטעון מחדש?')) {
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
-                window.location.reload();
-              }
+    const toPc = n => ((n % 12) + 12) % 12;
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const lastChord = recentChords[recentChords.length - 1];
+    const lastRoot = this.parseRoot(lastChord.label);
+    if (lastRoot < 0) return null;
+
+    const predictions = [];
+
+    const progression = this.recognizeProgressionPattern(recentChords, key);
+    if (progression && progression.next !== null) {
+      const deg = progression.next;
+      const targetRoot = toPc(key.root + scale[deg - 1]);
+      predictions.push({ root: targetRoot, label: this.getNoteName(targetRoot, key), confidence: progression.strength });
+    }
+
+    const fifthUp = toPc(lastRoot + 7);
+    const fifthDown = toPc(lastRoot - 7);
+
+    if (this.inKey(fifthUp, key.root, key.minor)) {
+      predictions.push({ root: fifthUp, label: this.getNoteName(fifthUp, key), confidence: 0.7 });
+    }
+    if (this.inKey(fifthDown, key.root, key.minor)) {
+      predictions.push({ root: fifthDown, label: this.getNoteName(fifthDown, key), confidence: 0.6 });
+    }
+
+    const stepUp = toPc(lastRoot + 2);
+    const stepDown = toPc(lastRoot - 2);
+    if (this.inKey(stepUp, key.root, key.minor)) {
+      predictions.push({ root: stepUp, label: this.getNoteName(stepUp, key), confidence: 0.5 });
+    }
+    if (this.inKey(stepDown, key.root, key.minor)) {
+      predictions.push({ root: stepDown, label: this.getNoteName(stepDown, key), confidence: 0.5 });
+    }
+
+    const map = new Map();
+    for (const p of predictions) {
+      if (!map.has(p.root) || map.get(p.root).confidence < p.confidence) {
+        map.set(p.root, p);
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+  }
+
+  enrichTimelineWithTheory(timeline, feats, key) {
+    const enriched = [];
+    const recent = [];
+    const MEMORY = 5;
+
+    for (let i = 0; i < timeline.length; i++) {
+      const chord = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!chord || !chord.label || typeof chord.label !== 'string') {
+        console.warn('⚠️ enrichTimelineWithTheory: skipping invalid chord at', i, chord);
+        continue;
+      }
+      
+      const analyzed = { ...chord };
+
+      if (recent.length >= 2) {
+        const prog = this.recognizeProgressionPattern(recent, key);
+        if (prog) analyzed.recognizedProgression = prog.name;
+      }
+
+      const next = i < timeline.length - 1 ? timeline[i + 1] : null;
+      if (next) {
+        const preds = this.predictNextChord(recent.concat([analyzed]), key);
+        if (preds && preds.length) {
+          analyzed.predictions = preds;
+          const nextRoot = this.parseRoot(next.label);
+          if (nextRoot >= 0 && preds[0].root === nextRoot) {
+            analyzed.predictionMatch = true;
+            analyzed.predictionConfidence = preds[0].confidence;
+          }
+        }
+      }
+
+      enriched.push(analyzed);
+      recent.push(analyzed);
+      if (recent.length > MEMORY) recent.shift();
+    }
+
+    return enriched;
+  }
+
+  computePredictionAccuracy(timeline) {
+    const withPred = timeline.filter(c => c.predictions && c.predictions.length);
+    if (!withPred.length) return 0;
+    const hits = withPred.filter(c => c.predictionMatch).length;
+    return Math.round((hits / withPred.length) * 100);
+  }
+
+  quickModulationCheck(timeline, primaryKey) {
+    if (!timeline || timeline.length < 20) return 0;
+
+    const third = Math.floor(timeline.length / 3);
+    const sections = [timeline.slice(0, third), timeline.slice(third, 2 * third), timeline.slice(2 * third)];
+
+    let modCount = 0;
+    let lastKey = { root: primaryKey.root, minor: primaryKey.minor };
+
+    for (const section of sections) {
+      if (!section.length) continue;
+
+      let diatonicCount = 0;
+      for (const chord of section) {
+        const root = this.parseRoot(chord.label);
+        if (root >= 0 && this.inKey(root, lastKey.root, lastKey.minor)) {
+          diatonicCount++;
+        }
+      }
+
+      const diatonicRatio = diatonicCount / section.length;
+      if (diatonicRatio >= 0.6) continue;
+
+      let bestNewKey = null;
+      let bestRatio = diatonicRatio;
+
+      for (let newRoot = 0; newRoot < 12; newRoot++) {
+        for (const newMinor of [false, true]) {
+          let cnt = 0;
+          for (const chord of section) {
+            const root = this.parseRoot(chord.label);
+            if (root >= 0 && this.inKey(root, newRoot, newMinor)) {
+              cnt++;
             }
-          });
-        });
-      })
-      .catch(error => {});
-    
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
+          }
+          const ratio = cnt / section.length;
+          if (ratio > bestRatio + 0.15) {
+            bestRatio = ratio;
+            bestNewKey = { root: newRoot, minor: newMinor };
+          }
+        }
+      }
+
+      if (bestNewKey) {
+        modCount++;
+        lastKey = bestNewKey;
+      }
+    }
+
+    return modCount;
+  }
+
+  degreeOfChord(label, key) {
+    const rootPc = this.parseRoot(label);
+    if (rootPc < 0) return null;
+
+    const toPc = n => ((n % 12) + 12) % 12;
+    const rel = toPc(rootPc - key.root);
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+
+    let bestDeg = null;
+    let bestDist = 999;
+
+    for (let d = 0; d < scale.length; d++) {
+      const dist = Math.min((rel - scale[d] + 12) % 12, (scale[d] - rel + 12) % 12);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestDeg = d + 1;
+      }
+    }
+
+    return bestDeg;
+  }
+
+  inKey(pc, keyRoot, minor) {
+    const toPc = n => ((n % 12) + 12) % 12;
+    const scale = minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const diatonic = scale.map(iv => toPc(keyRoot + iv));
+    const note = toPc(pc);
+
+    if (diatonic.includes(note)) return true;
+
+    if (minor) {
+      const rel = toPc(pc - keyRoot);
+      if (rel === 7 || rel === 11) return true;
+    } else {
+      const rel = toPc(pc - keyRoot);
+      if (rel === 2 || rel === 10 || rel === 8) return true;
+    }
+
+    return false;
+  }
+
+  parseRoot(label) {
+    if (!label || typeof label !== 'string') return -1;
+    const m = label.match(/^([A-G])(#{1}|b{1})?/);
+    if (!m) return -1;
+    const note = m[1] + (m[2] || '');
+    const sharpIndex = this.NOTES_SHARP.indexOf(note);
+    if (sharpIndex >= 0) return sharpIndex;
+    const flatIndex = this.NOTES_FLAT.indexOf(note);
+    if (flatIndex >= 0) return flatIndex;
+    return -1;
+  }
+
+  toPc(n) {
+    return ((n % 12) + 12) % 12;
+  }
+
+  getNoteName(pc, key) {
+    const toPc = n => ((n % 12) + 12) % 12;
+    pc = toPc(pc);
+    const keyRoot = key.root;
+    const keyMinor = !!key.minor;
+
+    const sharpMaj = [7,2,9,4,11,6,1];
+    const sharpMin = [4,11,6,1,8,3,10];
+    const flatMaj = [5,10,3,8,1,6,11];
+    const flatMin = [2,7,0,5,10,3,8];
+
+    let useFlats = false;
+
+    if (keyMinor) {
+      useFlats = flatMin.includes(keyRoot);
+    } else {
+      useFlats = flatMaj.includes(keyRoot);
+    }
+
+    if (keyRoot === 0 && !keyMinor) {
+      if ([10,3,8].includes(pc)) useFlats = true;
+    }
+
+    return useFlats ? this.NOTES_FLAT[pc] : this.NOTES_SHARP[pc];
+  }
+
+  mixStereo(audioBuffer) {
+    const left = audioBuffer.getChannelData(0);
+    const right = audioBuffer.getChannelData(1);
+    const len = Math.min(left.length, right.length);
+    const mono = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      mono[i] = 0.5 * (left[i] + right[i]);
+    }
+    return mono;
+  }
+
+  resampleLinear(samples, fromRate, toRate) {
+    if (!samples || fromRate === toRate) return samples;
+    const ratio = fromRate / toRate;
+    const newLength = Math.max(1, Math.floor(samples.length / ratio));
+    const resampled = new Float32Array(newLength);
+
+    for (let i = 0; i < newLength; i++) {
+      const srcIndex = i * ratio;
+      const i0 = Math.floor(srcIndex);
+      const i1 = Math.min(i0 + 1, samples.length - 1);
+      const t = srcIndex - i0;
+      resampled[i] = samples[i0] * (1 - t) + samples[i1] * t;
+    }
+
+    return resampled;
+  }
+
+  percentile(arr, p) {
+    const a = (arr || []).filter(v => Number.isFinite(v)).sort((x, y) => x - y);
+    if (!a.length) return 0;
+    const idx = Math.floor((p / 100) * (a.length - 1));
+    return a[idx];
+  }
+
+  getDiatonicChords(tonic, mode) {
+    const tonicPc = this.NOTES_SHARP.indexOf(tonic);
+    if (tonicPc < 0) return [];
+    const toPc = n => ((n % 12) + 12) % 12;
+    const scale = mode === 'minor' ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const qualities = mode === 'minor' ? ['m','dim','','m','m','',''] : ['','m','m','','','m','dim'];
+    return scale.map((deg, i) => {
+      const pc = toPc(tonicPc + deg);
+      return this.NOTES_SHARP[pc] + qualities[i];
     });
-  });
+  }
+
+  buildCircleOfFifths(key) {
+    const keyName = this.getNoteName(key.root, key) + (key.minor ? 'm' : '');
+    const chords = this.getDiatonicChords(keyName.replace(/m$/, ''), key.minor ? 'minor' : 'major');
+    const functions = key.minor ? ['i','ii°','III','iv','v','VI','VII'] : ['I','ii','iii','IV','V','vi','vii°'];
+    return chords.map((label, i) => ({ label, function: functions[i] || null }));
+  }
 }
 
-</script>
-
-</body>
-</html>
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ChordEngineEnhanced;
+}
