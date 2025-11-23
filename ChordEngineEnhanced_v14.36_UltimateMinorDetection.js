@@ -834,6 +834,16 @@ class ChordEngineEnhanced {
     return mono;
   }
   
+  // Alias for backward compatibility
+  resampleLinear(samples, fromRate, toRate) {
+    return this.resample(samples, fromRate, toRate);
+  }
+  
+  estimateTempo(x, sr) {
+    // Already implemented in main class
+    return this.estimateTempo(x, sr);
+  }
+  
   toPc(n) {
     return ((n % 12) + 12) % 12;
   }
@@ -847,6 +857,25 @@ class ChordEngineEnhanced {
       const pc = (tonicPc + deg) % 12;
       return this.NOTES_SHARP[pc] + qualities[i];
     });
+  }
+  
+  buildCircleOfFifths(key) {
+    const keyName = this.NOTES_SHARP[this.toPc(key.root)] + (key.minor ? 'm' : '');
+    const chords = this.getDiatonicChords(keyName.replace(/m$/, ''), key.minor ? 'minor' : 'major');
+    const functions = key.minor 
+      ? ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII'] 
+      : ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+    return chords.map((label, i) => ({ 
+      label, 
+      function: functions[i] || null 
+    }));
+  }
+  
+  percentile(arr, p) {
+    const sorted = arr.slice().sort((a, b) => a - b);
+    if (!sorted.length) return 0;
+    const idx = Math.floor((p / 100) * (sorted.length - 1));
+    return sorted[idx];
   }
 }
 
