@@ -839,11 +839,6 @@ class ChordEngineEnhanced {
     return this.resample(samples, fromRate, toRate);
   }
   
-  estimateTempo(x, sr) {
-    // Already implemented in main class
-    return this.estimateTempo(x, sr);
-  }
-  
   toPc(n) {
     return ((n % 12) + 12) % 12;
   }
