@@ -152,25 +152,33 @@ class ChordEngineEnhanced {
     timeline = this.analyzeModalContext(timeline, key);
     timeline = this.enrichTimelineWithTheory(timeline, feats, key);
     return timeline;
-  }
-
   processAudio(audioBuffer, channelData, sampleRate) {
-    let mono;
+    // ✅ FIX: If channelData + sampleRate provided - use directly (pre-resampled from HTML)
     if (channelData && sampleRate) {
-      mono = channelData;
-      const sr0 = sampleRate;
-      const sr = 22050;
-      const x = this.resampleLinear(mono, sr0, sr);
+      console.log('✅ Engine: using pre-resampled data from HTML');
+      const x = channelData;
+      const sr = sampleRate;
       const bpm = this.estimateTempo(x, sr);
       return { x, sr, bpm, duration: x.length / sr };
     }
 
+    // ✅ FIX: If no audioBuffer - throw clear error
+    if (!audioBuffer) {
+      throw new Error('❌ Engine requires either audioBuffer or (channelData + sampleRate)');
+    }
+
+    // ✅ FIX: Process AudioBuffer normally (original behavior for file uploads)
+    console.log('✅ Engine: processing AudioBuffer directly');
     const channels = audioBuffer.numberOfChannels || 1;
-    mono = (channels === 1) ? audioBuffer.getChannelData(0) : this.mixStereo(audioBuffer);
+    const mono = (channels === 1) 
+      ? audioBuffer.getChannelData(0) 
+      : this.mixStereo(audioBuffer);
+    
     const sr0 = audioBuffer.sampleRate || 44100;
     const sr = 22050;
     const x = this.resampleLinear(mono, sr0, sr);
     const bpm = this.estimateTempo(x, sr);
+    
     return { x, sr, bpm, duration: x.length / sr };
   }
 
