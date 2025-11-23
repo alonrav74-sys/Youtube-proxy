@@ -1,6 +1,6 @@
 /**
- * 🎵 Clean Chord Detection Engine
- * Based on music theory principles from ChordEngineEnhanced v14.36
+ * 🎵 ChordEngineEnhanced v15.0 - CLEAN REWRITE
+ * Complete rewrite based on solid music theory principles
  * 
  * Core Principles:
  * 1. Circle of Fifths for key detection
@@ -8,9 +8,13 @@
  * 3. Bass note detection for inversions
  * 4. Harmonic context analysis
  * 5. Progressive refinement pipeline
+ * 
+ * ✅ Clean code - no duplications
+ * ✅ Robust error handling
+ * ✅ Professional music theory
  */
 
-class ChordDetectionEngine {
+class ChordEngineEnhanced {
   constructor() {
     // Musical constants
     this.NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -813,9 +817,40 @@ class ChordDetectionEngine {
     const conf = Math.round(key.confidence * 100);
     return `${root}${mode} (${conf}%)`;
   }
+  
+  // ═══════════════════════════════════════════════════════════
+  // 🔧 LEGACY COMPATIBILITY HELPERS
+  // (Used by index.html - keep for backward compatibility)
+  // ═══════════════════════════════════════════════════════════
+  
+  mixStereo(audioBuffer) {
+    const left = audioBuffer.getChannelData(0);
+    const right = audioBuffer.getChannelData(1);
+    const len = Math.min(left.length, right.length);
+    const mono = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      mono[i] = 0.5 * (left[i] + right[i]);
+    }
+    return mono;
+  }
+  
+  toPc(n) {
+    return ((n % 12) + 12) % 12;
+  }
+  
+  getDiatonicChords(tonic, mode) {
+    const tonicPc = this.NOTES_SHARP.indexOf(tonic);
+    if (tonicPc < 0) return [];
+    const scale = mode === 'minor' ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    const qualities = mode === 'minor' ? ['m','dim','','m','m','',''] : ['','m','m','','','m','dim'];
+    return scale.map((deg, i) => {
+      const pc = (tonicPc + deg) % 12;
+      return this.NOTES_SHARP[pc] + qualities[i];
+    });
+  }
 }
 
 // Export for Node.js and browser
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ChordDetectionEngine;
+  module.exports = ChordEngineEnhanced;
 }
