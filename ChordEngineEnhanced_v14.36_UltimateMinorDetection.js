@@ -574,7 +574,8 @@ class ChordEngineEnhanced {
         timeline.push({
           t: startFrame * secPerFrame,
           label: candidates[currentState].label,
-          frameIdx: startFrame
+          frameIdx: startFrame,
+          fi: startFrame  // ✅ Alias for backward compatibility
         });
         currentState = states[t];
         startFrame = t;
@@ -585,7 +586,8 @@ class ChordEngineEnhanced {
     timeline.push({
       t: startFrame * secPerFrame,
       label: candidates[currentState].label,
-      frameIdx: startFrame
+      frameIdx: startFrame,
+      fi: startFrame  // ✅ Alias for backward compatibility
     });
     
     return timeline;
@@ -672,7 +674,11 @@ class ChordEngineEnhanced {
       const snapTolerance = 0.35 * secPerBeat;
       
       const t = Math.abs(beatTime - ev.t) <= snapTolerance ? beatTime : ev.t;
-      return { ...ev, t: Math.max(0, t) };
+      return { 
+        ...ev, 
+        t: Math.max(0, t),
+        fi: ev.frameIdx || ev.fi  // ✅ Preserve fi
+      };
     });
     
     // 3. Merge consecutive duplicates
@@ -694,9 +700,13 @@ class ChordEngineEnhanced {
       const root = this.parseRoot(ev.label);
       if (root < 0) return ev;
       
+      // Use frameIdx or fi (backward compatibility)
+      const frameIdx = ev.frameIdx !== undefined ? ev.frameIdx : ev.fi;
+      if (frameIdx === undefined) return ev;
+      
       // Get surrounding chroma
-      const i0 = Math.max(0, ev.frameIdx - 2);
-      const i1 = Math.min(features.chroma.length - 1, ev.frameIdx + 2);
+      const i0 = Math.max(0, frameIdx - 2);
+      const i1 = Math.min(features.chroma.length - 1, frameIdx + 2);
       
       const avgChroma = new Float32Array(12);
       for (let i = i0; i <= i1; i++) {
@@ -742,7 +752,11 @@ class ChordEngineEnhanced {
       const root = this.parseRoot(ev.label);
       if (root < 0) return ev;
       
-      const bass = features.bassPc[ev.frameIdx];
+      // Use frameIdx or fi (backward compatibility)
+      const frameIdx = ev.frameIdx !== undefined ? ev.frameIdx : ev.fi;
+      if (frameIdx === undefined) return ev;
+      
+      const bass = features.bassPc[frameIdx];
       if (bass < 0 || bass === root) return ev;
       
       // Check if bass is in chord
@@ -770,8 +784,12 @@ class ChordEngineEnhanced {
       const root = this.parseRoot(ev.label);
       if (root < 0) return false; // Invalid label
       
+      // Use frameIdx or fi (backward compatibility)
+      const frameIdx = ev.frameIdx !== undefined ? ev.frameIdx : ev.fi;
+      if (frameIdx === undefined) return false;
+      
       // Check chroma strength
-      const chroma = features.chroma[ev.frameIdx];
+      const chroma = features.chroma[frameIdx];
       if (!chroma) return false;
       
       const rootStrength = chroma[root];
