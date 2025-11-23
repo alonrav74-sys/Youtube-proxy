@@ -844,104 +844,37 @@ async function decodeAudio(source){
   else return await decodeYouTubeAudio(source.data);
 }
 
-// ✅ Mobile Debug Helper - מראה debug על המסך
-function debugLog(msg, data) {
-  let debugDiv = document.getElementById('mobileDebug');
-  if(!debugDiv) {
-    debugDiv = document.createElement('div');
-    debugDiv.id = 'mobileDebug';
-    debugDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(0,0,0,0.95);color:#0f0;font-family:monospace;font-size:11px;padding:10px;z-index:9999;max-height:50vh;overflow-y:auto;direction:ltr;text-align:left';
-    debugDiv.innerHTML = '<button onclick="this.parentElement.style.display=\'none\'" style="float:right;background:#f00;color:#fff;border:none;padding:4px 8px;border-radius:4px">✕ סגור</button><div id="debugLog"></div>';
-    document.body.appendChild(debugDiv);
-  }
-  
-  debugDiv.style.display = 'block';
-  const logDiv = document.getElementById('debugLog');
-  const line = document.createElement('div');
-  line.style.borderBottom = '1px solid #333';
-  line.style.padding = '4px 0';
-  line.innerHTML = `<strong style="color:#0ff">${msg}</strong>`;
-  if(data) {
-    line.innerHTML += `<pre style="margin:4px 0;color:#0f0;font-size:10px">${JSON.stringify(data, null, 2)}</pre>`;
-  }
-  logDiv.appendChild(line);
-  logDiv.scrollTop = logDiv.scrollHeight;
-}
-
 async function decodeAudioFile(file){
-  debugLog('🔍 START decodeAudioFile', {
-    name: file.name,
-    size: file.size + ' bytes',
-    type: file.type
-  });
-  
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = new AC(); 
   try{ await ctx.resume(); }catch{}
-  
   const arr = await file.arrayBuffer();
-  debugLog('📦 ArrayBuffer loaded', { bytes: arr.byteLength });
-  
   try{
-    debugLog('🎵 Decoding MP3...');
     const buf = await ctx.decodeAudioData(arr.slice(0));
-    debugLog('✅ Decode SUCCESS', {
-      duration: buf.duration.toFixed(2) + 's',
-      sampleRate: buf.sampleRate + ' Hz',
-      channels: buf.numberOfChannels,
-      samples: buf.length
-    });
     return postDecode(buf, URL.createObjectURL(file));
   }catch(e1){
-    debugLog('❌ Decode FAILED', { error: e1.message });
     try{
-      debugLog('🔄 Trying fallback...');
       const buf = await new Promise((resolve,reject)=>{ 
         ctx.decodeAudioData(arr.slice(0), b=>resolve(b), err=>reject(err)); 
       });
-      debugLog('✅ Fallback SUCCESS');
       return postDecode(buf, URL.createObjectURL(file));
-    }catch(e2){ 
-      debugLog('❌ Fallback FAILED', { error: e2.message });
-      throw e2||e1; 
-    }
+    }catch(e2){ throw e2||e1; }
   }
   
   function postDecode(buf, url){
-    debugLog('📊 postDecode', {
-      duration: buf.duration.toFixed(2) + 's',
-      channels: buf.numberOfChannels,
-      sampleRate: buf.sampleRate,
-      samples: buf.length
-    });
-    
     const audioMode = document.getElementById('audioMode').value;
-    debugLog('🎛️ Audio mode: ' + audioMode);
     
     if (audioMode === 'stereo' && buf.numberOfChannels === 2) {
-      debugLog('🎧 STEREO mode');
       const left = buf.getChannelData(0);
       const right = buf.getChannelData(1);
-      
-      debugLog('📊 Channels', {
-        leftLen: left.length,
-        rightLen: right.length
-      });
-      
       const sr0 = buf.sampleRate, sr = 22050;
       
       const leftResampled = engine.resampleLinear(left, sr0, sr);
       const rightResampled = engine.resampleLinear(right, sr0, sr);
       
-      debugLog('🔄 Resampled', {
-        leftLen: leftResampled.length,
-        rightLen: rightResampled.length
-      });
-      
       const bpm = engine.estimateTempo(leftResampled, sr);
-      debugLog('🎵 BPM: ' + bpm);
       
-      const result = {
+      return {
         x: leftResampled,
         xLeft: leftResampled,
         xRight: rightResampled,
@@ -952,28 +885,12 @@ async function decodeAudioFile(file){
         audioBuffer: buf,
         isStereo: true
       };
-      
-      debugLog('✅ Returning STEREO', {
-        duration: result.duration.toFixed(2) + 's',
-        bpm: result.bpm,
-        samples: result.x.length
-      });
-      return result;
     } else {
-      debugLog('🎧 MONO mode');
       const mono = (buf.numberOfChannels===1)? buf.getChannelData(0) : engine.mixStereo(buf);
-      
-      debugLog('📊 Mono length: ' + mono.length);
-      
       const sr0=buf.sampleRate, sr=22050;
       const x = engine.resampleLinear(mono, sr0, sr);
-      
-      debugLog('🔄 Resampled: ' + x.length);
-      
       const bpm = engine.estimateTempo(x, sr);
-      debugLog('🎵 BPM: ' + bpm);
-      
-      const result = { 
+      return { 
         x, 
         sr, 
         bpm, 
@@ -981,19 +898,9 @@ async function decodeAudioFile(file){
         url,
         audioBuffer: buf
       };
-      
-      debugLog('✅ Returning MONO', {
-        duration: result.duration.toFixed(2) + 's',
-        bpm: result.bpm,
-        samples: result.x.length
-      });
-      return result;
     }
   }
 }
-
-// השאר את decodeYouTubeAudio ללא שינוי (שורות 837-856)
-
 
 async function decodeYouTubeAudio(video){
   showAnalyzing('מוריד שמע מיוטיוב...');
