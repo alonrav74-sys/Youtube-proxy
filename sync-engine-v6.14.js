@@ -1,5 +1,6 @@
 // =====================================================
-// 🎵 SyncEngine v6.14 - CLEAN (No Debug)
+// 🎵 SyncEngine v6.14 - FIXED (YouTube Safe)
+// ✅ Added safety checks for invalid chords
 // =====================================================
 
 const SyncEngine = {
@@ -46,6 +47,9 @@ const SyncEngine = {
       const wordEnd = (w.end || wordStart + 0.3) + gateOffset;
 
       const overlappingChords = chords.filter(ch => {
+        // ✅ FIX: Skip invalid chords
+        if (!ch || !ch.label) return false;
+        
         const chordTime = ch.t + gateOffset;
         return chordTime >= wordStart && chordTime < wordEnd;
       });
@@ -75,6 +79,13 @@ const SyncEngine = {
       
       for (let i = 0; i < state.timeline.length; i++) {
         const chord = state.timeline[i];
+        
+        // ✅ FIX: Skip invalid chords
+        if (!chord || !chord.label) {
+          console.warn('⚠️ SyncEngine.refreshSheetTabView: skipping invalid chord at', i);
+          continue;
+        }
+        
         const displayLabel = sanitizeLabel(applyCapoToLabel(chord.label, capoVal));
         
         if (i > 0) html += '&nbsp;&nbsp;&nbsp;&nbsp;';
@@ -130,26 +141,34 @@ const SyncEngine = {
       // Check if first chord is tonic or relative minor
       let skipFirstChord = false;
       if (state.timeline[0]) {
-        const firstChordTime = state.timeline[0].t + gateOffset;
-        const firstChordLabel = state.timeline[0].label || '';
-        const keyRoot = state.key ? state.key.root : null;
+        const firstChord = state.timeline[0];
         
-        // Extract root from chord label (e.g., "Am" -> 0 for A, "C" -> 0 for C)
-        const chordRootMatch = firstChordLabel.match(/^([A-G][#b]?)/);
-        const chordRoot = chordRootMatch ? chordRootMatch[1] : null;
-        
-        // Check if chord is tonic or relative minor
-        const isTonic = (keyRoot !== null && chordRoot && 
-                         this.getChordRoot(chordRoot) === keyRoot);
-        const isRelativeMinor = (keyRoot !== null && chordRoot && 
-                                  this.getChordRoot(chordRoot) === (keyRoot + 9) % 12); // relative minor is +9 semitones
-        
-        // Skip ONLY if it's noise AND not tonic/relative minor
-        const isNoise = (firstChordTime < 1.5) && (firstChordTime < firstLineStart - 3.0);
-        skipFirstChord = isNoise && !isTonic && !isRelativeMinor;
+        // ✅ FIX: Check if first chord is valid
+        if (firstChord && firstChord.label) {
+          const firstChordTime = firstChord.t + gateOffset;
+          const firstChordLabel = firstChord.label;
+          const keyRoot = state.key ? state.key.root : null;
+          
+          // Extract root from chord label (e.g., "Am" -> 0 for A, "C" -> 0 for C)
+          const chordRootMatch = firstChordLabel.match(/^([A-G][#b]?)/);
+          const chordRoot = chordRootMatch ? chordRootMatch[1] : null;
+          
+          // Check if chord is tonic or relative minor
+          const isTonic = (keyRoot !== null && chordRoot && 
+                           this.getChordRoot(chordRoot) === keyRoot);
+          const isRelativeMinor = (keyRoot !== null && chordRoot && 
+                                    this.getChordRoot(chordRoot) === (keyRoot + 9) % 12); // relative minor is +9 semitones
+          
+          // Skip ONLY if it's noise AND not tonic/relative minor
+          const isNoise = (firstChordTime < 1.5) && (firstChordTime < firstLineStart - 3.0);
+          skipFirstChord = isNoise && !isTonic && !isRelativeMinor;
+        }
       }
       
       const introChords = state.timeline.filter((ch, idx) => {
+        // ✅ FIX: Skip invalid chords
+        if (!ch || !ch.label) return false;
+        
         const chordTime = ch.t + gateOffset;
         
         // Skip first chord if it's noise (and not tonic/relative)
@@ -183,6 +202,9 @@ const SyncEngine = {
       const lineEnd = line[line.length - 1].end;
       
       const lineChords = state.timeline.filter((ch, idx) => {
+        // ✅ FIX: Skip invalid chords
+        if (!ch || !ch.label) return false;
+        
         const chordTime = ch.t + gateOffset;
         if (chordTime >= lineStart && chordTime <= lineEnd) {
           usedChordIndices.add(idx);
@@ -259,6 +281,9 @@ const SyncEngine = {
       if (lineIdx < lines.length - 1) {
         const nextLineStart = lines[lineIdx + 1][0].time;
         const interludeChords = state.timeline.filter((ch, idx) => {
+          // ✅ FIX: Skip invalid chords
+          if (!ch || !ch.label) return false;
+          
           const chordTime = ch.t + gateOffset;
           if (chordTime > lineEnd && chordTime < nextLineStart && !usedChordIndices.has(idx)) {
             usedChordIndices.add(idx);
@@ -283,6 +308,9 @@ const SyncEngine = {
     if (lines.length > 0) {
       const lastLineEnd = lines[lines.length - 1][lines[lines.length - 1].length - 1].end;
       const outroChords = state.timeline.filter((ch, idx) => {
+        // ✅ FIX: Skip invalid chords
+        if (!ch || !ch.label) return false;
+        
         const chordTime = ch.t + gateOffset;
         if (chordTime > lastLineEnd && !usedChordIndices.has(idx)) {
           return true;
@@ -311,8 +339,11 @@ const SyncEngine = {
     const capoVal = parseInt(capo || '0', 10);
     const gateOffset = state.gateTime || 0;
     
+    // ✅ FIX: Filter out invalid chords before processing
+    const validChords = state.timeline.filter(ch => ch && ch.label);
+    
     // Collect chords and lyrics
-    const chords = state.timeline.map(ch => ({
+    const chords = validChords.map(ch => ({
       time: ch.t + gateOffset,
       label: sanitizeLabel(applyCapoToLabel(ch.label, capoVal))
     }));
@@ -475,4 +506,4 @@ const SyncEngine = {
 
 if (typeof window !== 'undefined') {
   window.SyncEngine = SyncEngine;
-  }
+}
