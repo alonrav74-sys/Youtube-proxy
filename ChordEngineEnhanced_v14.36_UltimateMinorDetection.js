@@ -105,7 +105,13 @@ class ChordEngineEnhanced {
 
     const modulations = this.quickModulationCheck(timeline, key);
 
-    timeline = timeline.filter(ev => ev && ev.label && typeof ev.label === 'string' && ev.label.trim());
+    // ✅ CRITICAL: Multiple safety checks for timeline filtering
+    timeline = timeline.filter(ev => {
+      if (!ev) return false;
+      if (!ev.label || typeof ev.label !== 'string') return false;
+      if (ev.label.trim() === '') return false;
+      return true;
+    });
 
     const stats = {
       totalChords: timeline.length,
@@ -1298,6 +1304,12 @@ class ChordEngineEnhanced {
     const toPc = n => ((n % 12) + 12) % 12;
 
     for (const ev of timeline) {
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ validateAndRefine: skipping invalid chord', ev);
+        continue;
+      }
+      
       const r = this.parseRoot(ev.label);
       if (r < 0) {
         out.push(ev);
@@ -1329,6 +1341,13 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const ev = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ classifyOrnaments: skipping invalid chord at', i, ev);
+        continue;
+      }
+      
       const prev = i > 0 ? timeline[i - 1] : null;
       const next = i < timeline.length - 1 ? timeline[i + 1] : null;
       const dur = next ? (next.t - ev.t) : spb;
@@ -1376,6 +1395,13 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const ev = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!ev || !ev.label || typeof ev.label !== 'string') {
+        console.warn('⚠️ analyzeModalContext: skipping invalid chord at', i, ev);
+        continue;
+      }
+      
       const r = this.parseRoot(ev.label);
       if (r < 0) {
         out.push({ ...ev, modalContext: null });
@@ -1570,6 +1596,13 @@ class ChordEngineEnhanced {
 
     for (let i = 0; i < timeline.length; i++) {
       const chord = timeline[i];
+      
+      // ✅ FIX: Skip invalid chords
+      if (!chord || !chord.label || typeof chord.label !== 'string') {
+        console.warn('⚠️ enrichTimelineWithTheory: skipping invalid chord at', i, chord);
+        continue;
+      }
+      
       const analyzed = { ...chord };
 
       if (recent.length >= 2) {
