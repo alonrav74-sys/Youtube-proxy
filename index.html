@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ChordFinderPro v15.0 🎵</title>
+  <title>ChordFinderPro v16.2 🎵</title>
   
   <!-- PWA Meta Tags -->
-  <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, מודולציות" />
+  <meta name="description" content="🎵 זיהוי אקורדים מתקדם - Ultimate Precision Engine" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
@@ -57,6 +57,7 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .card {
@@ -88,6 +89,7 @@
     .btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+      transform: none;
     }
 
     input[type="text"], input[type="file"] {
@@ -123,6 +125,8 @@
       padding: 10px;
       border-radius: 8px;
       transition: background 0.2s;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .chord-line:hover {
@@ -133,27 +137,31 @@
       font-weight: bold;
       color: var(--accent);
       font-size: 18px;
-      min-width: 120px;
+      min-width: 100px;
       cursor: pointer;
     }
 
     .chord-time {
       color: #888;
       font-size: 14px;
-      margin-left: 15px;
+      min-width: 50px;
+    }
+
+    .chord-bass {
+      color: #a855f7;
+      font-size: 12px;
       min-width: 60px;
     }
 
-    .chord-lyrics {
-      flex: 1;
-      color: var(--text);
-      font-size: 15px;
-      line-height: 1.8;
+    .chord-confidence {
+      color: #10b981;
+      font-size: 12px;
+      min-width: 40px;
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 15px;
       margin: 20px 0;
     }
@@ -167,13 +175,13 @@
     }
 
     .stat-value {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: bold;
       color: var(--accent);
     }
 
     .stat-label {
-      font-size: 14px;
+      font-size: 12px;
       color: #aaa;
       margin-top: 5px;
     }
@@ -224,29 +232,34 @@
       display: inline-block;
       padding: 4px 10px;
       border-radius: 12px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
-      margin-left: 8px;
+      margin-right: 5px;
     }
 
-    .badge-structural { background: rgba(79, 70, 229, 0.2); color: var(--accent); }
-    .badge-passing { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
-    .badge-neighbor { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
-    .badge-pedal { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-    .badge-secondary { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
     .badge-borrowed { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+    .badge-chromatic { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .badge-inversion { background: rgba(168, 85, 247, 0.2); color: #a855f7; }
+    .badge-inScale { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+
+    .method-tag {
+      font-size: 11px;
+      color: #888;
+      margin-right: 10px;
+    }
 
     @media (max-width: 768px) {
       header h1 { font-size: 1.8rem; }
-      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .chord-line { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🎵 ChordFinderPro v15.0</h1>
-      <p>זיהוי אקורדים מתקדם עם AI - Ultimate Minor Detection</p>
+      <h1>🎵 ChordFinderPro v16.2</h1>
+      <p>Ultimate Precision Engine - Hybrid Tonic Detection</p>
     </header>
 
     <div class="card">
@@ -255,18 +268,6 @@
       <p style="margin: 10px 0; color: #888;">או</p>
       <input type="text" id="youtubeUrl" placeholder="הדבק קישור YouTube כאן..." />
       <button class="btn" id="analyzeBtn">🎯 נתח אקורדים</button>
-      
-      <div style="margin-top: 15px;">
-        <label>
-          <input type="checkbox" id="bassBoost" checked /> 
-          Bass Boost (מומלץ לזיהוי inversions)
-        </label>
-        <br>
-        <label>
-          <input type="checkbox" id="jazzMode" checked /> 
-          Jazz Mode (extensions: 7th, 9th, 11th, 13th)
-        </label>
-      </div>
     </div>
 
     <div id="analyzing" class="card">
@@ -296,6 +297,10 @@
             <div class="stat-label">סה"כ אקורדים</div>
           </div>
           <div class="stat-box">
+            <div class="stat-value" id="stat-inScale">-</div>
+            <div class="stat-label">בסולם</div>
+          </div>
+          <div class="stat-box">
             <div class="stat-value" id="stat-extensions">-</div>
             <div class="stat-label">Extensions</div>
           </div>
@@ -305,22 +310,27 @@
           </div>
           <div class="stat-box">
             <div class="stat-value" id="stat-borrowed">-</div>
-            <div class="stat-label">Borrowed Chords</div>
+            <div class="stat-label">Borrowed</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="stat-noBass">-</div>
+            <div class="stat-label">ללא באס</div>
           </div>
         </div>
       </div>
 
       <div class="card theory-section">
         <h3>🎼 ניתוח תיאורטי</h3>
-        <p><strong>Tonic:</strong> <span id="tonic-info">-</span></p>
-        <p><strong>Mode:</strong> <span id="mode-info">-</span></p>
-        <p><strong>Modulations:</strong> <span id="modulations-info">-</span></p>
-        <p><strong>Prediction Accuracy:</strong> <span id="prediction-accuracy">-</span>%</p>
+        <p><strong>Tonic:</strong> <span id="tonic-info">-</span> <span class="method-tag" id="tonic-method"></span></p>
+        <p><strong>Mode:</strong> <span id="mode-info">-</span> <span class="method-tag" id="mode-method"></span></p>
+        <p><strong>Mode Analysis:</strong> m3=<span id="mode-m3">-</span>, M3=<span id="mode-M3">-</span>, ratio=<span id="mode-ratio">-</span></p>
+        <p><strong>Music Start:</strong> <span id="music-start">-</span>s</p>
+        <p><strong>Duration:</strong> <span id="duration">-</span>s</p>
         <p><strong>Circle of Fifths:</strong> <span id="circle-info">-</span></p>
       </div>
 
       <div class="card">
-        <h2>🎸 אקורדים + מילים</h2>
+        <h2>🎸 אקורדים</h2>
         <div id="chordDisplay"></div>
       </div>
 
@@ -331,15 +341,15 @@
     </div>
   </div>
 
-  <!-- Load ChordEngine -->
-  <script src="ChordEngineEnhanced_v15_COMPLETE.js"></script>
+  <!-- Load ChordEngine v16.2 -->
+  <script src="ChordEngine_v16.2_FINAL.js"></script>
 
   <script>
     // ═══════════════════════════════════════════════════════════
-    // 🎯 MAIN APPLICATION
+    // 🎯 MAIN APPLICATION - Compatible with ChordEngine v16.2
     // ═══════════════════════════════════════════════════════════
 
-    const engine = new ChordEngineEnhanced();
+    const engine = new ChordEngineUltimate();
     let currentResult = null;
     let audioContext = null;
 
@@ -353,8 +363,6 @@
     const resultsDiv = document.getElementById('results');
     const errorMsg = document.getElementById('error-msg');
     const chordDisplay = document.getElementById('chordDisplay');
-    const bassBoost = document.getElementById('bassBoost');
-    const jazzMode = document.getElementById('jazzMode');
     const downloadBtn = document.getElementById('downloadBtn');
     const copyBtn = document.getElementById('copyBtn');
 
@@ -386,16 +394,10 @@
         }
 
         showAnalyzing('מזהה אקורדים...');
+        setProgress(30);
 
-        const options = {
-          harmonyMode: jazzMode.checked ? 'jazz' : 'basic',
-          bassMultiplier: bassBoost.checked ? 1.4 : 1.0,
-          extensionMultiplier: jazzMode.checked ? 1.0 : 0.5,
-          extensionSensitivity: jazzMode.checked ? 1.0 : 1.5,
-          progressCallback: (info) => {
-            updateProgress(info);
-          }
-        };
+        // v16.2 options (simplified - no fake options)
+        const options = {};
 
         const result = await engine.detect(audioBuffer, options);
         currentResult = result;
@@ -427,7 +429,6 @@
     async function loadYouTube(url) {
       showAnalyzing('מוריד מ-YouTube...');
       
-      // Extract video ID
       let videoId = '';
       if (url.includes('youtu.be/')) {
         videoId = url.split('youtu.be/')[1].split('?')[0];
@@ -440,36 +441,57 @@
         throw new Error('YouTube URL לא תקין');
       }
 
-      // Use YouTube Data API or third-party service
-      // For demo purposes, we'll throw an error
-      throw new Error('YouTube download requires backend service');
+      throw new Error('YouTube download requires backend service. Please upload a file instead.');
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 📊 DISPLAY RESULTS
+    // 📊 DISPLAY RESULTS - Compatible with v16.2 output
     // ═══════════════════════════════════════════════════════════
 
     function displayResults(result) {
-      const { chords, key, tonic, bpm, duration, mode, stats } = result;
+      const { chords, key, tonic, bpm, duration, mode, stats, musicStart } = result;
 
-      // Update stats
+      // Update stats - using correct field names from v16.2
       document.getElementById('stat-key').textContent = formatKey(key);
-      document.getElementById('stat-bpm').textContent = bpm;
-      document.getElementById('stat-chords').textContent = stats.totalChords;
-      document.getElementById('stat-extensions').textContent = stats.extensions;
-      document.getElementById('stat-inversions').textContent = stats.inversions;
-      document.getElementById('stat-borrowed').textContent = stats.modalBorrowings;
+      document.getElementById('stat-bpm').textContent = bpm || '-';
+      document.getElementById('stat-chords').textContent = stats.totalChords || 0;
+      document.getElementById('stat-inScale').textContent = stats.inScale || 0;
+      document.getElementById('stat-extensions').textContent = stats.extensions || 0;
+      document.getElementById('stat-inversions').textContent = stats.inversions || 0;
+      document.getElementById('stat-borrowed').textContent = stats.borrowed || 0; // v16.2 uses 'borrowed' not 'modalBorrowings'
+      document.getElementById('stat-noBass').textContent = stats.noBass || 0;
 
-      // Theory info
-      document.getElementById('tonic-info').textContent = tonic.label + ` (${tonic.confidence}%)`;
-      document.getElementById('mode-info').textContent = mode;
-      document.getElementById('modulations-info').textContent = stats.modulations || 0;
-      document.getElementById('prediction-accuracy').textContent = stats.predictionAccuracy || 0;
+      // Tonic info
+      document.getElementById('tonic-info').textContent = 
+        `${tonic.label} (${tonic.confidence}%)`;
+      document.getElementById('tonic-method').textContent = 
+        `[${tonic.method || 'unknown'}]`;
+
+      // Mode info - v16.2 returns object { isMinor, confidence, m3, M3, ratio }
+      const modeStr = mode.isMinor ? 'Minor' : 'Major';
+      document.getElementById('mode-info').textContent = 
+        `${modeStr} (${mode.confidence || 0}%)`;
+      document.getElementById('mode-method').textContent = 
+        mode.method ? `[${mode.method}]` : '';
+      
+      // Mode analysis details
+      document.getElementById('mode-m3').textContent = 
+        mode.m3 !== undefined ? mode.m3.toFixed(3) : '-';
+      document.getElementById('mode-M3').textContent = 
+        mode.M3 !== undefined ? mode.M3.toFixed(3) : '-';
+      document.getElementById('mode-ratio').textContent = 
+        mode.ratio !== undefined ? mode.ratio.toFixed(2) : '-';
+
+      // Other info
+      document.getElementById('music-start').textContent = 
+        musicStart !== undefined ? musicStart.toFixed(2) : '-';
+      document.getElementById('duration').textContent = 
+        duration !== undefined ? duration.toFixed(1) : '-';
 
       // Circle of Fifths
       const circle = engine.buildCircleOfFifths(key);
       document.getElementById('circle-info').textContent = 
-        circle.map(c => `${c.label} (${c.function})`).join(', ');
+        circle.map(c => `${c.label}(${c.function})`).join(' → ');
 
       // Display chords
       displayChords(chords);
@@ -478,45 +500,78 @@
     function displayChords(chords) {
       chordDisplay.innerHTML = '';
 
+      if (!chords || !chords.length) {
+        chordDisplay.innerHTML = '<p style="color:#888;">לא נמצאו אקורדים</p>';
+        return;
+      }
+
       for (let i = 0; i < chords.length; i++) {
         const chord = chords[i];
         const line = document.createElement('div');
         line.className = 'chord-line';
 
-        // Chord label with badges
+        // Chord label
         const label = document.createElement('span');
         label.className = 'chord-label';
-        label.textContent = chord.label;
-        label.title = 'לחץ כדי לשמוע את האקורד';
-        
-        // Add badges
-        if (chord.ornamentType && chord.ornamentType !== 'structural') {
-          const badge = document.createElement('span');
-          badge.className = `badge badge-${chord.ornamentType}`;
-          badge.textContent = chord.ornamentType;
-          label.appendChild(badge);
-        }
-
-        if (chord.modalContext) {
-          const badge = document.createElement('span');
-          badge.className = chord.modalContext === 'secondary_dominant' ? 'badge badge-secondary' : 'badge badge-borrowed';
-          badge.textContent = chord.modalContext.replace('_', ' ');
-          label.appendChild(badge);
-        }
+        label.textContent = chord.label || 'N/A';
 
         // Time
         const time = document.createElement('span');
         time.className = 'chord-time';
-        time.textContent = formatTime(chord.t);
+        time.textContent = formatTime(chord.t || 0);
 
-        // Lyrics
-        const lyrics = document.createElement('span');
-        lyrics.className = 'chord-lyrics';
-        lyrics.textContent = chord.words ? chord.words.join(' ') : '';
+        // Bass note (if different from root - indicates inversion)
+        const bassSpan = document.createElement('span');
+        bassSpan.className = 'chord-bass';
+        if (chord.bassNote !== undefined && chord.bassNote >= 0) {
+          const bassName = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][chord.bassNote];
+          bassSpan.textContent = `Bass: ${bassName}`;
+        }
+
+        // Confidence
+        const confSpan = document.createElement('span');
+        confSpan.className = 'chord-confidence';
+        if (chord.confidence !== undefined) {
+          confSpan.textContent = `${chord.confidence}%`;
+        }
+
+        // Badges
+        const badgesDiv = document.createElement('div');
+        
+        // In scale badge
+        if (chord.inScale) {
+          const badge = document.createElement('span');
+          badge.className = 'badge badge-inScale';
+          badge.textContent = 'בסולם';
+          badgesDiv.appendChild(badge);
+        }
+
+        // Inversion badge
+        if (chord.isInversion || chord.label.includes('/')) {
+          const badge = document.createElement('span');
+          badge.className = 'badge badge-inversion';
+          badge.textContent = 'היפוך';
+          badgesDiv.appendChild(badge);
+        }
+
+        // Modal context badge
+        if (chord.modalContext) {
+          const badge = document.createElement('span');
+          if (chord.modalContext.includes('borrowed') || chord.modalContext.includes('secondary')) {
+            badge.className = 'badge badge-borrowed';
+          } else {
+            badge.className = 'badge badge-chromatic';
+          }
+          badge.textContent = chord.modalContext.replace(/_/g, ' ');
+          badgesDiv.appendChild(badge);
+        }
 
         line.appendChild(label);
         line.appendChild(time);
-        line.appendChild(lyrics);
+        line.appendChild(bassSpan);
+        line.appendChild(confSpan);
+        line.appendChild(badgesDiv);
+        
         chordDisplay.appendChild(line);
       }
     }
@@ -551,35 +606,36 @@
     });
 
     function generateTextOutput(result) {
-      const { chords, key, tonic, bpm, stats } = result;
+      const { chords, key, tonic, bpm, stats, mode, duration } = result;
       
-      let text = `🎵 ChordFinderPro v15.0 Analysis\n`;
+      let text = `🎵 ChordFinderPro v16.2 Analysis\n`;
       text += `${'═'.repeat(50)}\n\n`;
       text += `Key: ${formatKey(key)}\n`;
-      text += `Tonic: ${tonic.label} (${tonic.confidence}%)\n`;
+      text += `Tonic: ${tonic.label} (${tonic.confidence}%) [${tonic.method}]\n`;
+      text += `Mode: ${mode.isMinor ? 'Minor' : 'Major'} (${mode.confidence}%)\n`;
       text += `BPM: ${bpm}\n`;
+      text += `Duration: ${duration ? duration.toFixed(1) : '-'}s\n`;
+      text += `\n--- Stats ---\n`;
       text += `Total Chords: ${stats.totalChords}\n`;
+      text += `In Scale: ${stats.inScale}\n`;
       text += `Extensions: ${stats.extensions}\n`;
       text += `Inversions: ${stats.inversions}\n`;
-      text += `Borrowed Chords: ${stats.modalBorrowings}\n`;
+      text += `Borrowed: ${stats.borrowed}\n`;
+      text += `No Bass: ${stats.noBass}\n`;
       text += `\n${'═'.repeat(50)}\n\n`;
 
       for (const chord of chords) {
         text += `[${formatTime(chord.t)}] ${chord.label}`;
         
-        if (chord.ornamentType !== 'structural') {
-          text += ` (${chord.ornamentType})`;
+        if (chord.confidence !== undefined) {
+          text += ` (${chord.confidence}%)`;
         }
         
         if (chord.modalContext) {
           text += ` {${chord.modalContext}}`;
         }
         
-        if (chord.words && chord.words.length) {
-          text += `\n    ${chord.words.join(' ')}`;
-        }
-        
-        text += '\n\n';
+        text += '\n';
       }
 
       return text;
@@ -592,25 +648,11 @@
     function showAnalyzing(msg) {
       analyzingText.textContent = msg;
       analyzingDiv.style.display = 'block';
-      progressBar.style.width = '10%';
+      setProgress(10);
     }
 
-    function updateProgress(info) {
-      const { stage, progress } = info;
-      
-      const messages = {
-        'extracting': 'מחלץ תכונות...',
-        'detecting_key': 'מזהה מפתח...',
-        'key_detected': `מפתח: ${info.key || ''}`,
-        'analyzing_full': 'ניתוח מלא (HMM)...',
-        'analyzing_simple': 'ניתוח מהיר...',
-        'refining': 'משפר תוצאות...',
-        'decorating': 'מוסיף extensions...',
-        'complete': '✅ הושלם!'
-      };
-
-      analyzingText.textContent = messages[stage] || 'מעבד...';
-      progressBar.style.width = `${progress * 100}%`;
+    function setProgress(percent) {
+      progressBar.style.width = `${percent}%`;
     }
 
     function showError(msg) {
@@ -623,39 +665,35 @@
     }
 
     function formatTime(seconds) {
+      if (seconds === undefined || seconds === null) return '0:00';
       const mins = Math.floor(seconds / 60);
       const secs = Math.floor(seconds % 60);
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     function formatKey(key) {
+      if (!key) return '-';
       const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-      const root = notes[key.root];
+      const root = notes[key.root] || 'C';
       const mode = key.minor ? 'm' : '';
       return `${root}${mode}`;
-    }
-
-    function sanitizeLabel(label) {
-      if (!label || typeof label !== 'string') return 'C';
-      return label.trim() || 'C';
     }
 
     // ═══════════════════════════════════════════════════════════
     // 🎬 INITIALIZATION
     // ═══════════════════════════════════════════════════════════
 
-    console.log('🎵 ChordFinderPro v15.0 loaded!');
-    console.log('Engine features:', {
-      'Ultimate Minor Detection': true,
-      'Bass-based Tonic': true,
-      'HMM Tracking': true,
-      'Borrowed Chords': true,
-      'Ornament Classification': true,
-      'Modal Context': true,
-      'Extensions': true,
-      'Inversions': true,
-      'Predictions': true,
-      'Modulation Detection': true
+    console.log('🎵 ChordFinderPro v16.2 loaded!');
+    console.log('Engine: ChordEngineUltimate v16.2');
+    console.log('Features:', {
+      'Hybrid Tonic Detection': 'Bass + KS + First Chord',
+      'Hybrid Mode Detection': 'Third Analysis + KS Cross-check',
+      'Root from Chroma': 'Not from Bass',
+      'Inversions': 'Real slash chords',
+      'Dim/Aug Detection': 'Restored',
+      'No-Bass Segments': 'Chroma-only fallback',
+      'Light HMM': 'Sequence validation',
+      'Extensions': '7, maj7, sus2, sus4, 9'
     });
   </script>
 </body>
