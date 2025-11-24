@@ -1,10 +1,12 @@
 /**
- * ChordEngine v16.4 - Based on v16.2 + 3 fixes from v14.36
+ * ChordEngine v16.5 - Based on v16.2 + 5 targeted fixes
  * 
- * תיקונים מ-v14.36:
- * 1. finalizeTimeline - minDur = 0.5s + סינון חכם
- * 2. enforceEarlyDiatonic - 15 שניות ראשונות דיאטוניות
- * 3. inKey - borrowed chords מקובלים
+ * תיקונים:
+ * 1. determineChordFromChroma - סינון רעש + סגמנטים קצרים
+ * 2. buildChordsHybrid - מעביר secPerFrame
+ * 3. validateWithCircleOfFifths - זריקת כרומטי חלש
+ * 4. finalizeTimeline - סינון חזק יותר לא-דיאטוניים
+ * 5. detectTonicHybrid - העדפת באס במקרה יחסי C/Am
  */
 
 class ChordEngineUltimate {
@@ -14,41 +16,32 @@ class ChordEngineUltimate {
     this.MAJOR_SCALE = [0,2,4,5,7,9,11];
     this.MINOR_SCALE = [0,2,3,5,7,8,10];
     
-    // Krumhansl-Schmuckler profiles
     this.KS_MAJOR = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
     this.KS_MINOR = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
     
     this._hannCache = {};
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // 🎯 MAIN DETECTION
-  // ═══════════════════════════════════════════════════════════
-  
   async detect(audioBuffer, options = {}) {
     const opts = this.parseOptions(options);
     const timings = {};
     const t0 = this.now();
 
-    console.log('🎵 ChordEngine v16.4 (v16.2 + v14.36 fixes)');
+    console.log('🎵 ChordEngine v16.5 (v16.2 + 5 targeted fixes)');
 
-    // שלב 1: עיבוד אודיו
     const audio = this.processAudio(audioBuffer);
     console.log(`✅ Audio: ${audio.duration.toFixed(1)}s @ ${audio.bpm} BPM`);
 
-    // שלב 2: חילוץ Features
     const features = this.extractFeatures(audio);
     console.log(`✅ Features: ${features.numFrames} frames`);
 
-    // שלב 3: מציאת תחילת המנגינה
     const musicStart = this.findMusicStart(features);
     console.log(`✅ Music starts at ${musicStart.time.toFixed(2)}s`);
 
-    // שלב 4: זיהוי טוניקה - Hybrid
+    // 🎯 תיקון #5: detectTonicHybrid משופר
     const tonicResult = this.detectTonicHybrid(features, musicStart.frame);
     console.log(`✅ Tonic: ${this.NOTES_SHARP[tonicResult.root]} (${tonicResult.confidence}%) [${tonicResult.method}]`);
 
-    // שלב 5: זיהוי מינור/מז'ור - עם cross-check
     const modeResult = this.detectModeHybrid(features, tonicResult, musicStart.frame);
     
     const key = {
@@ -58,29 +51,20 @@ class ChordEngineUltimate {
     };
     console.log(`✅ Mode: ${key.minor ? 'MINOR' : 'MAJOR'} (${modeResult.confidence}%)`);
 
-    // שלב 6: בניית אקורדים - כולל fallback לקטעים בלי באס
+    // 🎯 תיקון #1+#2: buildChordsHybrid עם סינון רעש
     let timeline = this.buildChordsHybrid(features, key, musicStart.frame, audio.bpm);
     console.log(`✅ Initial chords: ${timeline.length}`);
 
-    // 🎯 תיקון #2 מ-v14.36: כפה דיאטוניים בהתחלה
-    timeline = this.enforceEarlyDiatonic(timeline, key, features, audio.bpm);
-
-    // שלב 7: אימות
+    // 🎯 תיקון #3: validateWithCircleOfFifths משופר
     timeline = this.validateWithCircleOfFifths(timeline, key, features);
 
-    // שלב 8: HMM קליל
     timeline = this.applyLightHMM(timeline, key);
-
-    // שלב 9: Extensions
     timeline = this.addExtensions(timeline, features, key, opts);
-
-    // שלב 10: Inversions
     timeline = this.addInversions(timeline, features, key);
 
-    // 🎯 תיקון #1 מ-v14.36: Finalize משופר
-    timeline = this.finalizeTimeline(timeline, audio.bpm, features, key);
+    // 🎯 תיקון #4: finalizeTimeline משופר
+    timeline = this.finalizeTimeline(timeline, audio.bpm, features);
 
-    // Safety filter
     timeline = timeline.filter(ev => 
       ev && ev.label && typeof ev.label === 'string' && ev.label.trim() && ev.fi != null
     );
@@ -107,155 +91,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎯 תיקון #1 מ-v14.36: FINALIZE משופר
-  // ═══════════════════════════════════════════════════════════
-  
-  finalizeTimeline(timeline, bpm, features, key) {
-    if (!timeline.length) return [];
-    
-    const spb = 60 / Math.max(60, Math.min(200, bpm));
-    const minDur = Math.max(0.5, 0.50 * spb); // 🎯 מינימום 0.5 שניות!
-    const energyMedian = this.percentile(features.energy, 50);
-    
-    const filtered = [];
-    
-    for (let i = 0; i < timeline.length; i++) {
-      const ev = timeline[i];
-      const next = timeline[i + 1];
-      const dur = next ? (next.t - ev.t) : minDur;
-      const energy = features.energy[ev.fi] || 0;
-      const isWeak = energy < energyMedian * 0.85;
-      
-      const r = this.parseRoot(ev.label);
-      const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
-      
-      // 🎯 סינון אקורדים חלשים/לא דיאטוניים אם קצרים
-      if (dur < minDur && filtered.length > 0 && (isWeak || !isDiatonic)) continue;
-      
-      // 🎯 גם דיאטוניים חלשים מאוד אם קצרים מדי
-      if (dur < minDur * 0.6 && isWeak) continue;
-      
-      filtered.push(ev);
-    }
-    
-    // Snap to grid
-    const snapped = [];
-    for (const ev of filtered) {
-      const raw = ev.t;
-      const grid = Math.round(raw / spb) * spb;
-      const snapTol = 0.35 * spb;
-      const t = Math.abs(grid - raw) <= snapTol ? grid : raw;
-      
-      if (!snapped.length || snapped[snapped.length - 1].label !== ev.label) {
-        snapped.push({ ...ev, t: Math.max(0, t) });
-      }
-    }
-    
-    return snapped;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 🎯 תיקון #2 מ-v14.36: ENFORCE EARLY DIATONIC
-  // ═══════════════════════════════════════════════════════════
-  
-  enforceEarlyDiatonic(timeline, key, features, bpm) {
-    if (!timeline || !timeline.length) return timeline;
-    
-    const spb = 60 / Math.max(60, Math.min(200, bpm || 120));
-    const earlyWindow = Math.max(15.0, 6 * spb); // 🎯 15 שניות או 6 פעימות
-    
-    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
-    const diatonicPcs = scale.map(s => this.toPc(key.root + s));
-    const qualities = key.minor 
-      ? ['m','dim','','m','m','',''] 
-      : ['','m','m','','','m','dim'];
-    
-    const getQuality = (pc) => {
-      for (let i = 0; i < diatonicPcs.length; i++) {
-        if (diatonicPcs[i] === this.toPc(pc)) return qualities[i];
-      }
-      return '';
-    };
-    
-    const snapToDiatonic = (pc) => {
-      let best = diatonicPcs[0];
-      let bestD = 99;
-      for (const d of diatonicPcs) {
-        const dist = Math.min((pc - d + 12) % 12, (d - pc + 12) % 12);
-        if (dist < bestD) { bestD = dist; best = d; }
-      }
-      return best;
-    };
-    
-    const out = [];
-    
-    for (const ev of timeline) {
-      let label = ev.label;
-      
-      if (ev.t <= earlyWindow) {
-        const r = this.parseRoot(label);
-        const isInKey = r >= 0 && this.inKey(r, key.root, key.minor);
-        
-        if (!isInKey) {
-          const bp = features.bass[ev.fi] ?? -1;
-          let newRoot = bp >= 0 ? snapToDiatonic(bp) : snapToDiatonic(r >= 0 ? r : key.root);
-          
-          // 🎯 כפייה לטוניקה ב-3 שניות ראשונות
-          if (ev.t < Math.min(3.0, 2.0 * spb)) {
-            newRoot = key.root;
-          }
-          
-          const q = getQuality(newRoot);
-          label = this.NOTES_SHARP[this.toPc(newRoot)] + q;
-          console.log(`🎯 Early fix: ${ev.label} → ${label} at ${ev.t.toFixed(2)}s`);
-        }
-      }
-      
-      out.push({ ...ev, label });
-    }
-    
-    return out;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // 🎯 תיקון #3 מ-v14.36: IN KEY עם borrowed chords
-  // ═══════════════════════════════════════════════════════════
-  
-  inKey(pc, keyRoot, minor) {
-    pc = this.toPc(pc);
-    const scale = minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
-    const diatonic = scale.map(iv => this.toPc(keyRoot + iv));
-    
-    if (diatonic.includes(pc)) return true;
-    
-    // 🎯 borrowed chords מקובלים
-    const rel = this.toPc(pc - keyRoot);
-    
-    if (minor) {
-      // מינור: V מז'ור (7), VII (11)
-      if (rel === 7 || rel === 11) return true;
-    } else {
-      // מז'ור: bVII (10), bVI (8), bIII (3), II (2)
-      if (rel === 2 || rel === 10 || rel === 8 || rel === 3) return true;
-    }
-    
-    return false;
-  }
-
-  parseRoot(label) {
-    if (!label || typeof label !== 'string') return -1;
-    const m = label.match(/^([A-G])(#{1}|b{1})?/);
-    if (!m) return -1;
-    const note = m[1] + (m[2] || '');
-    const sharpIndex = this.NOTES_SHARP.indexOf(note);
-    if (sharpIndex >= 0) return sharpIndex;
-    const flatIndex = this.NOTES_FLAT.indexOf(note);
-    if (flatIndex >= 0) return flatIndex;
-    return -1;
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // AUDIO PROCESSING (מ-v16.2 ללא שינוי)
+  // AUDIO PROCESSING
   // ═══════════════════════════════════════════════════════════
   
   processAudio(audioBuffer) {
@@ -318,7 +154,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // FEATURE EXTRACTION (מ-v16.2 ללא שינוי)
+  // FEATURE EXTRACTION
   // ═══════════════════════════════════════════════════════════
   
   extractFeatures(audio) {
@@ -365,7 +201,6 @@ class ChordEngineUltimate {
       bassRaw.push(this.detectBassNote(mags, sr, N));
     }
 
-    // Filter bass
     const bass = [];
     for (let i = 0; i < bassRaw.length; i++) {
       const bp = bassRaw[i];
@@ -377,7 +212,6 @@ class ChordEngineUltimate {
       bass.push(stable >= 2 ? bp : -1);
     }
 
-    // Global chroma
     const globalChroma = new Float32Array(12);
     let totalE = 0;
     for (let i = 0; i < chroma.length; i++) {
@@ -484,7 +318,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MUSIC START DETECTION (מ-v16.2)
+  // MUSIC START DETECTION
   // ═══════════════════════════════════════════════════════════
   
   findMusicStart(features) {
@@ -515,7 +349,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TONIC DETECTION - Hybrid (מ-v16.2)
+  // 🎯 תיקון #5: TONIC DETECTION - העדפת באס במקרה יחסי
   // ═══════════════════════════════════════════════════════════
   
   detectTonicHybrid(features, startFrame) {
@@ -526,17 +360,31 @@ class ChordEngineUltimate {
       return { root: bassTonic.root, confidence: Math.min(99, bassTonic.confidence + 10), method: 'bass+KS_agree' };
     }
     
-    const isRelative = (this.toPc(bassTonic.root - ksTonic.root) === 3 || this.toPc(ksTonic.root - bassTonic.root) === 3);
+    // Check if relative major/minor (C vs Am)
+    const isRelative = (
+      this.toPc(bassTonic.root - ksTonic.root) === 3 ||
+      this.toPc(ksTonic.root - bassTonic.root) === 3
+    );
     
     if (isRelative) {
       const firstChordRoot = this.getFirstStrongChordRoot(features, startFrame);
-      if (firstChordRoot === bassTonic.root) return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass+first_chord' };
-      if (firstChordRoot === ksTonic.root) return { root: ksTonic.root, confidence: ksTonic.confidence, method: 'KS+first_chord' };
-      if (bassTonic.confidence > ksTonic.confidence + 10) return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass_dominant' };
-      return { root: ksTonic.root, confidence: ksTonic.confidence, method: 'KS_dominant' };
+      
+      if (firstChordRoot === bassTonic.root) {
+        return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass+first_chord' };
+      } else if (firstChordRoot === ksTonic.root) {
+        return { root: ksTonic.root, confidence: ksTonic.confidence, method: 'KS+first_chord' };
+      }
+      
+      // 🎯 NEW: ברירת מחדל – להעדיף את הבאס, אלא אם KS הרבה יותר חזק
+      if (bassTonic.confidence + 10 >= ksTonic.confidence) {
+        return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass_relative_preferred' };
+      }
+      return { root: ksTonic.root, confidence: ksTonic.confidence, method: 'KS_relative_stronger' };
     }
     
-    if (bassTonic.confidence > ksTonic.confidence) return { root: bassTonic.root, confidence: bassTonic.confidence - 5, method: 'bass_only' };
+    if (bassTonic.confidence > ksTonic.confidence) {
+      return { root: bassTonic.root, confidence: bassTonic.confidence - 5, method: 'bass_only' };
+    }
     return { root: ksTonic.root, confidence: ksTonic.confidence - 5, method: 'KS_only' };
   }
 
@@ -615,7 +463,7 @@ class ChordEngineUltimate {
   }
 
   buildBassTimeline(features, startFrame) {
-    const { bass, energy, energyP70, secPerFrame } = features;
+    const { bass, energy, energyP70 } = features;
     const timeline = [];
     let currentBass = -1, start = startFrame;
     
@@ -665,7 +513,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // MODE DETECTION - Hybrid (מ-v16.2)
+  // MODE DETECTION
   // ═══════════════════════════════════════════════════════════
   
   detectModeHybrid(features, tonicResult, startFrame) {
@@ -765,7 +613,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // BUILD CHORDS - Hybrid (מ-v16.2)
+  // 🎯 תיקון #2: BUILD CHORDS - מעביר secPerFrame
   // ═══════════════════════════════════════════════════════════
   
   buildChordsHybrid(features, key, startFrame, bpm) {
@@ -787,7 +635,7 @@ class ChordEngineUltimate {
       
       if (bp >= 0) {
         if (noBassStart >= 0 && i - noBassStart >= minSegmentFrames) {
-          const chord = this.determineChordFromChromaOnly(chroma, noBassStart, i, key, diatonic);
+          const chord = this.determineChordFromChromaOnly(chroma, noBassStart, i, key, diatonic, secPerFrame);
           if (chord) {
             timeline.push({
               t: noBassStart * secPerFrame,
@@ -805,7 +653,8 @@ class ChordEngineUltimate {
         
         if (bp !== currentBass) {
           if (currentBass >= 0 && i > currentStart) {
-            const chord = this.determineChordFromChroma(chroma, currentStart, i, key, diatonic, currentBass);
+            // 🎯 תיקון #1: מעביר secPerFrame
+            const chord = this.determineChordFromChroma(chroma, currentStart, i, key, diatonic, currentBass, secPerFrame);
             if (chord) {
               timeline.push({
                 t: currentStart * secPerFrame,
@@ -827,7 +676,7 @@ class ChordEngineUltimate {
           noBassStart = i;
         }
         if (currentBass >= 0 && i - currentStart >= minSegmentFrames) {
-          const chord = this.determineChordFromChroma(chroma, currentStart, i, key, diatonic, currentBass);
+          const chord = this.determineChordFromChroma(chroma, currentStart, i, key, diatonic, currentBass, secPerFrame);
           if (chord) {
             timeline.push({
               t: currentStart * secPerFrame,
@@ -847,7 +696,7 @@ class ChordEngineUltimate {
     }
     
     if (currentBass >= 0 && chroma.length > currentStart) {
-      const chord = this.determineChordFromChroma(chroma, currentStart, chroma.length, key, diatonic, currentBass);
+      const chord = this.determineChordFromChroma(chroma, currentStart, chroma.length, key, diatonic, currentBass, secPerFrame);
       if (chord) {
         timeline.push({
           t: currentStart * secPerFrame,
@@ -865,23 +714,75 @@ class ChordEngineUltimate {
     return timeline;
   }
 
-  determineChordFromChroma(chroma, startFrame, endFrame, key, diatonic, bassNote) {
-    const avg = this.getAvgChroma(chroma, startFrame, endFrame);
+  // ═══════════════════════════════════════════════════════════
+  // 🎯 תיקון #1: DETERMINE CHORD - סינון רעש + סגמנטים קצרים
+  // ═══════════════════════════════════════════════════════════
+  
+  determineChordFromChroma(chroma, startFrame, endFrame, key, diatonic, bassNote, secPerFrame) {
+    const avg = new Float32Array(12);
+    const count = endFrame - startFrame;
     
-    const candidates = [];
+    if (count <= 0) return null;
     
-    for (const dc of diatonic.chords) {
-      const score = this.scoreChordCandidate(avg, dc.root, dc.minor, bassNote, true);
-      if (score > 0) candidates.push({ root: dc.root, isMinor: dc.minor, inScale: true, score: score + 10 });
+    for (let i = startFrame; i < endFrame && i < chroma.length; i++) {
+      for (let p = 0; p < 12; p++) avg[p] += chroma[i][p];
     }
+    for (let p = 0; p < 12; p++) avg[p] /= count;
     
-    if (bassNote >= 0 && !diatonic.pcs.includes(bassNote)) {
-      for (const isMinor of [false, true]) {
-        const score = this.scoreChordCandidate(avg, bassNote, isMinor, bassNote, false);
-        if (score > 15) candidates.push({ root: bassNote, isMinor, inScale: false, score });
+    // 🎯 NEW: בדיקת "האם בכלל יש שם אקורד"
+    let total = 0;
+    for (let p = 0; p < 12; p++) total += avg[p];
+    if (total <= 0) return null;
+    
+    // normalize for clarity metrics
+    const norm = new Float32Array(12);
+    for (let p = 0; p < 12; p++) norm[p] = avg[p] / total;
+    
+    // משך הסגמנט בשניות
+    const durSec = count * (secPerFrame || 0.1);
+    
+    // 🎯 אם קצר מאוד ולא מאוד ברור הרמונית → אל תכתוב אקורד
+    if (durSec < 0.18) {
+      let max1 = 0, max2 = 0, max3 = 0;
+      for (let p = 0; p < 12; p++) {
+        const v = norm[p];
+        if (v > max1) { max3 = max2; max2 = max1; max1 = v; }
+        else if (v > max2) { max3 = max2; max2 = v; }
+        else if (v > max3) { max3 = v; }
+      }
+      const top3 = max1 + max2 + max3;
+      if (top3 < 0.75) {
+        // התפלגות שטוחה מדי → כנראה רעש/פריטות
+        return null;
       }
     }
     
+    const candidates = [];
+    
+    // Diatonic candidates (priority)
+    for (const dc of diatonic.chords) {
+      const score = this.scoreChordCandidate(avg, dc.root, dc.minor, bassNote, true);
+      if (score > 0) {
+        candidates.push({
+          root: dc.root,
+          isMinor: dc.minor,
+          inScale: true,
+          score: score + 10
+        });
+      }
+    }
+    
+    // Chromatic candidates (רק אם הבאס רומז על משהו אחר)
+    if (bassNote >= 0 && !diatonic.pcs.includes(bassNote)) {
+      for (const isMinor of [false, true]) {
+        const score = this.scoreChordCandidate(avg, bassNote, isMinor, bassNote, false);
+        if (score > 18) { // 🎯 העליתי קצת את הסף
+          candidates.push({ root: bassNote, isMinor, inScale: false, score });
+        }
+      }
+    }
+    
+    // Inversions
     for (const dc of diatonic.chords) {
       const third = this.toPc(dc.root + (dc.minor ? 3 : 4));
       const fifth = this.toPc(dc.root + 7);
@@ -889,7 +790,14 @@ class ChordEngineUltimate {
       if (bassNote === third || bassNote === fifth) {
         const score = this.scoreChordCandidate(avg, dc.root, dc.minor, bassNote, true);
         if (score > 0) {
-          candidates.push({ root: dc.root, isMinor: dc.minor, inScale: true, score: score + 5, isInversion: true, inversionBass: bassNote });
+          candidates.push({
+            root: dc.root,
+            isMinor: dc.minor,
+            inScale: true,
+            score: score + 5,
+            isInversion: true,
+            inversionBass: bassNote
+          });
         }
       }
     }
@@ -898,6 +806,11 @@ class ChordEngineUltimate {
     
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
+    
+    // 🎯 NEW: אם הציון חלש יחסית → עדיף לא לכתוב אקורד בכלל
+    if (best.score < 35 && durSec < 0.35) {
+      return null;
+    }
     
     const chordDetails = this.checkDimAug(avg, best.root, best.isMinor);
     
@@ -918,8 +831,38 @@ class ChordEngineUltimate {
     };
   }
 
-  determineChordFromChromaOnly(chroma, startFrame, endFrame, key, diatonic) {
-    const avg = this.getAvgChroma(chroma, startFrame, endFrame);
+  determineChordFromChromaOnly(chroma, startFrame, endFrame, key, diatonic, secPerFrame) {
+    const avg = new Float32Array(12);
+    const count = endFrame - startFrame;
+    
+    if (count <= 0) return null;
+    
+    for (let i = startFrame; i < endFrame && i < chroma.length; i++) {
+      for (let p = 0; p < 12; p++) avg[p] += chroma[i][p];
+    }
+    for (let p = 0; p < 12; p++) avg[p] /= count;
+    
+    // בדיקת רעש
+    let total = 0;
+    for (let p = 0; p < 12; p++) total += avg[p];
+    if (total <= 0) return null;
+    
+    const durSec = count * (secPerFrame || 0.1);
+    
+    // סגמנט קצר בלי באס - צריך להיות מאוד ברור
+    if (durSec < 0.25) {
+      const norm = new Float32Array(12);
+      for (let p = 0; p < 12; p++) norm[p] = avg[p] / total;
+      
+      let max1 = 0, max2 = 0, max3 = 0;
+      for (let p = 0; p < 12; p++) {
+        const v = norm[p];
+        if (v > max1) { max3 = max2; max2 = max1; max1 = v; }
+        else if (v > max2) { max3 = max2; max2 = v; }
+        else if (v > max3) { max3 = v; }
+      }
+      if (max1 + max2 + max3 < 0.80) return null;
+    }
     
     const candidates = [];
     
@@ -935,6 +878,8 @@ class ChordEngineUltimate {
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
     
+    if (best.score < 40 && durSec < 0.4) return null;
+    
     const chordDetails = this.checkDimAug(avg, best.root, best.isMinor);
     const noteName = this.getNoteName(best.root, key);
     let label = noteName;
@@ -949,16 +894,6 @@ class ChordEngineUltimate {
       inScale: best.inScale,
       confidence: Math.min(90, Math.round(best.score))
     };
-  }
-
-  getAvgChroma(chroma, startFrame, endFrame) {
-    const avg = new Float32Array(12);
-    const count = endFrame - startFrame;
-    for (let i = startFrame; i < endFrame && i < chroma.length; i++) {
-      for (let p = 0; p < 12; p++) avg[p] += chroma[i][p];
-    }
-    if (count > 0) for (let p = 0; p < 12; p++) avg[p] /= count;
-    return avg;
   }
 
   scoreChordCandidate(avg, root, isMinor, bassNote, inScale) {
@@ -1025,7 +960,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // VALIDATION (מ-v16.2)
+  // 🎯 תיקון #3: VALIDATION - זריקת כרומטי חלש
   // ═══════════════════════════════════════════════════════════
   
   validateWithCircleOfFifths(timeline, key, features) {
@@ -1034,27 +969,48 @@ class ChordEngineUltimate {
     const diatonic = this.getDiatonicInfo(key);
     const validated = [];
     
-    for (const ev of timeline) {
+    for (let i = 0; i < timeline.length; i++) {
+      const ev = timeline[i];
+      const prev = i > 0 ? timeline[i - 1] : null;
+      const next = i < timeline.length - 1 ? timeline[i + 1] : null;
+      
+      // משך בקירוב
+      let dur = 0;
+      if (next) dur = next.t - ev.t;
+      else if (prev) dur = ev.t - prev.t;
+      
       const inScale = diatonic.pcs.includes(ev.root);
       
       if (inScale) {
         validated.push(ev);
-      } else {
-        const borrowedType = this.identifyBorrowedChord(ev.root, ev.type === 'minor', key);
-        
-        if (borrowedType) {
-          if (ev.confidence >= 50) {
-            validated.push({ ...ev, modalContext: borrowedType });
-          } else {
-            validated.push(this.snapToDiatonic(ev, diatonic, key));
-          }
+        continue;
+      }
+      
+      // Borrowed / secondary dominants
+      const borrowedType = this.identifyBorrowedChord(ev.root, ev.type === 'minor', key);
+      
+      if (borrowedType) {
+        if (ev.confidence >= 50 || dur > 0.4) {
+          validated.push({ ...ev, modalContext: borrowedType });
         } else {
-          if (ev.confidence >= 65) {
-            validated.push({ ...ev, modalContext: 'chromatic' });
-          } else {
-            validated.push(this.snapToDiatonic(ev, diatonic, key));
-          }
+          validated.push(this.snapToDiatonic(ev, diatonic, key));
         }
+        continue;
+      }
+      
+      // 🎯 UNKNOWN CHROMATIC:
+      // אם זה מאוד קצר ו-conf נמוך → פשוט לזרוק, לא להחליף בדיאטוני
+      if ((dur > 0 && dur < 0.3) && ev.confidence < 80) {
+        // skip – נעלם מהטיימליין
+        continue;
+      }
+      
+      // אחרת – לשמור רק אם באמת חזק
+      if (ev.confidence >= 70 && dur >= 0.25) {
+        validated.push({ ...ev, modalContext: 'chromatic' });
+      } else {
+        // במקרה כזה – להחזיר לדיאטוני הכי קרוב
+        validated.push(this.snapToDiatonic(ev, diatonic, key));
       }
     }
     
@@ -1096,7 +1052,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // LIGHT HMM (מ-v16.2)
+  // LIGHT HMM
   // ═══════════════════════════════════════════════════════════
   
   applyLightHMM(timeline, key) {
@@ -1133,7 +1089,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // EXTENSIONS (מ-v16.2)
+  // EXTENSIONS
   // ═══════════════════════════════════════════════════════════
   
   addExtensions(timeline, features, key, opts) {
@@ -1191,7 +1147,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // INVERSIONS (מ-v16.2)
+  // INVERSIONS
   // ═══════════════════════════════════════════════════════════
   
   addInversions(timeline, features, key) {
@@ -1222,6 +1178,49 @@ class ChordEngineUltimate {
       
       return { ...ev, actualBass: ev.bassNote };
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 🎯 תיקון #4: FINALIZE - סינון חזק יותר לא-דיאטוניים
+  // ═══════════════════════════════════════════════════════════
+  
+  finalizeTimeline(timeline, bpm, features) {
+    if (!timeline.length) return [];
+    
+    const spb = 60 / Math.max(60, Math.min(200, bpm));
+    const minDuration = 0.4 * spb;
+    
+    let filtered = [];
+    for (let i = 0; i < timeline.length; i++) {
+      const ev = timeline[i];
+      const next = timeline[i + 1];
+      const duration = next ? (next.t - ev.t) : minDuration;
+      
+      // 🎯 NEW: Non-diatonic / snapped chords קצרים יקבלו סינון חזק יותר
+      const isShort = duration < minDuration;
+      const isStrong = ev.confidence >= 85;
+      const isClearlyInScale = ev.inScale || (ev.modalContext && ev.modalContext.startsWith('borrowed'));
+      
+      if (!isShort || (isStrong && isClearlyInScale)) {
+        filtered.push(ev);
+      }
+    }
+    
+    const snapped = filtered.map(ev => {
+      const raw = ev.t;
+      const grid = Math.round(raw / spb) * spb;
+      const t = Math.abs(grid - raw) <= 0.3 * spb ? grid : raw;
+      return { ...ev, t: Math.max(0, t) };
+    });
+    
+    const merged = [];
+    for (const ev of snapped) {
+      if (!merged.length || merged[merged.length - 1].label !== ev.label) {
+        merged.push(ev);
+      }
+    }
+    
+    return merged;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1256,8 +1255,8 @@ class ChordEngineUltimate {
       totalChords: timeline.length,
       inScale: timeline.filter(e => e.inScale).length,
       borrowed: timeline.filter(e => e.modalContext && e.modalContext.startsWith('borrowed')).length,
-      inversions: timeline.filter(e => e.label.includes('/')).length,
-      extensions: timeline.filter(e => /7|9|11|13|sus|dim|aug/.test(e.label)).length,
+      inversions: timeline.filter(e => e.label && e.label.includes('/')).length,
+      extensions: timeline.filter(e => e.label && /7|9|11|13|sus|dim|aug/.test(e.label)).length,
       chromatic: timeline.filter(e => e.modalContext === 'chromatic').length,
       noBass: timeline.filter(e => e.bassNote === -1).length
     };
