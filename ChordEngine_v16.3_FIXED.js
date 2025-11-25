@@ -1,10 +1,12 @@
 /**
- * ChordEngine v16.7 - Triad-Aware First Chord Detection
+ * ChordEngine v16.8 - Stable Bass + Scale Degree Detection
  * 
- * Based on v16.6 + Critical Fix:
- * - getFirstStrongChordRoot() now detects FULL TRIADS, not just strongest pitch
- * - Solves C/Am confusion when keyboards play full chords with strong thirds
- * - Example: C major chord (C-E-G) with strong E won't be confused for Am
+ * Based on v16.7 + Critical Fixes:
+ * 1. STABLE BASS DURATION: Don't change chord on every bass wobble
+ *    - Require bass stability (0.5s+) OR significant chroma change (>30%)
+ * 2. SCALE DEGREE DETECTION: Detect M3 (major third) as standalone notes
+ *    - Example: Hallelujah C→Am→E→Am (E is M3 in C major)
+ * 3. Reduces chord over-segmentation dramatically
  */
 
 class ChordEngineUltimate {
@@ -25,7 +27,7 @@ class ChordEngineUltimate {
     const timings = {};
     const t0 = this.now();
 
-    console.log('🎵 ChordEngine v16.7 (Triad-Aware First Chord)');
+    console.log('🎵 ChordEngine v16.8 (Stable Bass + Scale Degrees)');
 
     const audio = this.processAudio(audioBuffer);
     console.log(`✅ Audio: ${audio.duration.toFixed(1)}s @ ${audio.bpm} BPM`);
@@ -48,7 +50,7 @@ class ChordEngineUltimate {
     };
     console.log(`✅ Mode: ${key.minor ? 'MINOR' : 'MAJOR'} (${modeResult.confidence}%)`);
 
-    let timeline = this.buildChordsTheoryAware(features, key, musicStart.frame, audio.bpm);
+    let timeline = this.buildChordsStableBass(features, key, musicStart.frame, audio.bpm);
     console.log(`✅ Initial chords: ${timeline.length}`);
 
     timeline = this.validateWithCircleOfFifths(timeline, key, features);
@@ -308,10 +310,6 @@ class ChordEngineUltimate {
     return { mags, N };
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // MUSIC START DETECTION
-  // ═══════════════════════════════════════════════════════════
-  
   findMusicStart(features) {
     const { energy, bass, secPerFrame, energyP50 } = features;
     
@@ -340,7 +338,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎯 TONIC DETECTION - WITH TRIAD-AWARE FIRST CHORD
+  // TONIC DETECTION
   // ═══════════════════════════════════════════════════════════
   
   detectTonicHybrid(features, startFrame) {
@@ -357,7 +355,6 @@ class ChordEngineUltimate {
     );
     
     if (isRelative) {
-      // 🎯 NEW: Use triad-aware detection instead of single pitch
       const firstChord = this.getFirstStrongChord(features, startFrame);
       
       if (firstChord && firstChord.root === bassTonic.root) {
@@ -374,7 +371,6 @@ class ChordEngineUltimate {
         };
       }
       
-      // If no clear first chord, prefer bass
       if (bassTonic.confidence + 10 >= ksTonic.confidence) {
         return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass_relative_preferred' };
       }
@@ -387,14 +383,9 @@ class ChordEngineUltimate {
     return { root: ksTonic.root, confidence: ksTonic.confidence - 5, method: 'KS_only' };
   }
 
-  /**
-   * 🎯 NEW: Detect full triad instead of single strongest pitch
-   * Solves keyboard/piano issue where thirds can be stronger than roots
-   */
   getFirstStrongChord(features, startFrame) {
     const { chroma, bass, energy, energyP70 } = features;
     
-    // Look at first 10 frames with sufficient energy
     let framesChecked = 0;
     for (let i = startFrame; i < chroma.length && framesChecked < 10; i++) {
       if (energy[i] >= energyP70 * 0.6) {
@@ -410,32 +401,25 @@ class ChordEngineUltimate {
     return null;
   }
 
-  /**
-   * 🎯 NEW: Detect triad (root + third + fifth) from chroma frame
-   * Returns { root, isMinor, score } or null
-   */
   detectTriadFromChroma(chromaFrame, bassNote) {
     const candidates = [];
     
-    // Try all possible roots
     for (let root = 0; root < 12; root++) {
       const rootStrength = chromaFrame[root];
       const major3 = chromaFrame[this.toPc(root + 4)];
       const minor3 = chromaFrame[this.toPc(root + 3)];
       const fifth = chromaFrame[this.toPc(root + 7)];
       
-      // Major triad: root + M3 + 5th
       if (rootStrength > 0.08 && major3 > 0.08 && fifth > 0.08) {
         const score = rootStrength * 1.5 + major3 * 1.0 + fifth * 1.0;
         const wrongThird = minor3;
-        const finalScore = score - wrongThird * 2.0; // Penalty for wrong third
+        const finalScore = score - wrongThird * 2.0;
         
-        // Bass support
         let bassBonus = 0;
         if (bassNote >= 0) {
           if (bassNote === root) bassBonus = 0.3;
-          else if (bassNote === this.toPc(root + 4)) bassBonus = 0.15; // First inversion
-          else if (bassNote === this.toPc(root + 7)) bassBonus = 0.10; // Second inversion
+          else if (bassNote === this.toPc(root + 4)) bassBonus = 0.15;
+          else if (bassNote === this.toPc(root + 7)) bassBonus = 0.10;
         }
         
         candidates.push({ 
@@ -445,7 +429,6 @@ class ChordEngineUltimate {
         });
       }
       
-      // Minor triad: root + m3 + 5th
       if (rootStrength > 0.08 && minor3 > 0.08 && fifth > 0.08) {
         const score = rootStrength * 1.5 + minor3 * 1.0 + fifth * 1.0;
         const wrongThird = major3;
@@ -468,7 +451,6 @@ class ChordEngineUltimate {
     
     if (!candidates.length) return null;
     
-    // Return best candidate
     candidates.sort((a, b) => b.score - a.score);
     return candidates[0].score > 0.3 ? candidates[0] : null;
   }
@@ -582,10 +564,6 @@ class ChordEngineUltimate {
     return count;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // MODE DETECTION
-  // ═══════════════════════════════════════════════════════════
-  
   detectModeHybrid(features, tonicResult, startFrame) {
     const modeFromThird = this.detectModeFromThird(features, tonicResult.root, startFrame);
     
@@ -683,9 +661,131 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // THEORY-AWARE CHORD BUILDING
+  // 🎯 STABLE BASS CHORD BUILDING - Prevent Over-Segmentation
   // ═══════════════════════════════════════════════════════════
   
+  buildChordsStableBass(features, key, startFrame, bpm) {
+    const { bass, chroma, energy, energyP70, secPerFrame } = features;
+    const timeline = [];
+    const diatonic = this.getDiatonicInfo(key);
+    
+    const MIN_DURATION_SEC = 0.5; // Minimum chord duration
+    const CHROMA_CHANGE_THRESHOLD = 0.30; // 30% chroma change required
+    
+    let currentBass = -1;
+    let currentStart = startFrame;
+    let currentChroma = null;
+    
+    for (let i = startFrame; i < bass.length; i++) {
+      const bp = bass[i];
+      const hasEnergy = energy[i] >= energyP70 * 0.3;
+      
+      if (!hasEnergy) continue;
+      
+      // Bass changed
+      if (bp >= 0 && bp !== currentBass) {
+        const durationSec = (i - currentStart) * secPerFrame;
+        
+        // Calculate chroma similarity if we have previous chroma
+        let chromaChange = 1.0;
+        if (currentChroma) {
+          chromaChange = this.calculateChromaDistance(currentChroma, chroma[i]);
+        }
+        
+        // Commit chord if:
+        // 1. Duration >= minimum OR
+        // 2. Significant chroma change (>30%)
+        const shouldCommit = durationSec >= MIN_DURATION_SEC || chromaChange >= CHROMA_CHANGE_THRESHOLD;
+        
+        if (currentBass >= 0 && i > currentStart && shouldCommit) {
+          const chord = this.determineChordTheoryAware(
+            chroma, currentStart, i, key, diatonic, currentBass, secPerFrame
+          );
+          
+          if (chord) {
+            timeline.push({
+              t: currentStart * secPerFrame,
+              fi: currentStart,
+              label: chord.label,
+              root: chord.root,
+              type: chord.type,
+              bassNote: currentBass,
+              inScale: chord.inScale,
+              confidence: chord.confidence,
+              chordType: chord.chordType,
+              duration: durationSec
+            });
+          }
+          
+          // Update state
+          currentBass = bp;
+          currentStart = i;
+          currentChroma = this.avgChroma(chroma, i, Math.min(i + 3, chroma.length));
+        } else if (currentBass < 0) {
+          // First chord
+          currentBass = bp;
+          currentStart = i;
+          currentChroma = this.avgChroma(chroma, i, Math.min(i + 3, chroma.length));
+        }
+        // Else: ignore transient bass change
+      }
+    }
+    
+    // Final segment
+    if (currentBass >= 0 && chroma.length > currentStart) {
+      const chord = this.determineChordTheoryAware(
+        chroma, currentStart, chroma.length, key, diatonic, currentBass, secPerFrame
+      );
+      if (chord) {
+        timeline.push({
+          t: currentStart * secPerFrame,
+          fi: currentStart,
+          label: chord.label,
+          root: chord.root,
+          type: chord.type,
+          bassNote: currentBass,
+          inScale: chord.inScale,
+          confidence: chord.confidence,
+          chordType: chord.chordType
+        });
+      }
+    }
+    
+    return timeline;
+  }
+
+  /**
+   * Calculate chroma distance (0 = identical, 1 = completely different)
+   */
+  calculateChromaDistance(chroma1, chroma2) {
+    let diff = 0;
+    for (let p = 0; p < 12; p++) {
+      diff += Math.abs(chroma1[p] - chroma2[p]);
+    }
+    return diff / 2; // Normalize to [0, 1]
+  }
+
+  /**
+   * Average chroma over a range
+   */
+  avgChroma(chromaArray, start, end) {
+    const avg = new Float32Array(12);
+    const count = end - start;
+    if (count <= 0) return avg;
+    
+    for (let i = start; i < end && i < chromaArray.length; i++) {
+      for (let p = 0; p < 12; p++) {
+        avg[p] += chromaArray[i][p];
+      }
+    }
+    
+    for (let p = 0; p < 12; p++) {
+      avg[p] /= count;
+    }
+    
+    return avg;
+  }
+
   getChordsWithBassNote(bassNote, key) {
     const candidates = [];
     const diatonic = this.getDiatonicInfo(key);
@@ -724,6 +824,21 @@ class ChordEngineUltimate {
           inversionBass: bassNote,
           chordType: 'diatonic_inv2',
           priority: 80
+        });
+      }
+    }
+    
+    // 🎯 NEW: Check if bass is M3 (major third) in major key
+    if (!key.minor) {
+      const M3 = this.toPc(key.root + 4);
+      if (bassNote === M3) {
+        candidates.push({
+          root: M3,
+          isMinor: false,
+          inversionBass: null,
+          chordType: 'scale_degree_M3',
+          priority: 90,
+          scaleDegree: 'M3'
         });
       }
     }
@@ -813,66 +928,6 @@ class ChordEngineUltimate {
     }
     
     return borrowed;
-  }
-
-  buildChordsTheoryAware(features, key, startFrame, bpm) {
-    const { bass, chroma, energy, energyP70, secPerFrame } = features;
-    const timeline = [];
-    const diatonic = this.getDiatonicInfo(key);
-    
-    let currentBass = -1;
-    let currentStart = startFrame;
-    
-    for (let i = startFrame; i < bass.length; i++) {
-      const bp = bass[i];
-      const hasEnergy = energy[i] >= energyP70 * 0.3;
-      
-      if (!hasEnergy) continue;
-      
-      if (bp >= 0 && bp !== currentBass) {
-        if (currentBass >= 0 && i > currentStart) {
-          const chord = this.determineChordTheoryAware(
-            chroma, currentStart, i, key, diatonic, currentBass, secPerFrame
-          );
-          if (chord) {
-            timeline.push({
-              t: currentStart * secPerFrame,
-              fi: currentStart,
-              label: chord.label,
-              root: chord.root,
-              type: chord.type,
-              bassNote: currentBass,
-              inScale: chord.inScale,
-              confidence: chord.confidence,
-              chordType: chord.chordType
-            });
-          }
-        }
-        currentBass = bp;
-        currentStart = i;
-      }
-    }
-    
-    if (currentBass >= 0 && chroma.length > currentStart) {
-      const chord = this.determineChordTheoryAware(
-        chroma, currentStart, chroma.length, key, diatonic, currentBass, secPerFrame
-      );
-      if (chord) {
-        timeline.push({
-          t: currentStart * secPerFrame,
-          fi: currentStart,
-          label: chord.label,
-          root: chord.root,
-          type: chord.type,
-          bassNote: currentBass,
-          inScale: chord.inScale,
-          confidence: chord.confidence,
-          chordType: chord.chordType
-        });
-      }
-    }
-    
-    return timeline;
   }
 
   determineChordTheoryAware(chroma, startFrame, endFrame, key, diatonic, bassNote, secPerFrame) {
@@ -1000,10 +1055,6 @@ class ChordEngineUltimate {
     return { pcs, chords };
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // VALIDATION
-  // ═══════════════════════════════════════════════════════════
-  
   validateWithCircleOfFifths(timeline, key, features) {
     if (timeline.length < 2) return timeline;
     
@@ -1191,7 +1242,8 @@ class ChordEngineUltimate {
       extensions: timeline.filter(e => e.label && /7|9|11|13|sus|dim|aug/.test(e.label)).length,
       secondaryDominants: timeline.filter(e => e.chordType === 'secondary_dominant' || e.chordType === 'secondary_dominant_inv1').length,
       borrowed: timeline.filter(e => e.chordType && e.chordType.startsWith('borrowed')).length,
-      chromatic: timeline.filter(e => e.chordType === 'chromatic').length
+      chromatic: timeline.filter(e => e.chordType === 'chromatic').length,
+      scaleDegrees: timeline.filter(e => e.chordType && e.chordType.startsWith('scale_degree')).length
     };
   }
 
