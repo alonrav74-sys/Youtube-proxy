@@ -1016,6 +1016,11 @@ class ChordEngineUltimate {
       const prev1 = result[i - 1];
       const curr = result[i];
       
+      // Safety checks
+      if (!prev2 || !prev1 || !curr) continue;
+      if (!prev2.label || !prev1.label || !curr.label) continue;
+      if (curr.fi == null || curr.fi < 0) continue;
+      
       const prev2Root = this.parseRoot(prev2.label);
       const prev1Root = this.parseRoot(prev1.label);
       const currRoot = this.parseRoot(curr.label);
