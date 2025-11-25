@@ -1,13 +1,10 @@
 /**
- * ChordEngine v16.6 - Theory-Aware Inversion Detection
+ * ChordEngine v16.7 - Triad-Aware First Chord Detection
  * 
- * Based on v16.5 + Critical Fix:
- * When bass note is NOT in scale, check if it's a third/fifth of:
- * 1. Diatonic chord (G/B, Am/E, etc.)
- * 2. Secondary dominant (E/G# in C major = V/vi)
- * 3. Common borrowed chord
- * 
- * Only if none match → consider chromatic chord (rare)
+ * Based on v16.6 + Critical Fix:
+ * - getFirstStrongChordRoot() now detects FULL TRIADS, not just strongest pitch
+ * - Solves C/Am confusion when keyboards play full chords with strong thirds
+ * - Example: C major chord (C-E-G) with strong E won't be confused for Am
  */
 
 class ChordEngineUltimate {
@@ -28,7 +25,7 @@ class ChordEngineUltimate {
     const timings = {};
     const t0 = this.now();
 
-    console.log('🎵 ChordEngine v16.6 (Theory-Aware Inversions)');
+    console.log('🎵 ChordEngine v16.7 (Triad-Aware First Chord)');
 
     const audio = this.processAudio(audioBuffer);
     console.log(`✅ Audio: ${audio.duration.toFixed(1)}s @ ${audio.bpm} BPM`);
@@ -343,7 +340,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // TONIC DETECTION
+  // 🎯 TONIC DETECTION - WITH TRIAD-AWARE FIRST CHORD
   // ═══════════════════════════════════════════════════════════
   
   detectTonicHybrid(features, startFrame) {
@@ -360,14 +357,24 @@ class ChordEngineUltimate {
     );
     
     if (isRelative) {
-      const firstChordRoot = this.getFirstStrongChordRoot(features, startFrame);
+      // 🎯 NEW: Use triad-aware detection instead of single pitch
+      const firstChord = this.getFirstStrongChord(features, startFrame);
       
-      if (firstChordRoot === bassTonic.root) {
-        return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass+first_chord' };
-      } else if (firstChordRoot === ksTonic.root) {
-        return { root: ksTonic.root, confidence: ksTonic.confidence, method: 'KS+first_chord' };
+      if (firstChord && firstChord.root === bassTonic.root) {
+        return { 
+          root: bassTonic.root, 
+          confidence: Math.min(95, bassTonic.confidence + 15), 
+          method: 'bass+first_triad' 
+        };
+      } else if (firstChord && firstChord.root === ksTonic.root) {
+        return { 
+          root: ksTonic.root, 
+          confidence: Math.min(95, ksTonic.confidence + 15), 
+          method: 'KS+first_triad' 
+        };
       }
       
+      // If no clear first chord, prefer bass
       if (bassTonic.confidence + 10 >= ksTonic.confidence) {
         return { root: bassTonic.root, confidence: bassTonic.confidence, method: 'bass_relative_preferred' };
       }
@@ -378,6 +385,92 @@ class ChordEngineUltimate {
       return { root: bassTonic.root, confidence: bassTonic.confidence - 5, method: 'bass_only' };
     }
     return { root: ksTonic.root, confidence: ksTonic.confidence - 5, method: 'KS_only' };
+  }
+
+  /**
+   * 🎯 NEW: Detect full triad instead of single strongest pitch
+   * Solves keyboard/piano issue where thirds can be stronger than roots
+   */
+  getFirstStrongChord(features, startFrame) {
+    const { chroma, bass, energy, energyP70 } = features;
+    
+    // Look at first 10 frames with sufficient energy
+    let framesChecked = 0;
+    for (let i = startFrame; i < chroma.length && framesChecked < 10; i++) {
+      if (energy[i] >= energyP70 * 0.6) {
+        framesChecked++;
+        const triad = this.detectTriadFromChroma(chroma[i], bass[i]);
+        if (triad && triad.score > 0.3) {
+          console.log(`  → First chord: ${this.NOTES_SHARP[triad.root]}${triad.isMinor ? 'm' : ''} (score: ${triad.score.toFixed(2)})`);
+          return triad;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * 🎯 NEW: Detect triad (root + third + fifth) from chroma frame
+   * Returns { root, isMinor, score } or null
+   */
+  detectTriadFromChroma(chromaFrame, bassNote) {
+    const candidates = [];
+    
+    // Try all possible roots
+    for (let root = 0; root < 12; root++) {
+      const rootStrength = chromaFrame[root];
+      const major3 = chromaFrame[this.toPc(root + 4)];
+      const minor3 = chromaFrame[this.toPc(root + 3)];
+      const fifth = chromaFrame[this.toPc(root + 7)];
+      
+      // Major triad: root + M3 + 5th
+      if (rootStrength > 0.08 && major3 > 0.08 && fifth > 0.08) {
+        const score = rootStrength * 1.5 + major3 * 1.0 + fifth * 1.0;
+        const wrongThird = minor3;
+        const finalScore = score - wrongThird * 2.0; // Penalty for wrong third
+        
+        // Bass support
+        let bassBonus = 0;
+        if (bassNote >= 0) {
+          if (bassNote === root) bassBonus = 0.3;
+          else if (bassNote === this.toPc(root + 4)) bassBonus = 0.15; // First inversion
+          else if (bassNote === this.toPc(root + 7)) bassBonus = 0.10; // Second inversion
+        }
+        
+        candidates.push({ 
+          root, 
+          isMinor: false, 
+          score: finalScore + bassBonus 
+        });
+      }
+      
+      // Minor triad: root + m3 + 5th
+      if (rootStrength > 0.08 && minor3 > 0.08 && fifth > 0.08) {
+        const score = rootStrength * 1.5 + minor3 * 1.0 + fifth * 1.0;
+        const wrongThird = major3;
+        const finalScore = score - wrongThird * 2.0;
+        
+        let bassBonus = 0;
+        if (bassNote >= 0) {
+          if (bassNote === root) bassBonus = 0.3;
+          else if (bassNote === this.toPc(root + 3)) bassBonus = 0.15;
+          else if (bassNote === this.toPc(root + 7)) bassBonus = 0.10;
+        }
+        
+        candidates.push({ 
+          root, 
+          isMinor: true, 
+          score: finalScore + bassBonus 
+        });
+      }
+    }
+    
+    if (!candidates.length) return null;
+    
+    // Return best candidate
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0].score > 0.3 ? candidates[0] : null;
   }
 
   detectTonicFromBass(features, startFrame) {
@@ -437,21 +530,6 @@ class ChordEngineUltimate {
     
     const confidence = Math.min(95, Math.max(40, best.score * 12));
     return { root: best.root, minor: best.minor, confidence: Math.round(confidence) };
-  }
-
-  getFirstStrongChordRoot(features, startFrame) {
-    const { chroma, energy, energyP70 } = features;
-    
-    for (let i = startFrame; i < Math.min(startFrame + 30, chroma.length); i++) {
-      if (energy[i] >= energyP70 * 0.7) {
-        let maxPc = 0, maxVal = 0;
-        for (let pc = 0; pc < 12; pc++) {
-          if (chroma[i][pc] > maxVal) { maxVal = chroma[i][pc]; maxPc = pc; }
-        }
-        return maxPc;
-      }
-    }
-    return 0;
   }
 
   buildBassTimeline(features, startFrame) {
@@ -605,18 +683,13 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎯 THEORY-AWARE CHORD BUILDING - The Core Fix
+  // THEORY-AWARE CHORD BUILDING
   // ═══════════════════════════════════════════════════════════
   
-  /**
-   * Get all possible chords that could have this bass note
-   * Returns array of { root, isMinor, inversionBass, chordType, priority }
-   */
   getChordsWithBassNote(bassNote, key) {
     const candidates = [];
     const diatonic = this.getDiatonicInfo(key);
     
-    // 1. Bass is root of diatonic chord
     for (const dc of diatonic.chords) {
       if (dc.root === bassNote) {
         candidates.push({
@@ -629,7 +702,6 @@ class ChordEngineUltimate {
       }
     }
     
-    // 2. Bass is third of diatonic chord (first inversion)
     for (const dc of diatonic.chords) {
       const third = this.toPc(dc.root + (dc.minor ? 3 : 4));
       if (third === bassNote) {
@@ -643,7 +715,6 @@ class ChordEngineUltimate {
       }
     }
     
-    // 3. Bass is fifth of diatonic chord (second inversion)
     for (const dc of diatonic.chords) {
       const fifth = this.toPc(dc.root + 7);
       if (fifth === bassNote) {
@@ -657,7 +728,6 @@ class ChordEngineUltimate {
       }
     }
     
-    // 4. Secondary dominants - V/x chords
     const secondaryDominants = this.getSecondaryDominants(key);
     for (const sd of secondaryDominants) {
       if (sd.root === bassNote) {
@@ -670,7 +740,6 @@ class ChordEngineUltimate {
           priority: 75
         });
       }
-      // Bass is third of secondary dominant (e.g., G# as third of E in C major)
       const third = this.toPc(sd.root + 4);
       if (third === bassNote) {
         candidates.push({
@@ -684,7 +753,6 @@ class ChordEngineUltimate {
       }
     }
     
-    // 5. Borrowed chords
     const borrowed = this.getBorrowedChords(key);
     for (const bc of borrowed) {
       if (bc.root === bassNote) {
@@ -838,7 +906,6 @@ class ChordEngineUltimate {
       if (max1 + max2 + max3 < 0.75) return null;
     }
     
-    // 🎯 THEORY-AWARE: Get all possible chords for this bass note
     const theoryCandidates = this.getChordsWithBassNote(bassNote, key);
     const candidates = [];
     
@@ -852,7 +919,6 @@ class ChordEngineUltimate {
       }
     }
     
-    // Chromatic fallback (rare)
     if (candidates.length === 0) {
       for (const isMinor of [false, true]) {
         const score = this.scoreChordCandidate(avg, bassNote, isMinor, bassNote, false);
@@ -977,10 +1043,6 @@ class ChordEngineUltimate {
     return validated;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // LIGHT HMM
-  // ═══════════════════════════════════════════════════════════
-  
   applyLightHMM(timeline, key) {
     if (timeline.length < 3) return timeline;
     
@@ -1014,10 +1076,6 @@ class ChordEngineUltimate {
     return 2;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // EXTENSIONS
-  // ═══════════════════════════════════════════════════════════
-  
   addExtensions(timeline, features, key, opts) {
     const { chroma } = features;
     
@@ -1064,10 +1122,6 @@ class ChordEngineUltimate {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // FINALIZE
-  // ═══════════════════════════════════════════════════════════
-  
   finalizeTimeline(timeline, bpm, features) {
     if (!timeline.length) return [];
     
@@ -1106,10 +1160,6 @@ class ChordEngineUltimate {
     return merged;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // UTILITIES
-  // ═══════════════════════════════════════════════════════════
-  
   parseOptions(options) {
     return {
       harmonyMode: options.harmonyMode || 'jazz',
