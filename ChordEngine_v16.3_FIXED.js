@@ -1018,9 +1018,37 @@ class ChordEngineUltimate {
     
     if (best.score < 45 && durSec < 0.40) return null; // v16.14: Stricter threshold
     
-    // v16.14: AUTO-CORRECT quality based on actual third
-    const m3 = avg[this.toPc(best.root + 3)];
-    const M3 = avg[this.toPc(best.root + 4)];
+    // v16.14: Enharmonic substitution for unlikely chromatics
+    // Example: G# in C major → consider E instead (modal interchange)
+    let finalRoot = best.root;
+    
+    if (!key.minor && !diatonic.pcs.includes(best.root)) {
+      // In C major: G#=8 → prefer E=4 (modal interchange from parallel minor)
+      // In C major: C#=1 → prefer Db=1 (bII, neapolitan)
+      // In C major: D#=3 → prefer Eb=3 (bIII, common borrowing)
+      
+      const enharmonics = [
+        { from: this.toPc(key.root + 8),  to: this.toPc(key.root + 4),  reason: 'G#→E (borrow from Am)' },  // Ab → E
+        { from: this.toPc(key.root + 1),  to: this.toPc(key.root + 1),  reason: 'C#=Db (neapolitan)' },      // C# = Db
+        { from: this.toPc(key.root + 6),  to: this.toPc(key.root + 5),  reason: 'F#→F (subdominant)' }       // F# → F
+      ];
+      
+      for (const enh of enharmonics) {
+        if (best.root === enh.from && enh.to !== enh.from) {
+          // Check if the "to" note makes more sense
+          const toScore = this.scoreChordCandidate(avg, enh.to, best.isMinor, bassNote, diatonic.pcs.includes(enh.to));
+          if (toScore > best.score * 0.7) { // If substitute is at least 70% as good
+            finalRoot = enh.to;
+            console.log(`🎵 Enharmonic: ${this.NOTES_SHARP[best.root]} → ${this.NOTES_SHARP[enh.to]} (${enh.reason})`);
+            break;
+          }
+        }
+      }
+    }
+    
+    // v16.14: AUTO-CORRECT quality based on actual third (use finalRoot!)
+    const m3 = avg[this.toPc(finalRoot + 3)];
+    const M3 = avg[this.toPc(finalRoot + 4)];
     
     let finalIsMinor = best.isMinor;
     if (m3 > M3 * 1.5) {
@@ -1030,7 +1058,7 @@ class ChordEngineUltimate {
     }
     // else: keep best.isMinor (ambiguous)
     
-    const noteName = this.getNoteName(best.root, key);
+    const noteName = this.getNoteName(finalRoot, key);
     let label = noteName + (finalIsMinor ? 'm' : '');
     
     if (best.inversionBass !== null) {
@@ -1038,10 +1066,10 @@ class ChordEngineUltimate {
       label += '/' + bassName;
     }
     
-    const inScale = diatonic.pcs.includes(best.root);
+    const inScale = diatonic.pcs.includes(finalRoot);
     
     return {
-      root: best.root,
+      root: finalRoot,
       label,
       type: finalIsMinor ? 'minor' : 'major',
       inScale: inScale || best.chordType.startsWith('diatonic'),
@@ -1117,6 +1145,62 @@ class ChordEngineUltimate {
     return { pcs, chords };
   }
 
+  // v16.14: Check if chromatic chord makes harmonic sense
+  isReasonableChromaticChord(root, key, prevChord) {
+    const tonicPc = key.root;
+    const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
+    
+    // Common borrowed chords in MAJOR:
+    if (!key.minor) {
+      const bVII = this.toPc(tonicPc + 10); // Bb in C major
+      const bVI = this.toPc(tonicPc + 8);   // Ab in C major
+      const bIII = this.toPc(tonicPc + 3);  // Eb in C major
+      const iv = this.toPc(tonicPc + 5);    // Fm in C major (minor iv)
+      
+      if (root === bVII || root === bVI || root === bIII || root === iv) {
+        return true; // Common modal borrowing
+      }
+    }
+    
+    // Common borrowed chords in MINOR:
+    if (key.minor) {
+      const V = this.toPc(tonicPc + 7);     // E in Am (raised leading tone)
+      const VII = this.toPc(tonicPc + 11);  // G# in Am (leading tone)
+      const IV = this.toPc(tonicPc + 5);    // D in Am (natural minor → harmonic)
+      
+      if (root === V || root === VII || root === IV) {
+        return true; // Harmonic/melodic minor variations
+      }
+    }
+    
+    // Secondary dominants (V/X)
+    // Example in C major: D7→G, A7→Dm, E7→Am
+    const diatonicPcs = scale.map(s => this.toPc(tonicPc + s));
+    
+    for (const target of diatonicPcs) {
+      const secondaryDominant = this.toPc(target + 7); // V of target
+      if (root === secondaryDominant) {
+        return true; // It's a secondary dominant!
+      }
+    }
+    
+    // Chromatic approach chords (passing)
+    // Example: C → C# → Dm (chromatic passing)
+    if (prevChord) {
+      const prevRoot = prevChord.root;
+      const distUp = this.toPc(root - prevRoot);
+      const distDown = this.toPc(prevRoot - root);
+      
+      // Half-step approach from either direction
+      if (distUp === 1 || distDown === 1) {
+        return true; // Chromatic passing chord
+      }
+    }
+    
+    // If none of the above, it's probably noise
+    return false;
+  }
+
   validateWithCircleOfFifths(timeline, key, features) {
     if (timeline.length < 2) return timeline;
     
@@ -1144,11 +1228,26 @@ class ChordEngineUltimate {
         continue;
       }
       
-      if ((dur > 0 && dur < 0.3) && ev.confidence < 80) {
-        continue;
+      // v16.14: STRICT chromatic filtering
+      // Non-diatonic chords must be:
+      // 1. LONG (>0.8s) OR very confident (95+)
+      // 2. Make harmonic sense (borrowed/secondary dominant)
+      
+      const isShort = dur > 0 && dur < 0.8;
+      const isWeak = ev.confidence < 95;
+      
+      if (isShort && isWeak) {
+        continue; // Skip short weak chromatic chords
       }
       
-      if (ev.confidence >= 70 && dur >= 0.25) {
+      // Check if it's a "reasonable" chromatic chord
+      const isReasonable = this.isReasonableChromaticChord(ev.root, key, prev);
+      
+      if (!isReasonable && dur < 1.2) {
+        continue; // Skip unreasonable chromatics unless very long
+      }
+      
+      if (ev.confidence >= 70 && dur >= 0.8) {
         validated.push({ ...ev, modalContext: 'chromatic' });
       }
     }
