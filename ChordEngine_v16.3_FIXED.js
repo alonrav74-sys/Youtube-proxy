@@ -1497,24 +1497,29 @@ class ChordEngineUltimate {
     
     for (let i = 1; i < M; i++) {
       if (states[i] !== cur) {
-        timeline.push({ 
-          t: start * secPerHop, 
-          label: candidates[cur].label, 
-          fi: start,
-          source: 'hmm'
-        });
+        // Safety check
+        if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
+          timeline.push({ 
+            t: start * secPerHop, 
+            label: candidates[cur].label, 
+            fi: start,
+            source: 'hmm'
+          });
+        }
         cur = states[i];
         start = i;
       }
     }
     
-    // Last segment
-    timeline.push({ 
-      t: start * secPerHop, 
-      label: candidates[cur].label, 
-      fi: start,
-      source: 'hmm'
-    });
+    // Last segment - with safety check
+    if (cur >= 0 && cur < candidates.length && candidates[cur] && candidates[cur].label) {
+      timeline.push({ 
+        t: start * secPerHop, 
+        label: candidates[cur].label, 
+        fi: start,
+        source: 'hmm'
+      });
+    }
     
     return timeline;
   }
@@ -1538,13 +1543,22 @@ class ChordEngineUltimate {
       
       // Safety checks
       if (!bEvt) {
-        merged.push(hEvt);
+        if (hEvt && hEvt.label) merged.push(hEvt);
         hi++;
         continue;
       }
       if (!hEvt) {
-        merged.push(bEvt);
+        if (bEvt && bEvt.label) merged.push(bEvt);
         bi++;
+        continue;
+      }
+      
+      // Additional safety
+      if (!bEvt.label || !hEvt.label) {
+        if (bEvt.label) merged.push(bEvt);
+        else if (hEvt.label) merged.push(hEvt);
+        bi++;
+        hi++;
         continue;
       }
       
@@ -1587,18 +1601,18 @@ class ChordEngineUltimate {
         bi++;
         hi++;
       } else if (bEvt.t < hEvt.t) {
-        merged.push(bEvt);
+        if (bEvt.label) merged.push(bEvt);
         bi++;
       } else {
-        merged.push(hEvt);
+        if (hEvt.label) merged.push(hEvt);
         hi++;
       }
     }
     
-    // Remove duplicates
+    // Remove duplicates - with label safety
     const deduped = [];
     for (const ev of merged) {
-      if (!deduped.length || deduped[deduped.length - 1].label !== ev.label) {
+      if (ev && ev.label && (!deduped.length || deduped[deduped.length - 1].label !== ev.label)) {
         deduped.push(ev);
       }
     }
