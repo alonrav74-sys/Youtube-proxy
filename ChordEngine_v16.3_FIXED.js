@@ -58,7 +58,7 @@ class ChordEngineUltimate {
 
     timeline = this.validateWithCircleOfFifths(timeline, key, features);
     timeline = this.applyLightHMM(timeline, key);
-    timeline = this.finalizeTimeline(timeline, audio.bpm, features);
+    timeline = this.finalizeTimeline(timeline, audio.bpm, features, key);
     timeline = this.enforceEarlyDiatonic(timeline, key, features, audio.bpm);
     timeline = this.addExtensions(timeline, features, key, opts);
 
@@ -942,7 +942,7 @@ class ChordEngineUltimate {
   }
 
   // ✅ AGGRESSIVE FILTERING (like v14.36)
-  finalizeTimeline(timeline, bpm, features) {
+  finalizeTimeline(timeline, bpm, features, key) {
     if (!timeline.length) return timeline;
     
     const spb = 60 / Math.max(60, Math.min(200, bpm));
