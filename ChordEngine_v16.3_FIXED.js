@@ -939,13 +939,13 @@ class ChordEngineUltimate {
     const borrowed = [];
     
     if (!key.minor) {
-      borrowed.push({ root: this.toPc(key.root + 10), minor: false, from: 'bVII' });
-      borrowed.push({ root: this.toPc(key.root + 8), minor: false, from: 'bVI' });
-      borrowed.push({ root: this.toPc(key.root + 3), minor: false, from: 'bIII' });
-      borrowed.push({ root: this.toPc(key.root + 5), minor: true, from: 'iv' });
+      borrowed.push({ root: this.toPc(key.root + 10), minor: false, from: 'bVII' }); // Bb in C
+      // v16.14: REMOVED bVI (Ab/G#) - causes confusion with E
+      borrowed.push({ root: this.toPc(key.root + 3), minor: false, from: 'bIII' });  // Eb in C
+      borrowed.push({ root: this.toPc(key.root + 5), minor: true, from: 'iv' });     // Fm in C
     } else {
-      borrowed.push({ root: this.toPc(key.root + 7), minor: false, from: 'V' });
-      borrowed.push({ root: this.toPc(key.root + 5), minor: false, from: 'IV' });
+      borrowed.push({ root: this.toPc(key.root + 7), minor: false, from: 'V' });     // E in Am
+      borrowed.push({ root: this.toPc(key.root + 5), minor: false, from: 'IV' });    // D in Am
     }
     
     return borrowed;
@@ -996,17 +996,22 @@ class ChordEngineUltimate {
     }
     
     if (candidates.length === 0) {
+      // v16.14: Chromatic fallback - only if VERY clear
       for (const isMinor of [false, true]) {
         const score = this.scoreChordCandidate(avg, bassNote, isMinor, bassNote, false);
-        if (score > 40) {
-          candidates.push({
-            root: bassNote,
-            isMinor,
-            inversionBass: null,
-            chordType: 'chromatic',
-            score: score - 20,
-            priority: 30
-          });
+        if (score > 60) { // v16.14: Higher threshold (was 40)
+          // Check if this chromatic makes sense
+          const isReasonable = this.isReasonableChromaticChord(bassNote, key, null);
+          if (isReasonable || score > 80) { // Only if reasonable OR super strong
+            candidates.push({
+              root: bassNote,
+              isMinor,
+              inversionBass: null,
+              chordType: 'chromatic',
+              score: score - 30, // v16.14: Bigger penalty (was -20)
+              priority: 20        // v16.14: Lower priority (was 30)
+            });
+          }
         }
       }
     }
@@ -1019,29 +1024,29 @@ class ChordEngineUltimate {
     if (best.score < 45 && durSec < 0.40) return null; // v16.14: Stricter threshold
     
     // v16.14: Enharmonic substitution for unlikely chromatics
-    // Example: G# in C major → consider E instead (modal interchange)
+    // Example: G# in C major → FORCE to E (modal interchange)
     let finalRoot = best.root;
     
     if (!key.minor && !diatonic.pcs.includes(best.root)) {
-      // In C major: G#=8 → prefer E=4 (modal interchange from parallel minor)
-      // In C major: C#=1 → prefer Db=1 (bII, neapolitan)
-      // In C major: D#=3 → prefer Eb=3 (bIII, common borrowing)
+      // In C major: G#=8 → MUST BE E=4 (not Ab!)
+      // In C major: C#=1 → could be Db=1 (neapolitan) 
+      // In C major: D#=3 → MUST BE Eb=3 (bIII)
+      // In C major: F#=6 → MUST BE F=5
       
-      const enharmonics = [
-        { from: this.toPc(key.root + 8),  to: this.toPc(key.root + 4),  reason: 'G#→E (borrow from Am)' },  // Ab → E
-        { from: this.toPc(key.root + 1),  to: this.toPc(key.root + 1),  reason: 'C#=Db (neapolitan)' },      // C# = Db
-        { from: this.toPc(key.root + 6),  to: this.toPc(key.root + 5),  reason: 'F#→F (subdominant)' }       // F# → F
+      const toPc = (interval) => (key.root + interval) % 12;
+      
+      const forcedSubstitutions = [
+        { from: toPc(8),  to: toPc(4),  name: 'G#→E' },   // G# → E (very common!)
+        { from: toPc(3),  to: toPc(3),  name: 'D#→Eb' },  // D#=Eb (bIII)
+        { from: toPc(6),  to: toPc(5),  name: 'F#→F' },   // F# → F
+        { from: toPc(10), to: toPc(10), name: 'A#→Bb' }   // A#=Bb (bVII)
       ];
       
-      for (const enh of enharmonics) {
-        if (best.root === enh.from && enh.to !== enh.from) {
-          // Check if the "to" note makes more sense
-          const toScore = this.scoreChordCandidate(avg, enh.to, best.isMinor, bassNote, diatonic.pcs.includes(enh.to));
-          if (toScore > best.score * 0.7) { // If substitute is at least 70% as good
-            finalRoot = enh.to;
-            console.log(`🎵 Enharmonic: ${this.NOTES_SHARP[best.root]} → ${this.NOTES_SHARP[enh.to]} (${enh.reason})`);
-            break;
-          }
+      for (const sub of forcedSubstitutions) {
+        if (best.root === sub.from) {
+          finalRoot = sub.to;
+          console.log(`🎵 Forced substitution: ${this.NOTES_SHARP[sub.from]} → ${this.NOTES_SHARP[sub.to]} in ${this.NOTES_SHARP[key.root]} major`);
+          break;
         }
       }
     }
@@ -1152,12 +1157,13 @@ class ChordEngineUltimate {
     
     // Common borrowed chords in MAJOR:
     if (!key.minor) {
-      const bVII = this.toPc(tonicPc + 10); // Bb in C major
-      const bVI = this.toPc(tonicPc + 8);   // Ab in C major
-      const bIII = this.toPc(tonicPc + 3);  // Eb in C major
-      const iv = this.toPc(tonicPc + 5);    // Fm in C major (minor iv)
+      const bVII = this.toPc(tonicPc + 10); // Bb in C major (common!)
+      const bIII = this.toPc(tonicPc + 3);  // Eb in C major (common!)
+      const iv = this.toPc(tonicPc + 5);    // Fm in C major (minor iv, common!)
       
-      if (root === bVII || root === bVI || root === bIII || root === iv) {
+      // v16.14: REMOVED bVI (Ab/G#) - too rare and often confused with E
+      
+      if (root === bVII || root === bIII || root === iv) {
         return true; // Common modal borrowing
       }
     }
@@ -1243,13 +1249,19 @@ class ChordEngineUltimate {
       // Check if it's a "reasonable" chromatic chord
       const isReasonable = this.isReasonableChromaticChord(ev.root, key, prev);
       
-      if (!isReasonable && dur < 1.2) {
-        continue; // Skip unreasonable chromatics unless very long
+      if (!isReasonable) {
+        // Unreasonable chromatic (like G# in C major)
+        console.log(`⚠️ Unreasonable chromatic: ${this.NOTES_SHARP[ev.root]} in ${this.NOTES_SHARP[key.root]}${key.minor?'m':''} (dur=${dur.toFixed(2)}s, conf=${ev.confidence}%)`);
+        if (dur < 1.5 || ev.confidence < 90) {
+          console.log(`   → FILTERED (too short or weak)`);
+          continue; // Skip unless VERY long AND confident
+        } else {
+          console.log(`   → KEPT (very long and confident)`);
+        }
       }
       
-      if (ev.confidence >= 70 && dur >= 0.8) {
-        validated.push({ ...ev, modalContext: 'chromatic' });
-      }
+      // If we got here, it's either reasonable OR super long/confident
+      validated.push({ ...ev, modalContext: 'chromatic' });
     }
     
     return validated;
