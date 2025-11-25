@@ -28,7 +28,7 @@ class ChordEngineUltimate {
     const timings = {};
     const t0 = this.now();
 
-    console.log('🎵 ChordEngine v16.14 (Conservative - Fewer but Solid Chords)');
+    console.log(`🎵 ChordEngine v16.15 (Auto Profile: ${opts.profile.toUpperCase()})`);
 
     const audio = this.processAudio(audioBuffer);
     console.log(`✅ Audio: ${audio.duration.toFixed(1)}s @ ${audio.bpm} BPM`);
@@ -54,10 +54,40 @@ class ChordEngineUltimate {
     let timeline = this.buildChordsStableBass(features, key, musicStart.frame, audio.bpm);
     console.log(`✅ Initial chords: ${timeline.length}`);
 
-    timeline = this.validateWithCircleOfFifths(timeline, key, features);
-    timeline = this.applyLightHMM(timeline, key);
-    timeline = this.addExtensions(timeline, features, key, opts);
-    timeline = this.finalizeTimeline(timeline, audio.bpm, features);
+    // v16.15: AUTO PROFILE DETECTION
+    let finalOpts = opts;
+    let complexity = null;
+    
+    if (opts.autoDetect) {
+      console.log(`\n🤖 Running AUTO complexity detection...`);
+      
+      // Run initial detection with balanced settings
+      let tempTimeline = this.validateWithCircleOfFifths(timeline, key, features, opts);
+      tempTimeline = this.applyLightHMM(tempTimeline, key);
+      tempTimeline = this.addExtensions(tempTimeline, features, key, opts);
+      tempTimeline = this.finalizeTimeline(tempTimeline, audio.bpm, features);
+      
+      // Analyze complexity
+      complexity = this.analyzeSongComplexity(tempTimeline, key, features);
+      
+      // If suggested profile is different, re-run with new profile
+      if (complexity.profile !== 'balanced') {
+        console.log(`\n🔄 Re-running with ${complexity.profile.toUpperCase()} profile...`);
+        finalOpts = this.parseOptions({ profile: complexity.profile });
+        timeline = this.buildChordsStableBass(features, key, musicStart.frame, audio.bpm);
+      } else {
+        // Use the temp timeline we already have
+        timeline = tempTimeline;
+      }
+    }
+    
+    // Run detection with final profile
+    if (!opts.autoDetect || (complexity && complexity.profile !== 'balanced')) {
+      timeline = this.validateWithCircleOfFifths(timeline, key, features, finalOpts);
+      timeline = this.applyLightHMM(timeline, key);
+      timeline = this.addExtensions(timeline, features, key, finalOpts);
+      timeline = this.finalizeTimeline(timeline, audio.bpm, features);
+    }
 
     timeline = timeline.filter(ev => 
       ev && ev.label && typeof ev.label === 'string' && ev.label.trim() && ev.fi != null
@@ -80,6 +110,8 @@ class ChordEngineUltimate {
       bpm: audio.bpm,
       duration: audio.duration,
       stats: this.buildStats(timeline, key),
+      complexity: complexity,  // v16.15: Auto-detected complexity
+      profile: complexity ? complexity.profile : opts.profile,  // v16.15: Selected profile
       timings
     };
   }
@@ -1150,65 +1182,74 @@ class ChordEngineUltimate {
     return { pcs, chords };
   }
 
-  // v16.14: Check if chromatic chord makes harmonic sense
-  isReasonableChromaticChord(root, key, prevChord) {
+  // v16.15: Check if chromatic chord makes harmonic sense based on profile
+  isReasonableChromaticChord(root, key, prevChord, opts = {}) {
     const tonicPc = key.root;
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
     
-    // Common borrowed chords in MAJOR:
-    if (!key.minor) {
-      const bVII = this.toPc(tonicPc + 10); // Bb in C major (common!)
-      const bIII = this.toPc(tonicPc + 3);  // Eb in C major (common!)
-      const iv = this.toPc(tonicPc + 5);    // Fm in C major (minor iv, common!)
-      
-      // v16.14: REMOVED bVI (Ab/G#) - too rare and often confused with E
+    // SAFE mode: very restrictive
+    if (opts.profile === 'safe') {
+      if (key.minor) {
+        const V = this.toPc(tonicPc + 7); // E in Am
+        return root === V; // Only V in minor
+      }
+      return false; // No borrowed in major for SAFE
+    }
+    
+    // Common borrowed chords in MAJOR (BALANCED/RICH):
+    if (!key.minor && opts.allowBorrowed) {
+      const bVII = this.toPc(tonicPc + 10); // Bb in C major
+      const bIII = this.toPc(tonicPc + 3);  // Eb in C major
+      const iv = this.toPc(tonicPc + 5);    // Fm in C major
       
       if (root === bVII || root === bIII || root === iv) {
-        return true; // Common modal borrowing
+        return true;
       }
     }
     
     // Common borrowed chords in MINOR:
     if (key.minor) {
-      const V = this.toPc(tonicPc + 7);     // E in Am (raised leading tone)
-      const VII = this.toPc(tonicPc + 11);  // G# in Am (leading tone)
-      const IV = this.toPc(tonicPc + 5);    // D in Am (natural minor → harmonic)
+      const V = this.toPc(tonicPc + 7);     // E in Am
+      const VII = this.toPc(tonicPc + 11);  // G# in Am
+      const IV = this.toPc(tonicPc + 5);    // D in Am
       
       if (root === V || root === VII || root === IV) {
-        return true; // Harmonic/melodic minor variations
+        return true;
       }
     }
     
-    // Secondary dominants (V/X)
-    // Example in C major: D7→G, A7→Dm, E7→Am
-    const diatonicPcs = scale.map(s => this.toPc(tonicPc + s));
-    
-    for (const target of diatonicPcs) {
-      const secondaryDominant = this.toPc(target + 7); // V of target
-      if (root === secondaryDominant) {
-        return true; // It's a secondary dominant!
+    // Secondary dominants
+    if (opts.allowSecondaryDominants) {
+      const diatonicPcs = scale.map(s => this.toPc(tonicPc + s));
+      
+      for (const target of diatonicPcs) {
+        const secondaryDominant = this.toPc(target + 7);
+        if (root === secondaryDominant) {
+          return true;
+        }
       }
     }
     
-    // Chromatic approach chords (passing)
-    // Example: C → C# → Dm (chromatic passing)
-    if (prevChord) {
+    // Chromatic passing chords
+    if (opts.allowChromaticPassing && prevChord) {
       const prevRoot = prevChord.root;
       const distUp = this.toPc(root - prevRoot);
       const distDown = this.toPc(prevRoot - root);
       
-      // Half-step approach from either direction
       if (distUp === 1 || distDown === 1) {
-        return true; // Chromatic passing chord
+        return true;
       }
     }
     
-    // If none of the above, it's probably noise
     return false;
   }
 
-  validateWithCircleOfFifths(timeline, key, features) {
+  validateWithCircleOfFifths(timeline, key, features, opts = {}) {
     if (timeline.length < 2) return timeline;
+    
+    // v16.15: Use profile settings
+    const minDur = opts.minChromaticDuration || 0.8;
+    const minConf = opts.minChromaticConfidence || 90;
     
     const diatonic = this.getDiatonicInfo(key);
     const validated = [];
@@ -1234,27 +1275,28 @@ class ChordEngineUltimate {
         continue;
       }
       
-      // v16.14: STRICT chromatic filtering
-      // Non-diatonic chords must be:
-      // 1. LONG (>0.8s) OR very confident (95+)
-      // 2. Make harmonic sense (borrowed/secondary dominant)
-      
-      const isShort = dur > 0 && dur < 0.8;
-      const isWeak = ev.confidence < 95;
+      // v16.15: Profile-based chromatic filtering
+      const isShort = dur > 0 && dur < minDur;
+      const isWeak = ev.confidence < minConf;
       
       if (isShort && isWeak) {
         continue; // Skip short weak chromatic chords
       }
       
       // Check if it's a "reasonable" chromatic chord
-      const isReasonable = this.isReasonableChromaticChord(ev.root, key, prev);
+      const isReasonable = this.isReasonableChromaticChord(ev.root, key, prev, opts);
       
       if (!isReasonable) {
-        // Unreasonable chromatic (like G# in C major)
+        // Unreasonable chromatic
+        if (opts.profile === 'safe') {
+          console.log(`🔒 SAFE mode: filtered ${this.NOTES_SHARP[ev.root]}`);
+          continue; // Always skip in SAFE mode
+        }
+        
         console.log(`⚠️ Unreasonable chromatic: ${this.NOTES_SHARP[ev.root]} in ${this.NOTES_SHARP[key.root]}${key.minor?'m':''} (dur=${dur.toFixed(2)}s, conf=${ev.confidence}%)`);
-        if (dur < 1.5 || ev.confidence < 90) {
+        if (dur < minDur * 2 || ev.confidence < minConf) {
           console.log(`   → FILTERED (too short or weak)`);
-          continue; // Skip unless VERY long AND confident
+          continue;
         } else {
           console.log(`   → KEPT (very long and confident)`);
         }
@@ -1420,12 +1462,185 @@ class ChordEngineUltimate {
     return merged;
   }
 
+  // v16.15: Analyze song complexity and suggest profile
+  analyzeSongComplexity(timeline, key, features) {
+    if (!timeline.length) return 'safe';
+    
+    const stats = this.buildStats(timeline, key);
+    const total = timeline.length;
+    
+    // Calculate complexity metrics
+    const inScaleRatio = stats.inScale / total;
+    const chromaticRatio = stats.chromatic / total;
+    const borrowedRatio = stats.borrowed / total;
+    const secondaryDominantRatio = stats.secondaryDominants / total;
+    const extensionRatio = stats.extensions / total;
+    
+    // Check for "acceptable" borrowed chords (V in minor, bVII in major)
+    const acceptableBorrowed = timeline.filter(ev => {
+      if (!ev.chordType || !ev.chordType.startsWith('borrowed')) return false;
+      // V in minor, bVII/bIII/iv in major are "simple" borrowed
+      return ev.borrowedFrom === 'V' || 
+             ev.borrowedFrom === 'bVII' || 
+             ev.borrowedFrom === 'bIII' ||
+             ev.borrowedFrom === 'iv';
+    }).length;
+    
+    const acceptableBorrowedRatio = acceptableBorrowed / total;
+    
+    // "True chromatic" = not in scale AND not acceptable borrowed
+    const trueChromaticRatio = chromaticRatio + borrowedRatio - acceptableBorrowedRatio;
+    
+    // Complexity score (0-100)
+    let complexityScore = 0;
+    
+    // MAIN FACTOR: How much is truly out-of-key?
+    if (inScaleRatio >= 0.85 && trueChromaticRatio < 0.05) {
+      complexityScore += 0;  // Diatonic with acceptable borrowing = SAFE
+    } else if (inScaleRatio >= 0.75 && trueChromaticRatio < 0.15) {
+      complexityScore += 25; // Some chromatic = BALANCED
+    } else {
+      complexityScore += 50; // Lots of chromatic = RICH
+    }
+    
+    // Secondary dominants add moderate complexity
+    if (secondaryDominantRatio > 0.15) {
+      complexityScore += 20; // Many secondary dominants
+    } else if (secondaryDominantRatio > 0.05) {
+      complexityScore += 10; // Some secondary dominants
+    }
+    
+    // Extensions (if many = jazz/complex)
+    // v16.15: Check for COMPLEX extensions specifically
+    const complexExtensions = timeline.filter(ev => 
+      ev.label && (
+        ev.label.includes('maj7') ||
+        ev.label.includes('sus') ||
+        ev.label.includes('dim') ||
+        ev.label.includes('aug') ||
+        ev.label.includes('9') ||
+        ev.label.includes('11') ||
+        ev.label.includes('13') ||
+        ev.label.includes('6')
+      )
+    ).length;
+    
+    const complexExtensionRatio = complexExtensions / total;
+    
+    if (complexExtensionRatio > 0.30) {
+      complexityScore += 25; // Lots of maj7, sus, etc = jazz/complex
+    } else if (complexExtensionRatio > 0.15) {
+      complexityScore += 15;
+    } else if (extensionRatio > 0.40) {
+      complexityScore += 10; // Just basic 7ths
+    }
+    
+    // Average chord duration (very fast changes = complex)
+    const durations = [];
+    for (let i = 0; i < timeline.length - 1; i++) {
+      durations.push(timeline[i + 1].t - timeline[i].t);
+    }
+    const avgDuration = durations.length ? 
+      durations.reduce((a, b) => a + b, 0) / durations.length : 2.0;
+    
+    if (avgDuration < 0.8) {
+      complexityScore += 15; // Very fast = complex
+    } else if (avgDuration < 1.5) {
+      complexityScore += 5;
+    }
+    
+    // Determine profile based on score
+    let suggestedProfile;
+    if (complexityScore < 30) {
+      suggestedProfile = 'safe';    // Diatonic + acceptable borrowed (Hallelujah!)
+    } else if (complexityScore < 65) {
+      suggestedProfile = 'balanced'; // Some chromatic/secondary dominants
+    } else {
+      suggestedProfile = 'rich';     // Complex harmony
+    }
+    
+    console.log(`🎼 Song Complexity Analysis:`);
+    console.log(`   In-scale: ${(inScaleRatio * 100).toFixed(0)}%`);
+    console.log(`   Acceptable borrowed: ${(acceptableBorrowedRatio * 100).toFixed(0)}%`);
+    console.log(`   True chromatic: ${(trueChromaticRatio * 100).toFixed(0)}%`);
+    console.log(`   Secondary Dom: ${(secondaryDominantRatio * 100).toFixed(0)}%`);
+    console.log(`   Extensions (all): ${(extensionRatio * 100).toFixed(0)}%`);
+    console.log(`   Complex ext (maj7/sus/dim/aug): ${(complexExtensionRatio * 100).toFixed(0)}%`);
+    console.log(`   Avg duration: ${avgDuration.toFixed(2)}s`);
+    console.log(`   📊 Complexity Score: ${complexityScore.toFixed(0)}/100`);
+    console.log(`   ✅ Auto-selected profile: ${suggestedProfile.toUpperCase()}`);
+    
+    return { 
+      profile: suggestedProfile, 
+      score: complexityScore,
+      stats: {
+        inScaleRatio,
+        trueChromaticRatio,
+        acceptableBorrowedRatio,
+        secondaryDominantRatio,
+        extensionRatio,
+        complexExtensionRatio,
+        avgDuration
+      }
+    };
+  }
+
   parseOptions(options) {
+    // v16.15: Profile system - safe/balanced/rich/auto
+    const profile = options.profile || 'auto'; // Changed default to 'auto'
+    
+    // Profile presets
+    const profiles = {
+      safe: {
+        allowBorrowed: false,
+        allowSecondaryDominants: true,  // Only V/V (common)
+        allowChromaticPassing: false,
+        minChromaticDuration: 2.0,
+        minChromaticConfidence: 95,
+        extensionMode: 'minimal',
+        bassMultiplier: 1.5
+      },
+      balanced: {
+        allowBorrowed: true,            // bVII, bIII, iv
+        allowSecondaryDominants: true,
+        allowChromaticPassing: true,
+        minChromaticDuration: 0.8,
+        minChromaticConfidence: 90,
+        extensionMode: 'standard',
+        bassMultiplier: 1.2
+      },
+      rich: {
+        allowBorrowed: true,
+        allowSecondaryDominants: true,
+        allowChromaticPassing: true,
+        minChromaticDuration: 0.5,
+        minChromaticConfidence: 80,
+        extensionMode: 'full',
+        bassMultiplier: 1.0
+      },
+      auto: {
+        // Will be determined after initial detection
+        allowBorrowed: true,
+        allowSecondaryDominants: true,
+        allowChromaticPassing: true,
+        minChromaticDuration: 0.8,
+        minChromaticConfidence: 90,
+        extensionMode: 'standard',
+        bassMultiplier: 1.2,
+        autoDetect: true  // Flag for auto-detection
+      }
+    };
+    
+    const preset = profiles[profile] || profiles.auto;
+    
     return {
+      profile,
+      ...preset,
       harmonyMode: options.harmonyMode || 'jazz',
-      bassMultiplier: options.bassMultiplier || 1.2,
       extensionSensitivity: options.extensionSensitivity || 1.0,
-      progressCallback: options.progressCallback || null
+      progressCallback: options.progressCallback || null,
+      // Manual overrides
+      ...options
     };
   }
 
