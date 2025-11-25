@@ -25,6 +25,7 @@ class ChordEngineUltimate {
 
   async detect(audioBuffer, options = {}) {
     const opts = this.parseOptions(options);
+    this.currentOpts = opts; // Store for use in subfunctions
     const timings = {};
     const t0 = this.now();
 
@@ -840,9 +841,11 @@ class ChordEngineUltimate {
   }
 
   getChordsWithBassNote(bassNote, key) {
+    const opts = this.currentOpts || {}; // v16.15: Use stored opts
     const candidates = [];
     const diatonic = this.getDiatonicInfo(key);
     
+    // דיאטוניים על הבאס
     for (const dc of diatonic.chords) {
       if (dc.root === bassNote) {
         candidates.push({
@@ -855,6 +858,7 @@ class ChordEngineUltimate {
       }
     }
     
+    // אינברסיות – עדיין דיאטוני
     for (const dc of diatonic.chords) {
       const third = this.toPc(dc.root + (dc.minor ? 3 : 4));
       if (third === bassNote) {
@@ -881,7 +885,14 @@ class ChordEngineUltimate {
       }
     }
     
-    // 🎯 NEW: Check if bass is M3 (major third) in major key
+    // 🔒 SAFE mode: נעצרים כאן – אין borrowed / secondary בכלל
+    if (opts.profile === 'safe') {
+      return candidates.sort((a, b) => b.priority - a.priority);
+    }
+    
+    // ✅ מכאן: BALANCED / RICH בלבד
+    
+    // M3 scale-degree במז'ור
     if (!key.minor) {
       const M3 = this.toPc(key.root + 4);
       if (bassNote === M3) {
@@ -896,59 +907,63 @@ class ChordEngineUltimate {
       }
     }
     
-    const secondaryDominants = this.getSecondaryDominants(key);
-    for (const sd of secondaryDominants) {
-      if (sd.root === bassNote) {
-        candidates.push({
-          root: sd.root,
-          isMinor: false,
-          inversionBass: null,
-          chordType: 'secondary_dominant',
-          target: sd.target,
-          priority: 75
-        });
-      }
-      const third = this.toPc(sd.root + 4);
-      if (third === bassNote) {
-        candidates.push({
-          root: sd.root,
-          isMinor: false,
-          inversionBass: bassNote,
-          chordType: 'secondary_dominant_inv1',
-          target: sd.target,
-          priority: 70
-        });
+    if (opts.allowSecondaryDominants) {
+      const secondaryDominants = this.getSecondaryDominants(key);
+      for (const sd of secondaryDominants) {
+        if (sd.root === bassNote) {
+          candidates.push({
+            root: sd.root,
+            isMinor: false,
+            inversionBass: null,
+            chordType: 'secondary_dominant',
+            target: sd.target,
+            priority: 75
+          });
+        }
+        const third = this.toPc(sd.root + 4);
+        if (third === bassNote) {
+          candidates.push({
+            root: sd.root,
+            isMinor: false,
+            inversionBass: bassNote,
+            chordType: 'secondary_dominant_inv1',
+            target: sd.target,
+            priority: 70
+          });
+        }
       }
     }
     
-    const borrowed = this.getBorrowedChords(key);
-    for (const bc of borrowed) {
-      if (bc.root === bassNote) {
-        candidates.push({
-          root: bc.root,
-          isMinor: bc.minor,
-          inversionBass: null,
-          chordType: 'borrowed',
-          borrowedFrom: bc.from,
-          priority: 65
-        });
-      }
-      const third = this.toPc(bc.root + (bc.minor ? 3 : 4));
-      if (third === bassNote) {
-        candidates.push({
-          root: bc.root,
-          isMinor: bc.minor,
-          inversionBass: bassNote,
-          chordType: 'borrowed_inv1',
-          borrowedFrom: bc.from,
-          priority: 60
-        });
+    if (opts.allowBorrowed) {
+      const borrowed = this.getBorrowedChords(key);
+      for (const bc of borrowed) {
+        if (bc.root === bassNote) {
+          candidates.push({
+            root: bc.root,
+            isMinor: bc.minor,
+            inversionBass: null,
+            chordType: 'borrowed',
+            borrowedFrom: bc.from,
+            priority: 65
+          });
+        }
+        const third = this.toPc(bc.root + (bc.minor ? 3 : 4));
+        if (third === bassNote) {
+          candidates.push({
+            root: bc.root,
+            isMinor: bc.minor,
+            inversionBass: bassNote,
+            chordType: 'borrowed_inv1',
+            borrowedFrom: bc.from,
+            priority: 60
+          });
+        }
       }
     }
     
     return candidates.sort((a, b) => b.priority - a.priority);
   }
-  
+
   getSecondaryDominants(key) {
     const dominants = [];
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
@@ -1263,46 +1278,69 @@ class ChordEngineUltimate {
       if (next) dur = next.t - ev.t;
       else if (prev) dur = ev.t - prev.t;
       
-      if (ev.chordType && !ev.chordType.startsWith('chromatic')) {
-        validated.push(ev);
-        continue;
-      }
-      
       const inScale = diatonic.pcs.includes(ev.root);
       
+      // 🎯 1) דיאטוני אמיתי – תמיד נשאר
       if (inScale) {
         validated.push(ev);
         continue;
       }
       
-      // v16.15: Profile-based chromatic filtering
+      // 🎯 1.5) חריגים מקובלים בכל מצב - UNIVERSAL EXCEPTIONS
+      const tonic = key.root;
+      const universalExceptions = [];
+      
+      if (!key.minor) {
+        // במז'ור:
+        universalExceptions.push(
+          this.toPc(tonic + 4),   // E in C (V/vi → Am) - הללויה!
+          this.toPc(tonic + 2),   // D in C (V/V → G)
+          this.toPc(tonic + 9),   // A in C (V/ii → Dm)
+          this.toPc(tonic + 10)   // Bb in C (bVII) - רוק קלאסי
+        );
+      } else {
+        // במינור:
+        universalExceptions.push(
+          this.toPc(tonic + 7),   // V (E in Am) - הרמוני מינור
+          this.toPc(tonic + 5)    // IV (D in Am) - נטורל מינור
+        );
+      }
+      
+      if (universalExceptions.includes(ev.root)) {
+        // דורשים רק שיהיה סביר (לא חייב מאוד חזק)
+        if (dur >= 0.4 && ev.confidence >= 75) {
+          console.log(`✅ Universal exception: ${this.NOTES_SHARP[ev.root]}`);
+          validated.push(ev);
+          continue;
+        }
+      }
+      
+      // 🎯 2) SAFE PROFILE – חוסם את השאר
+      if (opts.profile === 'safe') {
+        console.log(`🔒 SAFE: filtered ${this.NOTES_SHARP[ev.root]} (${ev.chordType || 'unknown'})`);
+        continue;
+      }
+      
+      // מכאן והלאה: BALANCED / RICH בלבד
       const isShort = dur > 0 && dur < minDur;
       const isWeak = ev.confidence < minConf;
       
       if (isShort && isWeak) {
-        continue; // Skip short weak chromatic chords
+        continue;
       }
       
-      // Check if it's a "reasonable" chromatic chord
       const isReasonable = this.isReasonableChromaticChord(ev.root, key, prev, opts);
       
       if (!isReasonable) {
-        // Unreasonable chromatic
-        if (opts.profile === 'safe') {
-          console.log(`🔒 SAFE mode: filtered ${this.NOTES_SHARP[ev.root]}`);
-          continue; // Always skip in SAFE mode
-        }
-        
-        console.log(`⚠️ Unreasonable chromatic: ${this.NOTES_SHARP[ev.root]} in ${this.NOTES_SHARP[key.root]}${key.minor?'m':''} (dur=${dur.toFixed(2)}s, conf=${ev.confidence}%)`);
+        console.log(`⚠️ Unreasonable: ${this.NOTES_SHARP[ev.root]} (${ev.chordType || 'unknown'})`);
         if (dur < minDur * 2 || ev.confidence < minConf) {
-          console.log(`   → FILTERED (too short or weak)`);
+          console.log(`   → FILTERED`);
           continue;
         } else {
-          console.log(`   → KEPT (very long and confident)`);
+          console.log(`   → KEPT (long+confident)`);
         }
       }
       
-      // If we got here, it's either reasonable OR super long/confident
       validated.push({ ...ev, modalContext: 'chromatic' });
     }
     
@@ -1362,20 +1400,38 @@ class ChordEngineUltimate {
       const root = ev.root;
       const isMinor = ev.type === 'minor';
       
-      // v16.14: Check all chord tones properly
-      const r = avg[root];                            // 1 (root)
-      const m3 = avg[this.toPc(root + 3)];           // m3
-      const M3 = avg[this.toPc(root + 4)];           // M3
-      const p4 = avg[this.toPc(root + 5)];           // 4th (sus4)
-      const dim5 = avg[this.toPc(root + 6)];         // dim5 (b5)
-      const p5 = avg[this.toPc(root + 7)];           // 5 (perfect fifth)
-      const aug5 = avg[this.toPc(root + 8)];         // aug5 (#5)
-      const M6 = avg[this.toPc(root + 9)];           // 6
-      const b7 = avg[this.toPc(root + 10)];          // b7 (dominant)
-      const M7 = avg[this.toPc(root + 11)];          // M7 (major)
-      const M9 = avg[this.toPc(root + 2)];           // 9 (same as 2nd)
+      const r = avg[root];
+      const m3 = avg[this.toPc(root + 3)];
+      const M3 = avg[this.toPc(root + 4)];
+      const p4 = avg[this.toPc(root + 5)];
+      const dim5 = avg[this.toPc(root + 6)];
+      const p5 = avg[this.toPc(root + 7)];
+      const aug5 = avg[this.toPc(root + 8)];
+      const M6 = avg[this.toPc(root + 9)];
+      const b7 = avg[this.toPc(root + 10)];
+      const M7 = avg[this.toPc(root + 11)];
+      const M9 = avg[this.toPc(root + 2)];
       
       let label = ev.label;
+      
+      // 🔒 SAFE MODE: מינימום extensions
+      if (opts.extensionMode === 'minimal' || opts.profile === 'safe') {
+        // רק 7 על dominant חזק (V במז'ור או במינור)
+        const tonic = key.root;
+        const V = this.toPc(tonic + 7);
+        const isDominant = root === V;
+        
+        if (isDominant && !label.includes('7')) {
+          // דורש b7 חזקה מאוד
+          if (b7 > 0.20 && b7 > M7 * 2.5 && p5 > 0.12) {
+            label += '7';
+          }
+        }
+        
+        return { ...ev, label };
+      }
+      
+      // מכאן BALANCED/RICH - מה שהיה קודם
       
       // 1. Check for diminished (m3 + dim5)
       if (isMinor && dim5 > 0.12 && dim5 > p5 * 1.3) {
@@ -1486,9 +1542,31 @@ class ChordEngineUltimate {
              ev.borrowedFrom === 'iv';
     }).length;
     
-    const acceptableBorrowedRatio = acceptableBorrowed / total;
+    // v16.15: Check for UNIVERSAL exceptions (always acceptable)
+    const tonic = key.root;
+    const universalExceptionRoots = [];
     
-    // "True chromatic" = not in scale AND not acceptable borrowed
+    if (!key.minor) {
+      universalExceptionRoots.push(
+        this.toPc(tonic + 4),   // E in C (V/vi)
+        this.toPc(tonic + 2),   // D in C (V/V)
+        this.toPc(tonic + 9),   // A in C (V/ii)
+        this.toPc(tonic + 10)   // Bb in C (bVII)
+      );
+    } else {
+      universalExceptionRoots.push(
+        this.toPc(tonic + 7),   // V in minor
+        this.toPc(tonic + 5)    // IV in minor
+      );
+    }
+    
+    const universalExceptions = timeline.filter(ev => 
+      universalExceptionRoots.includes(ev.root)
+    ).length;
+    
+    const acceptableBorrowedRatio = (acceptableBorrowed + universalExceptions) / total;
+    
+    // "True chromatic" = not in scale AND not acceptable borrowed AND not universal exception
     const trueChromaticRatio = chromaticRatio + borrowedRatio - acceptableBorrowedRatio;
     
     // Complexity score (0-100)
