@@ -90,6 +90,12 @@ class ChordEngineUltimate {
       timeline = this.finalizeTimeline(timeline, audio.bpm, features);
     }
 
+    // v16.15: Enforce tonic at opening if appropriate
+    timeline = this.enforceOpeningTonic(timeline, key, features);
+
+    // v16.15: AI Layer - Harmonic Memory + Cadence + Meta Score refinement
+    timeline = this.applyHarmonicRefinement(timeline, key, features);
+
     timeline = timeline.filter(ev => 
       ev && ev.label && typeof ev.label === 'string' && ev.label.trim() && ev.fi != null
     );
@@ -867,7 +873,7 @@ class ChordEngineUltimate {
           isMinor: dc.minor,
           inversionBass: bassNote,
           chordType: 'diatonic_inv1',
-          priority: 85
+          priority: 70  // v16.15: היה 85 - מעדיפים שורש על הבאס
         });
       }
     }
@@ -880,7 +886,7 @@ class ChordEngineUltimate {
           isMinor: dc.minor,
           inversionBass: bassNote,
           chordType: 'diatonic_inv2',
-          priority: 80
+          priority: 65  // v16.15: היה 80 - מעדיפים שורש על הבאס
         });
       }
     }
@@ -1064,6 +1070,44 @@ class ChordEngineUltimate {
     }
     
     if (!candidates.length) return null;
+    
+    // v16.15: בוסט לטריאדה חזקה על הבאס (E→E, לא C/E)
+    if (bassNote >= 0) {
+      const bassRoot = bassNote;
+      const M3pc = this.toPc(bassRoot + 4);
+      const m3pc = this.toPc(bassRoot + 3);
+      const fifthPc = this.toPc(bassRoot + 7);
+
+      const bassRootEnergy = avg[bassRoot];
+      const bassMajorThird = avg[M3pc];
+      const bassMinorThird = avg[m3pc];
+      const bassFifthEnergy = avg[fifthPc];
+
+      const majorTriadScore = bassRootEnergy * 1.5 + bassMajorThird * 1.2 + bassFifthEnergy;
+      const minorTriadScore = bassRootEnergy * 1.5 + bassMinorThird * 1.2 + bassFifthEnergy;
+
+      const strongMajorTriad = majorTriadScore > minorTriadScore * 1.3 && majorTriadScore > 0.12;
+      const strongMinorTriad = minorTriadScore > majorTriadScore * 1.3 && minorTriadScore > 0.12;
+
+      for (const c of candidates) {
+        // בוסט למועמד ששורש שלו = הבאס, כשהטריאדה עליו חזקה
+        if (c.root === bassRoot && !c.isMinor && strongMajorTriad) {
+          c.score += 30; // E מזור בהללויה יקפוץ למעלה
+        }
+        if (c.root === bassRoot && c.isMinor && strongMinorTriad) {
+          c.score += 25;
+        }
+
+        // קנס על טוניקה באינברסיה כשיש טריאדה חזקה על הבאס
+        if (
+          c.inversionBass === bassNote &&
+          c.root === key.root &&
+          (strongMajorTriad || strongMinorTriad)
+        ) {
+          c.score -= 20;
+        }
+      }
+    }
     
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
@@ -1484,7 +1528,7 @@ class ChordEngineUltimate {
     if (!timeline.length) return [];
     
     const spb = 60 / Math.max(60, Math.min(200, bpm));
-    const minDuration = 0.5 * spb; // v16.14: Longer minimum (was 0.4)
+    const minDuration = 0.5 * spb;
     
     let filtered = [];
     for (let i = 0; i < timeline.length; i++) {
@@ -1492,8 +1536,14 @@ class ChordEngineUltimate {
       const next = timeline[i + 1];
       const duration = next ? (next.t - ev.t) : minDuration;
       
+      // 🔹 v16.15: אל תזרוק את האקורד הראשון – הוא העוגן של השיר
+      if (i === 0) {
+        filtered.push(ev);
+        continue;
+      }
+      
       const isShort = duration < minDuration;
-      const isStrong = ev.confidence >= 90; // v16.14: Higher threshold (was 85)
+      const isStrong = ev.confidence >= 90;
       const isTheoryBacked = ev.chordType && !ev.chordType.startsWith('chromatic');
       
       if (!isShort || (isStrong && isTheoryBacked)) {
@@ -1518,7 +1568,339 @@ class ChordEngineUltimate {
     return merged;
   }
 
+  // v16.15: Enforce tonic at opening if the first chord should be tonic
+  enforceOpeningTonic(timeline, key, features) {
+    if (!timeline.length) return timeline;
+
+    const first = timeline[0];
+
+    // אם כבר טוניקה – לא נוגעים
+    if (first.root === key.root) return timeline;
+
+    const secPerFrame = features.secPerFrame || 0.1;
+    const chroma = features.chroma || [];
+    if (first.fi == null || first.fi < 0 || first.fi >= chroma.length) {
+      return timeline;
+    }
+
+    // כמה זמן האקורד הראשון מחזיק
+    const next = timeline[1] || null;
+    const estDuration = next ? (next.t - first.t) : 2.0;
+    const isLongEnough = estDuration >= 1.0;
+
+    if (!isLongEnough) return timeline;
+
+    // מחשבים ממוצע כרומה על ההתחלה של האקורד הראשון
+    const maxFrames = Math.round(2.0 / secPerFrame);
+    const endFi = Math.min(
+      chroma.length,
+      next ? next.fi : first.fi + maxFrames
+    );
+
+    const avg = new Float32Array(12);
+    let count = 0;
+    for (let i = first.fi; i < endFi; i++) {
+      const c = chroma[i];
+      if (!c) continue;
+      for (let p = 0; p < 12; p++) avg[p] += c[p];
+      count++;
+    }
+    if (!count) return timeline;
+    for (let p = 0; p < 12; p++) avg[p] /= count;
+
+    const bassNote = first.bassNote != null ? first.bassNote : -1;
+
+    // ציון לאקורד הנוכחי
+    const currIsMinor = first.type === 'minor';
+    const scoreCurrent = this.scoreChordCandidate(
+      avg,
+      first.root,
+      currIsMinor,
+      bassNote,
+      first.inScale
+    );
+
+    // ציון לטוניקה – גם מז'ור וגם מינור
+    const tonicRoot = key.root;
+    const scoreTonicMaj = this.scoreChordCandidate(avg, tonicRoot, false, bassNote, true);
+    const scoreTonicMin = this.scoreChordCandidate(avg, tonicRoot, true, bassNote, true);
+    const scoreTonic = Math.max(scoreTonicMaj, scoreTonicMin);
+    const tonicIsMinor = scoreTonicMin > scoreTonicMaj;
+
+    // אם האקורד הנוכחי באמת "צועק" משהו אחר – נשאיר אותו
+    const tonicGoodEnough =
+      scoreTonic >= scoreCurrent * 0.9 ||
+      scoreTonic > scoreCurrent + 10;
+
+    if (!tonicGoodEnough) {
+      // הנוכחי מנצח בבירור – לא נוגעים
+      return timeline;
+    }
+
+    // החלפה לטוניקה
+    const tonicName = this.getNoteName(tonicRoot, key);
+    const newLabelBase = tonicName + (tonicIsMinor ? 'm' : '');
+
+    let newLabel = newLabelBase;
+
+    // אם יש באס אחר – נשאיר אותו
+    if (first.bassNote != null && first.bassNote >= 0 && first.bassNote !== tonicRoot) {
+      const bassName = this.getNoteName(first.bassNote, key);
+      newLabel = newLabelBase + '/' + bassName;
+    }
+
+    console.log(
+      `🎯 Enforcing tonic at opening: ${this.NOTES_SHARP[first.root]} → ${this.NOTES_SHARP[tonicRoot]} (${newLabel})`
+    );
+
+    timeline[0] = {
+      ...first,
+      root: tonicRoot,
+      type: tonicIsMinor ? 'minor' : 'major',
+      label: newLabel,
+      inScale: true
+    };
+
+    return timeline;
+  }
+
   // v16.15: Analyze song complexity and suggest profile
+  // ═══════════════════════════════════════════════════════════
+  // v16.15: AI LAYER - Harmonic Memory + Cadence + Meta Score
+  // ═══════════════════════════════════════════════════════════
+
+  // 1. בניית זיכרון הרמוני מכל השיר
+  computeHarmonicMemory(timeline, key) {
+    const mem = {
+      degreeFreq: new Map(),
+      transitions: new Map(),
+      rootHist: new Array(12).fill(0),
+      bassHist: new Array(12).fill(0),
+      totalChords: timeline.length
+    };
+
+    for (let i = 0; i < timeline.length; i++) {
+      const c = timeline[i];
+      const deg = this.toPc(c.root - key.root);
+
+      mem.rootHist[c.root]++;
+      if (c.bassNote >= 0) mem.bassHist[c.bassNote]++;
+
+      mem.degreeFreq.set(deg, (mem.degreeFreq.get(deg) || 0) + 1);
+
+      if (i > 0) {
+        const prev = timeline[i - 1];
+        const tr = `${prev.root}->${c.root}`;
+        mem.transitions.set(tr, (mem.transitions.get(tr) || 0) + 1);
+      }
+    }
+
+    return mem;
+  }
+
+  // 2. זיהוי וציון קיידנסים
+  computeCadenceScore(timeline, key) {
+    let score = 0;
+    const tonic = key.root;
+    const V = this.toPc(tonic + 7);
+    const IV = this.toPc(tonic + 5);
+    const vi = this.toPc(tonic + 9);
+    const ii = this.toPc(tonic + 2);
+
+    for (let i = 1; i < timeline.length; i++) {
+      const a = timeline[i - 1].root;
+      const b = timeline[i].root;
+
+      // Authentic Cadence: V → I
+      if (a === V && b === tonic) score += 3;
+      
+      // Plagal Cadence: IV → I
+      if (a === IV && b === tonic) score += 2;
+      
+      // Half Cadence: X → V
+      if (b === V) score += 1;
+      
+      // Deceptive Cadence: V → vi
+      if (a === V && b === vi) score += 2;
+      
+      // ii → V (part of ii-V-I)
+      if (a === ii && b === V) score += 2;
+    }
+
+    return score;
+  }
+
+  // 3. זיהוי דפוסי קיידנס ספציפיים
+  detectCadencePatterns(timeline, key) {
+    const patterns = [];
+    const tonic = key.root;
+    const V = this.toPc(tonic + 7);
+    const IV = this.toPc(tonic + 5);
+    const vi = this.toPc(tonic + 9);
+    const ii = this.toPc(tonic + 2);
+
+    for (let i = 0; i < timeline.length - 1; i++) {
+      const curr = timeline[i].root;
+      const next = timeline[i + 1].root;
+
+      // V → I (Authentic)
+      if (curr === V && next === tonic) {
+        patterns.push({ type: 'authentic', start: i, end: i + 1 });
+      }
+      
+      // IV → I (Plagal)
+      if (curr === IV && next === tonic) {
+        patterns.push({ type: 'plagal', start: i, end: i + 1 });
+      }
+
+      // ii → V → I
+      if (i < timeline.length - 2) {
+        const nextNext = timeline[i + 2].root;
+        if (curr === ii && next === V && nextNext === tonic) {
+          patterns.push({ type: 'ii-V-I', start: i, end: i + 2 });
+        }
+      }
+
+      // I → V → vi → IV (Pop progression)
+      if (i < timeline.length - 3) {
+        const c1 = timeline[i].root;
+        const c2 = timeline[i + 1].root;
+        const c3 = timeline[i + 2].root;
+        const c4 = timeline[i + 3].root;
+        if (c1 === tonic && c2 === V && c3 === vi && c4 === IV) {
+          patterns.push({ type: 'pop', start: i, end: i + 3 });
+        }
+      }
+    }
+
+    return patterns;
+  }
+
+  // 4. חישוב Meta Score לאקורד בודד
+  computeMetaScore(chord, mem, key, prevChord = null) {
+    const deg = this.toPc(chord.root - key.root);
+    
+    // התאמה לדרגות נפוצות בשיר
+    const degreeFreq = mem.degreeFreq.get(deg) || 0;
+    const degreeFit = degreeFreq / Math.max(1, mem.totalChords);
+    
+    // התאמה לבאס
+    const bassFit = chord.bassNote >= 0 ? 
+      (mem.bassHist[chord.bassNote] || 0) / Math.max(1, mem.totalChords) : 0;
+    
+    // התאמה למעבר מהאקורד הקודם
+    let transitionFit = 0.5; // default
+    if (prevChord) {
+      const tr = `${prevChord.root}->${chord.root}`;
+      const trCount = mem.transitions.get(tr) || 0;
+      transitionFit = Math.min(1, trCount / 5);
+    }
+    
+    // קנס על כרומטי
+    const chromaticPenalty = chord.chordType === 'chromatic' ? 1 : 0;
+    
+    // קנס על אינברסיה כשיש שורש טוב יותר
+    const inversionPenalty = chord.inversionBass != null ? 0.1 : 0;
+    
+    const confidence = (chord.confidence || 80) / 100;
+    
+    const score = 
+      0.35 * confidence +
+      0.25 * degreeFit +
+      0.20 * bassFit +
+      0.15 * transitionFit +
+      -0.25 * chromaticPenalty +
+      -0.10 * inversionPenalty;
+    
+    return Math.max(0, Math.min(1, score));
+  }
+
+  // 5. שכבת תיקון על כל ה-timeline
+  applyHarmonicRefinement(timeline, key, features) {
+    if (timeline.length < 3) return timeline;
+    
+    console.log(`🧠 Applying Harmonic AI Refinement...`);
+    
+    // בניית זיכרון הרמוני
+    const mem = this.computeHarmonicMemory(timeline, key);
+    const cadenceScore = this.computeCadenceScore(timeline, key);
+    const cadencePatterns = this.detectCadencePatterns(timeline, key);
+    
+    console.log(`   Cadence score: ${cadenceScore}`);
+    console.log(`   Cadence patterns found: ${cadencePatterns.length}`);
+    
+    const diatonic = this.getDiatonicInfo(key);
+    const refined = [...timeline];
+    let corrections = 0;
+    
+    for (let i = 0; i < refined.length; i++) {
+      const chord = refined[i];
+      const prev = i > 0 ? refined[i - 1] : null;
+      const next = i < refined.length - 1 ? refined[i + 1] : null;
+      
+      const metaScore = this.computeMetaScore(chord, mem, key, prev);
+      
+      // בדיקה: האם האקורד חשוד?
+      const isSuspect = 
+        metaScore < 0.3 ||
+        (chord.confidence < 80 && !diatonic.pcs.includes(chord.root));
+      
+      if (!isSuspect) continue;
+      
+      // מציאת חלופה טובה יותר
+      let bestAlt = null;
+      let bestAltScore = metaScore;
+      
+      // בודקים אקורדים דיאטוניים כחלופות
+      for (const dc of diatonic.chords) {
+        const altChord = {
+          ...chord,
+          root: dc.root,
+          type: dc.minor ? 'minor' : 'major',
+          isMinor: dc.minor,
+          confidence: chord.confidence
+        };
+        
+        const altScore = this.computeMetaScore(altChord, mem, key, prev);
+        
+        // בדיקת קיידנס: אם החלופה משלימה קיידנס
+        if (next && next.root === key.root && dc.root === this.toPc(key.root + 7)) {
+          // V → I cadence!
+          bestAlt = altChord;
+          bestAltScore = altScore + 0.2;
+          break;
+        }
+        
+        if (altScore > bestAltScore + 0.15) {
+          bestAlt = altChord;
+          bestAltScore = altScore;
+        }
+      }
+      
+      // החלפה אם מצאנו חלופה טובה משמעותית
+      if (bestAlt && bestAltScore > metaScore + 0.15) {
+        const oldLabel = chord.label;
+        const newLabel = this.getNoteName(bestAlt.root, key) + (bestAlt.isMinor ? 'm' : '');
+        
+        console.log(`   🔄 Refined: ${oldLabel} → ${newLabel} (meta: ${metaScore.toFixed(2)} → ${bestAltScore.toFixed(2)})`);
+        
+        refined[i] = {
+          ...chord,
+          root: bestAlt.root,
+          type: bestAlt.type,
+          label: newLabel,
+          inScale: true,
+          refinedBy: 'harmonic_ai'
+        };
+        corrections++;
+      }
+    }
+    
+    console.log(`   ✅ Harmonic refinement: ${corrections} corrections`);
+    
+    return refined;
+  }
+
   analyzeSongComplexity(timeline, key, features) {
     if (!timeline.length) return 'safe';
     
