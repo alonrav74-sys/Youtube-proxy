@@ -1141,6 +1141,33 @@ class ChordEngineUltimate {
     
     if (best.score < 45 && durSec < 0.40) return null; // v16.14: Stricter threshold
     
+    // 🎯 v16.16: תיקון שורש "שלישית" - כמו G# במקום E בסולם C
+    // אם השורש שזוהה הוא כרומטי, אבל הוא שלישית של אקורד דיאטוני חזק – נעדיף את השורש הדיאטוני
+    if (!diatonic.pcs.includes(best.root)) {
+      for (const dc of diatonic.chords) {
+        const majorThird = this.toPc(dc.root + 4);
+        const minorThird = this.toPc(dc.root + 3);
+        
+        // האם ה-root הכרומטי הוא שלישית של אקורד דיאטוני?
+        if (best.root === majorThird || best.root === minorThird) {
+          const triadDiatonic = this._triadsScore(avg, dc.root);
+          const triadChromatic = this._triadsScore(avg, best.root);
+          
+          // אם הטריאדה על השורש הדיאטוני חזקה בצורה דומה או חזקה יותר – נעדיף אותה
+          if (triadDiatonic >= triadChromatic * 0.85 && triadDiatonic > 0.08) {
+            console.log(`🎵 Re-rooting ${this.NOTES_SHARP[best.root]} → ${this.NOTES_SHARP[dc.root]} (third-of-diatonic fix, diatonic=${triadDiatonic.toFixed(3)}, chromatic=${triadChromatic.toFixed(3)})`);
+            
+            // נעדכן את best לשורש הדיאטוני
+            best.root = dc.root;
+            best.isMinor = dc.minor;
+            best.chordType = 'diatonic_reinterpreted';
+          }
+          
+          break; // מספיק אקורד דיאטוני אחד שמתאים
+        }
+      }
+    }
+    
     // v16.16: במצב SAFE - טיפול חכם באקורדים לא דיאטוניים
     const opts = this.currentOpts || {};
     if (opts.profile === 'safe') {
@@ -1330,6 +1357,19 @@ class ChordEngineUltimate {
     };
   }
 
+  // v16.16: חישוב "חוסן" של טריאדה על שורש נתון מתוך וקטור כרומה ממוצע
+  _triadsScore(avg, root) {
+    const r  = avg[this.toPc(root)];
+    const M3 = avg[this.toPc(root + 4)];
+    const m3 = avg[this.toPc(root + 3)];
+    const P5 = avg[this.toPc(root + 7)];
+    
+    // לוקחים את השלישיה החזקה יותר (מז'ור/מינור)
+    const majorTriad = r + M3 + P5;
+    const minorTriad = r + m3 + P5;
+    return Math.max(majorTriad, minorTriad);
+  }
+
   // v16.15b: ניתוח ארפג'יו - זיהוי תווים ברצף לזיהוי מדויק יותר
   // בארפג'יו התווים מנוגנים אחד אחד, מה שמאפשר לשמוע כל תו בנפרד
   analyzeArpeggio(chroma, startFrame, endFrame, bassNote, key) {
@@ -1505,7 +1545,12 @@ class ChordEngineUltimate {
     else if (bassNote === actualThird) score += 12;
     else if (bassNote === fifth) score += 10;
     
-    if (inScale) score += 8;
+    // v16.16: העדפה חזקה יותר לאקורדים דיאטוניים
+    if (inScale) {
+      score += 12;
+    } else {
+      score -= 8; // אקורד לא בסולם צריך להיות ממש משכנע כדי לנצח
+    }
     
     return score;
   }
