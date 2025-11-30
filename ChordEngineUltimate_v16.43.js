@@ -2684,8 +2684,25 @@ class ChordEngineUltimate {
     if (energy < energyP70 * 0.2) score -= 1.0;
     else if (energy < energyP70 * 0.4) score -= 0.3;
     
-    // Bonus for diatonic
-    if (!candidate.borrowed) score += 0.2;
+    // v16.43: Listen to the THIRD! Major vs Minor detection
+    // If this is a major/minor choice, check which third is actually present
+    const majorThird = this.toPc(candidate.root + 4);  // G# for E chord
+    const minorThird = this.toPc(candidate.root + 3);  // G for Em chord
+    const maj3Strength = frame[majorThird] || 0;
+    const min3Strength = frame[minorThird] || 0;
+    
+    if (candidate.minor && min3Strength > maj3Strength + 0.1) {
+      score += 0.3;  // Minor third is stronger - good for minor chord
+    } else if (!candidate.minor && maj3Strength > min3Strength + 0.1) {
+      score += 0.3;  // Major third is stronger - good for major chord
+    } else if (candidate.minor && maj3Strength > min3Strength + 0.15) {
+      score -= 0.5;  // Major third heard but chord is minor - penalize!
+    } else if (!candidate.minor && min3Strength > maj3Strength + 0.15) {
+      score -= 0.5;  // Minor third heard but chord is major - penalize!
+    }
+    
+    // Small bonus for diatonic (but third detection is more important!)
+    if (!candidate.borrowed) score += 0.1;
     
     return score;
   }
