@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ChordFinderPro v14.36 🎵 Ultimate Precision</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, וסנכרון lyrics" />
+  <meta name="theme-color" content="#38bdf8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ChordFinder Pro" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+  
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="icon192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon512.png" />
+  <link rel="apple-touch-icon" href="icon192.png" />
+  
+  <style>
+    :root{--bg:#0b1022;--panel:#0f172a;--muted:#94a3b8;--text:#e5e7eb;--card:#0a1324;--border:#1b2333;--brand:#22c55e;--accent:#38bdf8;--alert:#f59e0b}
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(160deg,var(--bg),#0a0f1c);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);direction:rtl}
+    .wrap{max-width:1200px;margin:auto;padding:18px;padding-bottom:80px}
+    h1{margin:6px 0 10px;font-size:24px}
+    .muted{color:var(--muted);font-size:14px}
+    .panel{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:14px;margin-top:12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    input[type="file"], select, button, input[type="number"], input[type="text"]{padding:10px 14px;border-radius:12px;border:1px solid #223;background:#0b1221;color:#cfe3ff;appearance:none;font-weight:700;cursor:pointer}
+    input[type="text"]{width:100%;max-width:500px;font-weight:400}
+    .badge{display:inline-flex;gap:6px;align-items:center;background:#0b1221;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px}
+    .badge.pro{border-color:#664d23;background:#2e1f0d;color:#ffd7a3}
+    .badge.whisper{border-color:#38bdf8;background:#0a1f2e;color:#bae6fd}
+    .live{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:18px;margin-top:10px}
+    .live .title{color:#a9b4c8;font-size:13px}
+    .live .ch{font-weight:800;font-size:42px}
+    .live .func{font-size:14px;color:#38bdf8;margin-top:4px}
+    .live .lyric{font-size:18px;color:#cbd5e1;margin-top:12px;font-style:italic;direction:rtl;line-height:1.6;background:#0a1324;padding:10px;border-radius:8px}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #2a3d55;margin:2px 4px;background:#0b1221}
+    .ok{border-color:#1f5f3f;color:#d7ffe6;background:#0d2e1f}
+    .err{border-color:#5f2323;color:#ffe0e0;background:#3f1d1d}
+    .warn{border-color:#8a6a1f;color:#fff0d9;background:#3a2a0c}
+    .spin{width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);border-top-color:transparent;animation:sp 1s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;background:#0b1221;border:1px solid #1f2a40;font-size:12px}
+    .chip .dot{width:6px;height:6px;border-radius:50%;background:#22c55e}
+    .chip.ornament{border-color:#8a6a1f;background:#2a2010}
+    .chip.structural{border-color:#1f5f3f;background:#0d2e1f}
+    .analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:12px}
+    .analysis-card{background:#0b1221;border:1px solid #1f2a40;border-radius:12px;padding:12px}
+    .analysis-card h3{margin:0 0 8px 0;font-size:14px;color:#38bdf8}
+    .analysis-card .value{font-size:20px;font-weight:700;color:#22c55e}
+    .yt-result{display:flex;gap:10px;padding:10px;border:1px solid #1f2a40;border-radius:10px;margin-top:8px;align-items:center;cursor:pointer;transition:all 0.2s}
+    .yt-result:hover{background:#12203a;border-color:#38bdf8}
+    .yt-result.selected{background:#164e3a;border-color:#22c55e}
+    .yt-result img.thumb{width:120px;height:68px;object-fit:cover;border-radius:8px;flex-shrink:0}
+    .yt-result .info{flex:1;min-width:0}
+    .yt-result .title{font-weight:700;margin-bottom:4px;color:#e5e7eb;word-wrap:break-word;white-space:normal;line-height:1.3}
+    .yt-result .channel{font-size:12px;color:#94a3b8}
+    .yt-results{max-height:400px;overflow-y:auto}
+    .tabs{display:flex;gap:4px;margin-bottom:12px}
+    .tab{padding:8px 16px;border-radius:8px;background:#0b1221;border:1px solid #1f2a40;cursor:pointer;transition:all 0.2s}
+    .tab.active{background:#0d2e1f;border-color:#22c55e;color:#d7ffe6}
+    .tab:hover{border-color:#38bdf8}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    .info-box{background:#1f2a40;padding:10px;border-radius:8px;margin-top:8px;font-size:13px;color:#cbd5e1}
+    .info-box.success{background:#0d2e1f;border:1px solid #22c55e}
+    .synced-sheet{background:#0a1324;color:#e5e7eb;padding:24px;border-radius:12px;font-family:'Courier New',Courier,monospace;line-height:1.8;overflow-x:auto;max-width:100%;white-space:pre;border:1px solid #1f2a40}
+    .synced-sheet.rtl{direction:rtl;text-align:right}
+    .synced-sheet.ltr{direction:ltr;text-align:left}
+    .lyrics-container{display:block;width:100%;background:#0a1324;padding:20px;border-radius:12px;border:1px solid #1f2a40;max-height:500px;overflow-y:auto;overflow-x:auto;scroll-behavior:smooth}
+    .report-section{margin-top:15px;padding:15px;background:#0a1324;border:1px solid #1f2a40;border-radius:12px}
+    .report-output{white-space:pre-wrap;direction:ltr;font-family:monospace;font-size:13px;background:#0b1221;padding:15px;border-radius:8px;margin-top:10px;max-height:400px;overflow-y:auto;color:#cbd5e1}
+  </style>
+</head>
+<body>
+
+  <div class="wrap">
+    <h1>Chord Finder Pro v14.36
+      <span class="badge pro">AI + Profiles</span>
+      <span class="badge whisper">Groq Whisper</span>
+    </h1>
+    <div class="muted">
+      אקורדים מעל מילים בזמן אמת + דף נגינה מלא. RTL/LTR אוטומטי.<br>
+      <small style="opacity:0.7;font-size:11px">
+        Powered by <strong>Groq Whisper</strong> • 
+        Harmonic AI + Auto Profiles • 
+        Built by <strong>Alon</strong>
+      </small>
+    </div>
+
+    <section class="panel">
+      <div class="tabs">
+        <div class="tab active" data-tab="file">📁 קובץ מקומי</div>
+        <div class="tab" data-tab="youtube">🎬 יוטיוב</div>
+        <div class="tab" data-tab="sheet">📝 דף נגינה</div>
+        <div class="tab" data-tab="report">📊 דוח</div>
+      </div>
+
+      <div id="fileTab" class="tab-content active">
+        <div class="row">
+          <input id="file" type="file" accept="audio/*,video/*" />
+        </div>
+      </div>
+
+      <div id="youtubeTab" class="tab-content">
+        <div class="info-box success">
+          ⚡ סנכרון מדויק: אקורד על מילה/בין מילים לפי הזמן המדויק.
+        </div>
+        
+        <div class="row" style="margin-top:12px">
+          <input id="ytSearch" type="text" placeholder='חפש שיר (למשל: "Leonard Cohen Hallelujah")' />
+          <button id="ytSearchBtn">🔍 חפש</button>
+        </div>
+        
+        <div id="ytResults" class="yt-results" style="display:none"></div>
+        
+        <div style="margin-top:12px">
+          <div style="margin-bottom:8px;font-weight:700">או הדבק קישור יוטיוב:</div>
+          <div class="row">
+            <input id="ytUrl" type="text" placeholder="https://www.youtube.com/watch?v=..." style="flex:1" />
+            <button id="ytUrlBtn">✅ השתמש</button>
+          </div>
+        </div>
+        
+        <div id="ytStatus" class="pill" style="display:none;margin-top:8px"></div>
+        <div id="whisperStatus" class="pill warn" style="display:none;margin-top:8px">
+          <span class="spin"></span> 🎙️ Groq Whisper עובד ברקע...
+        </div>
+      </div>
+
+      <div id="sheetTab" class="tab-content">
+        <h3>📄 דף נגינה מקצועי</h3>
+        <div id="fullSheet" class="synced-sheet">—</div>
+        
+        <h3 style="margin-top:16px">🎙️ תמלול מלא</h3>
+        <div id="fullTranscript" style="max-height:300px;overflow:auto;background:#0b1221;padding:12px;border-radius:8px;white-space:pre-wrap;font-family:Arial">—</div>
+        
+        <div class="row" style="margin-top:12px">
+          <button id="exportBtn">💾 ייצא ל-ChordPro</button>
+          <button id="copyBtn">📋 העתק דף</button>
+        </div>
+      </div>
+
+      <!-- 📊 TAB חדש: דוח השוואה -->
+      <div id="reportTab" class="tab-content">
+        <h3>📊 דוח השוואת אקורדים</h3>
+        <div class="info-box">
+          השווה את תוצאות המנוע לאקורדים נכונים (Ground Truth)
+        </div>
+        
+        <!-- חיפוש במאגרים -->
+        <div style="margin-top:15px;padding:12px;background:#0a1324;border-radius:8px;border:1px solid #2a3d55;">
+          <label style="font-weight:700;color:#38bdf8;">🔍 חיפוש במאגרים אקדמיים</label>
+          <p style="font-size:12px;color:#94a3b8;margin:4px 0 8px;">Beatles, Queen, Carole King מ-Isophonics Dataset</p>
+          <div class="row">
+            <input id="songSearchInput" type="text" placeholder="שם השיר באנגלית (למשל: Yesterday)" style="flex:1" />
+            <button id="btnSearchChords">🔍 חפש</button>
+          </div>
+          <div id="searchStatus" class="pill" style="display:none;margin-top:8px"></div>
+        </div>
+        
+        <!-- העלאת תמונה -->
+        <div style="margin-top:12px;padding:12px;background:#0a1324;border-radius:8px;border:1px solid #2a3d55;">
+          <label style="font-weight:700;color:#f472b6;">🖼️ חילוץ אקורדים מתמונה</label>
+          <p style="font-size:12px;color:#94a3b8;margin:4px 0 8px;">
+            העלה צילום מסך של דף אקורדים
+          </p>
+          <input type="file" id="chordImageInput" accept="image/*" style="width:100%;" />
+        </div>
+        
+        <!-- הזנה ידנית -->
+        <div style="margin-top:12px">
+          <label style="display:block;margin-bottom:4px;font-weight:700;color:#22c55e;">✏️ אקורדים נכונים (Ground Truth)</label>
+          <p style="font-size:12px;color:#94a3b8;margin:0 0 8px;">האקורדים יופיעו כאן אחרי חיפוש/העלאה, או הדבק ידנית</p>
+          <textarea id="truthChordsInput" 
+                    placeholder="פורמטים נתמכים:
+
+רשימה פשוטה (הכי קל):
+C Am F G C Am F G Em
+
+או עם זמנים (CSV):
+0.00,C
+2.50,Am
+5.00,F"
+                    style="width:100%;height:120px;padding:10px;background:#0a1324;border:1px solid #2a3d55;color:#e5e7eb;border-radius:8px;font-family:monospace;resize:vertical;"></textarea>
+        </div>
+        
+        <!-- כפתורי פעולה -->
+        <div class="row" style="margin-top:12px">
+          <button id="btnGenerateReport" style="background:linear-gradient(135deg,#22c55e,#16a34a);">📊 השווה עכשיו</button>
+          <button id="btnExportCsv" style="background:#1f2a40;">💾 הורד CSV של המנוע</button>
+        </div>
+        
+        <p style="font-size:11px;color:#64748b;margin-top:8px;">
+          💡 <b>טיפ:</b> ההשוואה בודקת התאמת רצף האקורדים (בלי זמנים). מתאים ל-Ultimate Guitar, תמונות, או כל מקור אחר.
+        </p>
+        
+        <!-- דוח תוצאות -->
+        <pre id="reportOutput" class="report-output" style="margin-top:15px;">ממתין לניתוח שיר ואקורדים להשוואה...</pre>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <label>🎸 קאפו:
+          <input id="capo" type="number" value="0" min="0" max="11" style="width:80px" />
+        </label>
+        <button id="analyzeBtn">נתח</button>
+        <button id="playBtn" disabled>▶ הפעל</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <span class="badge">BPM: <b id="bpm">—</b></span>
+        <span class="badge">משך: <b id="dur">—</b></span>
+        <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
+          סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
+          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v14.36</button>
+        </div>
+        <div id="debugPanel" style="display:none;background:#0a0f1a;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-top:10px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;">
+          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v14.36</div>
+          <pre id="debugOutput" style="color:#a0e0ff;white-space:pre-wrap;margin:0;max-height:300px;overflow-y:auto;">Waiting for analysis...</pre>
+        </span>
+        <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
+        <button onclick="transposeDown()" style="padding:4px 10px;font-size:12px" title="הורד חצי טון">♭</button>
+        <button onclick="transposeUp()" style="padding:4px 10px;font-size:12px" title="העלה חצי טון">♯</button>
+        <span class="badge">מצב: <b id="modeBadge">—</b></span>
+        <span class="badge" id="profileBadge" style="display:none">פרופיל: <b id="profileValue">—</b></span>
+      </div>
+
+      <div id="status" class="pill ok" style="display:none"></div>
+      <div id="error" class="pill err" style="display:none"></div>
+
+      <div class="row">
+        <span id="gateChip" class="chip warn" style="display:none"><span class="dot"></span>מחכה לפריטה...</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>ניתוח הרמוני מתקדם</h2>
+      <div class="analysis-grid">
+        <div class="analysis-card">
+          <h3>סה"כ אקורדים</h3>
+          <div class="value" id="totalChordsCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>בסולם</h3>
+          <div class="value" id="inScaleCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>Borrowed</h3>
+          <div class="value" id="borrowedCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>Inversions</h3>
+          <div class="value" id="inversionsCount">—</div>
+        </div>
+        <div class="analysis-card">
+          <h3>Extensions</h3>
+          <div class="value" id="extensionsCount">—</div>
+        </div>
+      </div>
+      
+      <h3 style="margin-top:16px">🎻 אקורדים טבעיים בסולם (Circle of Fifths)</h3>
+      <div id="circleOfFifths" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">—</div>
+    </section>
+
+    <section class="panel">
+      <h2>תצוגה חיה</h2>
+      <audio id="player" controls preload="auto" crossorigin="anonymous" style="width:100%"></audio>
+      <div class="live">
+        <div style="flex:1">
+          <div class="title">האקורד כרגע</div>
+          <div class="ch" id="liveChord">—</div>
+          <div class="func" id="liveFunction">—</div>
+          <div class="lyric" id="liveLyric">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>📝 דף נגינה – זמן אמת</h2>
+      <div id="liveSheet" class="synced-sheet">—</div>
+      <div class="row" style="margin-top:8px">
+        <button id="resetSheet">אפס דף</button>
+      </div>
+    </section>
+  </div>
+
+<!-- Load ChordEngine v14.36 + ChordEvalSimple -->
+<script src="ChordEngineEnhanced_v14.36_CLEAN.js"></script>
+<script src="SyncEngine_v6.14_FIXED.js"></script>
+<script src="ChordEvalSimple.js"></script>
+<script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded')"></script>
+<script src="hebrew-spell-checker.js" onerror="console.warn('hebrew-spell-checker not loaded')"></script>
+
+<script>
+let engine;
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof ChordEngineEnhanced === 'undefined') {
+    alert('❌ ChordEngineEnhanced_v14.36_CLEAN.js לא נטען!');
+    throw new Error('Engine not loaded');
+  }
+  try {
+    engine = new ChordEngineEnhanced();
+    console.log('✅ Engine v14.36 with AI Profiles initialized');
+  } catch(e) {
+    alert('❌ שגיאה ביצירת Engine: ' + e.message);
+    throw e;
+  }
+});
+
+const SERVER = window.location.origin;
+let selectedYouTubeVideo = null;
+let currentTab = 'file';
+let WHISPER_SEGMENTS = [];
+let WHISPER_WORDS = [];
+let WHISPER_TEXT = '';
+let WHISPER_RUNNING = false;
+let DETECTED_LANGUAGE = 'en';
+let LIVE_STREAM = [];
+let LIVE_POINTER = 0;
+
+const fileEl=document.getElementById('file');
+const analyzeBtn=document.getElementById('analyzeBtn');
+const playBtn=document.getElementById('playBtn');
+const statusEl=document.getElementById('status');
+const errorEl=document.getElementById('error');
+const whisperStatusEl=document.getElementById('whisperStatus');
+const fullTranscriptEl=document.getElementById('fullTranscript');
+const fullSheetEl=document.getElementById('fullSheet');
+const gateChip=document.getElementById('gateChip');
+const player=document.getElementById('player');
+const bpmEl=document.getElementById('bpm');
+const durEl=document.getElementById('dur');
+const capoEl=document.getElementById('capo');
+const keyBadge=document.getElementById('keyBadge');
+const modeBadge=document.getElementById('modeBadge');
+const profileBadge=document.getElementById('profileBadge');
+const profileValue=document.getElementById('profileValue');
+const liveChordEl=document.getElementById('liveChord');
+const liveFunctionEl=document.getElementById('liveFunction');
+const liveLyricEl=document.getElementById('liveLyric');
+const liveSheetEl=document.getElementById('liveSheet');
+const resetSheetBtn=document.getElementById('resetSheet');
+const exportBtn=document.getElementById('exportBtn');
+const copyBtn=document.getElementById('copyBtn');
+const totalChordsCountEl=document.getElementById('totalChordsCount');
+const inScaleCountEl=document.getElementById('inScaleCount');
+const borrowedCountEl=document.getElementById('borrowedCount');
+const inversionsCountEl=document.getElementById('inversionsCount');
+const extensionsCountEl=document.getElementById('extensionsCount');
+const ytSearchEl=document.getElementById('ytSearch');
+const ytSearchBtn=document.getElementById('ytSearchBtn');
+const ytResultsEl=document.getElementById('ytResults');
+const ytStatusEl=document.getElementById('ytStatus');
+const ytUrlEl=document.getElementById('ytUrl');
+const ytUrlBtn=document.getElementById('ytUrlBtn');
+
+// ═══════════════════════════════════════════════════════════
+// 📊 דוח השוואה - חיפוש אקורדים ממאגרים
+// ═══════════════════════════════════════════════════════════
+
+// מאגר Isophonics - Beatles, Queen, Carole King
+const ISOPHONICS_BASE = 'https://raw.githubusercontent.com/tmc323/Isophonics/master';
+
+// פונקציה לחיפוש אקורדים
+async function searchChords(songName) {
+  const searchStatus = document.getElementById('searchStatus');
+  const truthInput = document.getElementById('truthChordsInput');
+  
+  searchStatus.style.display = 'inline-flex';
+  searchStatus.className = 'pill warn';
+  searchStatus.innerHTML = '<span class="spin"></span> מחפש...';
+  
+  try {
+    // חיפוש ב-GitHub Isophonics
+    const searchUrl = `https://api.github.com/search/code?q=${encodeURIComponent(songName)}+extension:lab+repo:tmc323/Isophonics`;
+    const searchResponse = await fetch(searchUrl);
+    
+    if (searchResponse.ok) {
+      const data = await searchResponse.json();
+      if (data.items && data.items.length > 0) {
+        const firstResult = data.items[0];
+        const rawUrl = firstResult.html_url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+        
+        const fileResponse = await fetch(rawUrl);
+        if (fileResponse.ok) {
+          const labContent = await fileResponse.text();
+          const chords = parseLabFile(labContent);
+          
+          truthInput.value = chords;
+          searchStatus.className = 'pill ok';
+          searchStatus.textContent = `✅ נמצא! מאגר Isophonics (${firstResult.name})`;
+          return;
+        }
+      }
+    }
+    
+    searchStatus.className = 'pill warn';
+    searchStatus.textContent = '⚠️ לא נמצא. הדבק ידנית או חפש ב-Ultimate Guitar';
+    
+  } catch (err) {
+    console.error('Search error:', err);
+    searchStatus.className = 'pill err';
+    searchStatus.textContent = '❌ שגיאה: ' + err.message;
+  }
+}
+
+// פרסור קובץ .lab (פורמט Isophonics)
+function parseLabFile(content) {
+  const lines = content.trim().split('\n');
+  const results = [];
+  
+  for (const line of lines) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length >= 3) {
+      const startTime = parseFloat(parts[0]);
+      const chord = parts[2];
+      if (!isNaN(startTime) && chord && chord !== 'N' && chord !== 'X') {
+        results.push(`${startTime.toFixed(2)},${chord}`);
+      }
+    }
+  }
+  return results.join('\n');
+}
+
+// כפתור חיפוש
+document.getElementById('btnSearchChords').addEventListener('click', () => {
+  const songName = document.getElementById('songSearchInput').value.trim();
+  if (!songName) { alert('הזן שם שיר'); return; }
+  searchChords(songName);
+});
+
+document.getElementById('songSearchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btnSearchChords').click();
+});
+
+// כפתור הורדת CSV
+document.getElementById('btnExportCsv').addEventListener('click', () => {
+  if (!window.__lastChordResult) {
+    alert('אין תוצאה אחרונה של זיהוי. תריץ שיר קודם.');
+    return;
+  }
+  if (typeof ChordEvalSimple === 'undefined') {
+    alert('ChordEvalSimple.js לא נטען!');
+    return;
+  }
+  const filename = `chords_${new Date().toISOString().slice(0,10)}.csv`;
+  ChordEvalSimple.downloadEngineCsv(window.__lastChordResult, filename);
+});
+
+// נורמליזציה להשוואה
+function normalizeChordLabel(label) {
+  if (!label) return '';
+  label = label.trim().toUpperCase();
+  const slashIdx = label.indexOf('/');
+  if (slashIdx >= 0) label = label.substring(0, slashIdx);
+  label = label.replace(/:MAJ|:MIN|:AUG|:DIM|:7|:9|:SUS.*/g, '');
+  return label.replace(/\s+/g, '');
+}
+
+// פרסור קלט אקורדים
+function parseTruthChords(text) {
+  const chords = [];
+  const lines = text.trim().split('\n');
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',');
+      if (parts.length >= 2) {
+        const time = parseFloat(parts[0]);
+        const chord = parts[1].trim();
+        if (!isNaN(time) && chord) chords.push({ t: time, label: chord });
+      }
+    } else {
+      const chordsInLine = trimmed.split(/\s+/);
+      for (const chord of chordsInLine) {
+        if (chord && /^[A-Ga-g]/.test(chord)) {
+          chords.push({ t: chords.length * 2, label: chord });
+        }
+      }
+    }
+  }
+  return chords;
+}
+
+// כפתור השוואה
+document.getElementById('btnGenerateReport').addEventListener('click', () => {
+  const reportOutput = document.getElementById('reportOutput');
+  const truthText = document.getElementById('truthChordsInput').value;
+  
+  if (!window.__lastChordResult || !window.__lastChordResult.chords) {
+    alert('תריץ ניתוח קודם.');
+    return;
+  }
+  if (!truthText.trim()) {
+    alert('הדבק או חפש אקורדים נכונים קודם.');
+    return;
+  }
+  
+  const engineChords = window.__lastChordResult.chords;
+  const truthChords = parseTruthChords(truthText);
+  
+  if (truthChords.length === 0) {
+    alert('לא הצלחתי לפרסר את האקורדים.');
+    return;
+  }
+  
+  const engineLabels = engineChords.map(c => normalizeChordLabel(c.label));
+  const truthLabels = truthChords.map(c => normalizeChordLabel(c.label));
+  
+  const engineUnique = [...new Set(engineLabels)];
+  const truthUnique = [...new Set(truthLabels)];
+  const missingInEngine = truthUnique.filter(c => !engineUnique.includes(c));
+  const extraInEngine = engineUnique.filter(c => !truthUnique.includes(c));
+  
+  let report = `🎼 דו"ח השוואת אקורדים\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `מנוע: ${engineChords.length} אקורדים | GT: ${truthChords.length}\n`;
+  report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  
+  report += `אקורדים במנוע: ${engineUnique.join(', ')}\n`;
+  report += `אקורדים ב-GT: ${truthUnique.join(', ')}\n\n`;
+  
+  if (missingInEngine.length > 0) report += `❌ חסרים: ${missingInEngine.join(', ')}\n`;
+  if (extraInEngine.length > 0) report += `⚠️ מיותרים: ${extraInEngine.join(', ')}\n`;
+  
+  report += `\n📋 השוואה רציפה:\n────────────────────────────────────────\n`;
+  
+  const maxCompare = Math.min(30, Math.max(engineLabels.length, truthLabels.length));
+  let matches = 0;
+  
+  for (let i = 0; i < maxCompare; i++) {
+    const eng = engineLabels[i] || '—';
+    const tru = truthLabels[i] || '—';
+    const match = eng === tru;
+    if (match) matches++;
+    report += `${(i+1).toString().padStart(2)}. ${match ? '✅' : '❌'} ${eng.padEnd(6)} | ${tru}\n`;
+  }
+  
+  const accuracy = maxCompare > 0 ? (matches / maxCompare * 100).toFixed(1) : 0;
+  report += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  report += `🎯 דיוק: ${matches}/${maxCompare} (${accuracy}%)\n`;
+  
+  reportOutput.textContent = report;
+});
+
+// ═══════════════════════════════════════════════════════════
+
+function refreshSheetTabView(){
+  if(typeof SyncEngine !== 'undefined') {
+    SyncEngine.refreshSheetTabView(window.__STATE, WHISPER_WORDS, WHISPER_TEXT, DETECTED_LANGUAGE, capoEl.value, sanitizeLabel, applyCapoToLabel, fullSheetEl);
+  }
+}
+
+function initTabs() {
+  const tabs = document.querySelectorAll('.tab');
+  const tabContents = document.querySelectorAll('.tab-content');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', function() {
+      const tabName = this.getAttribute('data-tab');
+      currentTab = tabName;
+      tabs.forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+      tabContents.forEach(content => content.classList.remove('active'));
+      const targetContent = document.getElementById(tabName + 'Tab');
+      if(targetContent) targetContent.classList.add('active');
+      if(tabName === 'sheet') refreshSheetTabView();
+    });
+  });
+}
+initTabs();
+
+async function correctHebrewWords(words, fullText) {
+  if(typeof HebrewSpellChecker === 'undefined') return words;
+  const corrected = HebrewSpellChecker.correctWords(words);
+  const corrections = corrected.filter(w => w.original).length;
+  if (corrections > 0) console.log(`✅ Fixed ${corrections} Hebrew words`);
+  return corrected;
+}
+
+async function runWhisperInBackground(videoId) {
+  if(WHISPER_RUNNING) return;
+  WHISPER_RUNNING = true;
+  whisperStatusEl.style.display = 'inline-flex';
+  whisperStatusEl.textContent = 'טוען Groq Whisper...';
+  
+  try {
+    const url = `${SERVER}/api/groq-transcribe`;
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ videoId: videoId })
+    });
+    
+    if(!r.ok) throw new Error(`Failed: ${r.status}`);
+    
+    const data = await r.json();
+    
+    if(data.success) {
+      WHISPER_SEGMENTS = data.segments || [];
+      WHISPER_WORDS = data.words || [];
+      WHISPER_TEXT = data.text || '';
+      DETECTED_LANGUAGE = data.language || 'en';
+      
+      if (DETECTED_LANGUAGE === 'he' && WHISPER_WORDS.length > 0) {
+        WHISPER_WORDS = await correctHebrewWords(WHISPER_WORDS, WHISPER_TEXT);
+      }
+      
+      whisperStatusEl.textContent = '✅ Groq Whisper';
+      whisperStatusEl.classList.remove('warn');
+      whisperStatusEl.classList.add('ok');
+      if(window.__STATE && window.__STATE.timeline) {
+        syncChordsWithLyrics();
+        displayWhisperResult();
+        refreshSheetTabView();
+        const isRTL = DETECTED_LANGUAGE === 'he';
+        buildFullLyricsSheet(isRTL);
+      }
+      setTimeout(() => whisperStatusEl.style.display = 'none', 2500);
+    } else throw new Error(data.error || 'Failed');
+  } catch(e) {
+    whisperStatusEl.textContent = '❌ שגיאה';
+    whisperStatusEl.classList.add('err');
+    setTimeout(() => whisperStatusEl.style.display = 'none', 4000);
+  } finally {
+    WHISPER_RUNNING = false;
+  }
+}
+
+function syncChordsWithLyrics(){
+  if(typeof SyncEngine !== 'undefined') {
+    LIVE_STREAM = SyncEngine.syncChordsWithLyrics(window.__STATE, WHISPER_WORDS, capoEl.value, sanitizeLabel, applyCapoToLabel);
+    LIVE_POINTER = 0;
+  }
+}
+
+function displayWhisperResult() {
+  if(!WHISPER_TEXT || WHISPER_TEXT.trim() === '') {
+    fullTranscriptEl.textContent = '💬 תמלול לא זמין';
+    return;
+  }
+  const lang = DETECTED_LANGUAGE === 'he' ? 'עברית' : (DETECTED_LANGUAGE === 'en' ? 'English' : DETECTED_LANGUAGE);
+  fullTranscriptEl.textContent = `🎙️ [Groq Whisper - ${lang}]\n\n${WHISPER_TEXT}`;
+}
+
+ytSearchBtn.onclick = async () => {
+  const query = ytSearchEl.value.trim();
+  if (!query) return showYtStatus('הזן שם שיר', 'warn');
+  showYtStatus('מחפש...', 'warn');
+  ytResultsEl.style.display = 'none';
+  try {
+    const r = await fetch(`${SERVER}/api/yt?q=${encodeURIComponent(query)}`);
+    const data = await r.json();
+    if (!data || !data.length) return showYtStatus('לא נמצא', 'warn');
+    displayYouTubeResults(data.map(v => ({
+      videoId: v.id, title: v.title, author: v.author || v.channel, thumbnail: v.thumbnail
+    })));
+    ytStatusEl.style.display = 'none';
+    ytResultsEl.style.display = 'block';
+  } catch (e) {
+    showYtStatus('שגיאה בחיפוש', 'err');
+  }
+};
+
+ytSearchEl.onkeydown = (e) => { if(e.key === 'Enter') ytSearchBtn.click(); };
+
+ytUrlBtn.onclick = async () => {
+  const url = ytUrlEl.value.trim();
+  if(!url) return showYtStatus('הזן קישור', 'warn');
+  const videoId = extractYouTubeId(url);
+  if(!videoId) return showYtStatus('קישור לא תקין', 'err');
+  selectedYouTubeVideo = { id: videoId, title: 'YouTube Video', url: `https://www.youtube.com/watch?v=${videoId}` };
+  showYtStatus('✅ נבחר', 'ok');
+  ytResultsEl.style.display = 'none';
+};
+
+function extractYouTubeId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for(const pattern of patterns) {
+    const match = url.match(pattern);
+    if(match) return match[1];
+  }
+  return null;
+}
+
+function showYtStatus(msg, type) {
+  ytStatusEl.textContent = msg;
+  ytStatusEl.className = `pill ${type}`;
+  ytStatusEl.style.display = 'inline-flex';
+}
+
+function displayYouTubeResults(results) {
+  ytResultsEl.innerHTML = '';
+  results.forEach((video) => {
+    if(!video.videoId) return;
+    const div = document.createElement('div');
+    div.className = 'yt-result';
+    div.innerHTML = `
+      <img class="thumb" src="${video.thumbnail}" alt="" />
+      <div class="info">
+        <div class="title">${escapeHtml(video.title || 'Unknown')}</div>
+        <div class="channel">${escapeHtml(video.author || 'Unknown')}</div>
+      </div>
+    `;
+    div.onclick = () => {
+      document.querySelectorAll('.yt-result').forEach(r => r.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedYouTubeVideo = { id: video.videoId, title: video.title, url: `https://www.youtube.com/watch?v=${video.videoId}` };
+      ytUrlEl.value = selectedYouTubeVideo.url;
+      showYtStatus('✅ נבחר', 'ok');
+    };
+    ytResultsEl.appendChild(div);
+  });
+}
+
+function escapeHtml(text) { 
+  const div = document.createElement('div'); 
+  div.textContent = text; 
+  return div.innerHTML; 
+}
+
+function showAnalyzing(stepText){ 
+  statusEl.innerHTML='<span class="spin"></span> '+stepText; 
+  statusEl.className='pill warn'; 
+  statusEl.style.display='inline-flex'; 
+}
+
+function ok(msg){ 
+  statusEl.textContent=msg; 
+  statusEl.className='pill ok'; 
+  statusEl.style.display='inline-flex'; 
+}
+
+function err(msg){ 
+  errorEl.textContent=msg; 
+  errorEl.style.display='inline-flex'; 
+}
+
+function hideAlerts(){ 
+  statusEl.style.display='none'; 
+  errorEl.style.display='none'; 
+  gateChip.style.display='none'; 
+}
+
+function parseRoot(label){ 
+  const m=label?.match?.(/^([A-G](?:#|b)?)/); 
+  if(!m) return -1; 
+  const nm=m[1].replace('b','#'); 
+  return engine.NOTES_SHARP.indexOf(nm); 
+}
+
+function applyCapoToLabel(label, capo){
+  capo = parseInt(capo);
+  if(!capo || capo === 0) return label;
+  
+  const NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const NOTES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  
+  function transposeNote(noteStr, semitones) {
+    const normalized = noteStr.replace('b', '#');
+    const idx = NOTES_SHARP.indexOf(normalized);
+    if(idx < 0) return noteStr;
+    const newPc = ((idx - semitones) % 12 + 12) % 12;
+    return NOTES_FLAT[newPc];
+  }
+  
+  if(label.includes('/')) {
+    const parts = label.split('/');
+    const rootPart = parts[0];
+    const bassPart = parts[1];
+    
+    const rootMatch = rootPart.match(/^([A-G](?:#|b)?)(.*)$/);
+    if(!rootMatch) return label;
+    const transposedRoot = transposeNote(rootMatch[1], capo) + (rootMatch[2] || '');
+    
+    const bassMatch = bassPart.match(/^([A-G](?:#|b)?)(.*)$/);
+    if(!bassMatch) return transposedRoot;
+    const transposedBass = transposeNote(bassMatch[1], capo) + (bassMatch[2] || '');
+    
+    return transposedRoot + '/' + transposedBass;
+  }
+  
+  const m = label.match(/^([A-G](?:#|b)?)(.*)$/);
+  if(!m) return label;
+  
+  return transposeNote(m[1], capo) + (m[2] || '');
+}
+
+function sanitizeLabel(lbl){ 
+  if(!lbl) return lbl; 
+  return lbl.replace(/[^A-Ga-g#bm79sus246()/\s+altdim]/g,'').trim(); 
+}
+
+function smartEnharmonic(label, key) {
+  if (!label || !key || !engine) return label;
+  
+  const keySignatures = {
+    'G': 1, 'D': 2, 'A': 3, 'E': 4, 'B': 5, 'F#': 6, 'C#': 7,
+    'Em': 1, 'Bm': 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, 'A#m': 7,
+    'F': -1, 'Bb': -2, 'Eb': -3, 'Ab': -4, 'Db': -5, 'Gb': -6, 'Cb': -7,
+    'Dm': -1, 'Gm': -2, 'Cm': -3, 'Fm': -4, 'Bbm': -5, 'Ebm': -6, 'Abm': -7,
+    'C': 0, 'Am': 0
+  };
+  
+  const keyName = engine.NOTES_SHARP[engine.toPc(key.root)] + (key.minor ? 'm' : '');
+  const signature = keySignatures[keyName] || 0;
+  const useFlats = signature < 0;
+  
+  const match = label.match(/^([A-G][#b]?)(.*)$/);
+  if (!match) return label;
+  
+  const root = match[1];
+  const quality = match[2];
+  
+  const enharmonicMap = {
+    'C#': useFlats ? 'Db' : 'C#',
+    'Db': useFlats ? 'Db' : 'C#',
+    'D#': useFlats ? 'Eb' : 'D#',
+    'Eb': useFlats ? 'Eb' : 'D#',
+    'F#': useFlats ? 'Gb' : 'F#',
+    'Gb': useFlats ? 'Gb' : 'F#',
+    'G#': useFlats ? 'Ab' : 'G#',
+    'Ab': useFlats ? 'Ab' : 'G#',
+    'A#': useFlats ? 'Bb' : 'A#',
+    'Bb': useFlats ? 'Bb' : 'A#'
+  };
+  
+  const newRoot = enharmonicMap[root] || root;
+  return newRoot + quality;
+}
+
+function displayChord(label, capo) {
+  if (!label) return label;
+  let clean = sanitizeLabel(label);
+  const key = window.__STATE ? window.__STATE.key : null;
+  if (key) clean = smartEnharmonic(clean, key);
+  clean = applyCapoToLabel(clean, capo);
+  return clean;
+}
+
+analyzeBtn.onclick=async()=>{
+  hideAlerts();
+  liveChordEl.textContent='—'; 
+  liveFunctionEl.textContent='—';
+  liveLyricEl.textContent='—';
+  liveSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
+  fullSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
+  fullTranscriptEl.textContent='ממתין...';
+  LIVE_STREAM=[]; 
+  LIVE_POINTER=0;
+  WHISPER_SEGMENTS = [];
+  WHISPER_WORDS = [];
+  WHISPER_TEXT = '';
+  DETECTED_LANGUAGE = 'en';
+  window.__STATE = null;
+  window.__lastChordResult = null;
+  playBtn.disabled=true; 
+  keyBadge.textContent=''; 
+  modeBadge.textContent='';
+  profileBadge.style.display='none';
+  totalChordsCountEl.textContent='—'; 
+  inScaleCountEl.textContent='—'; 
+  borrowedCountEl.textContent='—'; 
+  inversionsCountEl.textContent='—';
+  extensionsCountEl.textContent='—';
+  if(!WHISPER_TEXT) fullTranscriptEl.textContent = 'ממתין...';
+  
+  let audioSource = null;
+  if(currentTab === 'file') {
+    const f=fileEl.files?.[0]; 
+    if(!f){ err('בחר קובץ'); return; }
+    audioSource = { type: 'file', data: f };
+  } else if(currentTab === 'youtube') {
+    if(!selectedYouTubeVideo) { err('בחר סרטון'); return; }
+    audioSource = { type: 'youtube', data: selectedYouTubeVideo };
+  } else {
+    err('בחר קובץ או סרטון'); return;
+  }
+  
+  try{
+    showAnalyzing('שלב 1/3: טעינת אודיו');
+    const audioData = await decodeAudio(audioSource);
+    
+    bpmEl.textContent = audioData.bpm; 
+    durEl.textContent = audioData.duration.toFixed(1)+'s';
+    if(audioData.url) player.src = audioData.url;
+    
+    showAnalyzing('שלב 2/3: זיהוי אקורדים (v14.36 AI Profiles)');
+    
+    // v14.36 - AUTO profile detection
+    const result = await engine.detect(audioData.audioBuffer, {});
+    
+    // 🔬 v14.36 OUTPUT
+    const debugEl = document.getElementById('debugOutput');
+    if (debugEl && result) {
+      const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      let dbg = '';
+      dbg += `═══════════════════════════════════════\n`;
+      dbg += `🎯 FINAL RESULT:\n`;
+      dbg += `   Key: ${NOTES[result.key.root]} ${result.key.minor ? 'minor' : 'major'}\n`;
+      dbg += `   Confidence: ${(result.key.confidence * 100).toFixed(0)}%\n`;
+      if (result.musicStart !== undefined) {
+        dbg += `   Music Start: ${result.musicStart.toFixed(2)}s\n`;
+      }
+      dbg += `═══════════════════════════════════════\n`;
+      
+      // Show tonic detection debug if available
+      const tonicDebug = result.tonic?._debug || (engine ? engine._debugInfo : null);
+      if (tonicDebug) {
+        dbg += `\n🔬 TONIC DETECTION BREAKDOWN:\n`;
+        dbg += `───────────────────────────────────────\n`;
+        if (tonicDebug.bassTonic) {
+          dbg += `   Bass says:     ${tonicDebug.bassTonic.note} (pc=${tonicDebug.bassTonic.root}, conf=${tonicDebug.bassTonic.confidence}%)\n`;
+        }
+        if (tonicDebug.ksTonic) {
+          dbg += `   KS says:       ${tonicDebug.ksTonic.note} (pc=${tonicDebug.ksTonic.root}, conf=${tonicDebug.ksTonic.confidence}%)\n`;
+        }
+        if (tonicDebug.firstChord) {
+          dbg += `   First chord:   ${tonicDebug.firstChord.note}${tonicDebug.firstChord.isMinor?'m':''} (pc=${tonicDebug.firstChord.root}, score=${tonicDebug.firstChord.score?.toFixed(2)})\n`;
+        } else {
+          dbg += `   First chord:   ❌ NOT DETECTED!\n`;
+        }
+        if (tonicDebug.dominantChord) {
+          dbg += `   Dominant:      ${tonicDebug.dominantChord.note} (pc=${tonicDebug.dominantChord.root}, ${tonicDebug.dominantChord.count} frames)\n`;
+        }
+        dbg += `───────────────────────────────────────\n`;
+        
+        // v14.36: Show bass histogram
+        if (tonicDebug.bassHist && tonicDebug.bassHist.length > 0) {
+          dbg += `   BASS NOTES: ${tonicDebug.bassHist.slice(0, 6).map(b => `${b.note}:${b.count}`).join(', ')}\n`;
+        }
+        
+        if (tonicDebug.votes) {
+          dbg += `   VOTES: ${tonicDebug.votes.map(v => `${v.note}:${v.votes}`).join(', ')}\n`;
+        }
+        if (tonicDebug.winner) {
+          dbg += `   WINNER: ${tonicDebug.winner.note} (${tonicDebug.winner.votes} votes)\n`;
+        }
+        if (tonicDebug.ivTrap) {
+          dbg += `   ⛔ IV/I TRAP: ${tonicDebug.ivTrap.from} → ${tonicDebug.ivTrap.to}\n`;
+        }
+      }
+      
+      if (result.tonic) {
+        dbg += `\n🎹 TONIC RESULT:\n`;
+        dbg += `   Root: ${result.tonic.label} (pc=${result.tonic.root})\n`;
+        dbg += `   Confidence: ${result.tonic.confidence}%\n`;
+        dbg += `   Method: ${result.tonic.method}\n`;
+      }
+      if (result.mode) {
+        dbg += `\n🎵 MODE DETECTION:\n`;
+        dbg += `   isMinor: ${result.mode.isMinor}\n`;
+        dbg += `   m3: ${result.mode.m3?.toFixed(3) || 'N/A'}\n`;
+        dbg += `   M3: ${result.mode.M3?.toFixed(3) || 'N/A'}\n`;
+        dbg += `   ratio: ${result.mode.ratio?.toFixed(2) || 'N/A'}\n`;
+      }
+      
+      // 🔬 Show first frames chroma analysis
+      if (tonicDebug && tonicDebug.firstFramesChroma && tonicDebug.firstFramesChroma.length > 0) {
+        dbg += `\n🔬 FIRST FRAMES CHROMA:\n`;
+        tonicDebug.firstFramesChroma.forEach((f, i) => {
+          dbg += `   Frame ${i+1} @ ${f.time}s (bass=${f.bass || '?'}):\n`;
+          // Show top 4 notes
+          const sorted = Object.entries(f.chroma).sort((a,b) => b[1] - a[1]).slice(0,4);
+          dbg += `     Top: ${sorted.map(([n,v]) => `${n}:${v.toFixed(2)}`).join(' ')}\n`;
+        });
+      }
+      
+      if (result.chords && result.chords.length > 0) {
+        const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        dbg += `\n🎸 FIRST 10 CHORDS:\n`;
+        result.chords.slice(0, 10).forEach((c, i) => {
+          const bassStr = c.bassNote >= 0 ? NOTES[c.bassNote] : '?';
+          dbg += `   ${i+1}. ${c.label} @ ${c.t?.toFixed(2)}s (fi=${c.fi || '?'}, bass=${bassStr}, type=${c.chordType || '?'})\n`;
+        });
+      }
+      debugEl.textContent = dbg;
+    }
+    
+    // 🔹 שמירת התוצאה לדוח
+    window.__lastChordResult = result;
+    
+    const timeline = result.chords;
+    const key = result.key;
+    const modeObj = result.mode;
+    const stats = result.stats;
+    const detectedProfile = result.profile || 'auto';
+    
+    showAnalyzing('שלב 3/3: עיבוד...');
+    
+    timeline.forEach(ev => {
+      if (!ev || !ev.label) return;
+      ev.label = sanitizeLabel(ev.label);
+      ev.words = ev.words || [];
+    });
+    
+    const modeString = modeObj.isMinor ? 'Minor' : 'Major';
+    
+    window.__STATE = { 
+      bpm: audioData.bpm, 
+      duration: audioData.duration, 
+      timeline: timeline, 
+      key, 
+      mode: modeString,
+      gateTime: 0,
+      stats: stats,
+      profile: detectedProfile
+    };
+    
+    const capo=parseInt(capoEl.value||'0',10);
+    
+    if (!engine || !engine.NOTES_SHARP) {
+      console.error('Engine not properly initialized!');
+      err('שגיאה: Engine לא הוגדר נכון');
+      return;
+    }
+    
+    const updateKeyDisplay = () => {
+      const currentKey = window.__STATE ? window.__STATE.key : key;
+      const displayKey = applyCapoToLabel(engine.NOTES_SHARP[engine.toPc(currentKey.root)]+(currentKey.minor?'m':''), capo);
+      if (keyBadge.textContent !== displayKey) {
+        keyBadge.textContent = displayKey;
+      }
+    };
+    
+    updateKeyDisplay();
+    
+    let pollCount = 0;
+    const pollInterval = setInterval(() => {
+      updateKeyDisplay();
+      pollCount++;
+      if (pollCount >= 20) clearInterval(pollInterval);
+    }, 100);
+    
+    modeBadge.textContent = modeString + ` (${modeObj.confidence}%)`;
+    
+    // v14.36: הצגת פרופיל
+    if (detectedProfile) {
+      profileBadge.style.display = 'inline-flex';
+      profileValue.textContent = detectedProfile.toUpperCase();
+    }
+    
+    const tonic = engine.NOTES_SHARP[engine.toPc(key.root)];
+    const keyMode = key.minor ? 'minor' : 'major';
+    const diatonicChords = engine.getDiatonicChords(tonic, keyMode);
+    const circleEl = document.getElementById('circleOfFifths');
+    circleEl.innerHTML = diatonicChords.map(name => {
+      const displayLabel = applyCapoToLabel(name, capo);
+      return `<span class="tag" style="background:#1a2332;border-color:#38bdf8;padding:4px 8px;border-radius:8px">${displayLabel}</span>`;
+    }).join('');
+    
+    totalChordsCountEl.textContent = stats.totalChords || timeline.length;
+    inScaleCountEl.textContent = stats.inScale || 0;
+    borrowedCountEl.textContent = stats.borrowed || 0;
+    inversionsCountEl.textContent = stats.inversions || 0;
+    extensionsCountEl.textContent = stats.extensions || 0;
+    
+    if(WHISPER_WORDS && WHISPER_WORDS.length > 0) {
+      syncChordsWithLyrics();
+      displayWhisperResult();
+      refreshSheetTabView();
+    } else {
+      const isRTL = DETECTED_LANGUAGE === 'he';
+      buildFullLyricsSheet(isRTL);
+    }
+    
+    ok(`✅ v14.36 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
+    hookPlaybackLive(); 
+    refreshSheetTabView();
+    playBtn.disabled=false; 
+  }catch(e){ 
+    console.error(e);
+    err('שגיאה: '+e.message); 
+  }
+};
+
+playBtn.onclick=async()=>{ 
+  try{ await player.play(); } 
+  catch(e){ alert('לחץ ▶️'); } 
+};
+
+async function decodeAudio(source){
+  if(source.type === 'file') return await decodeAudioFile(source.data);
+  else return await decodeYouTubeAudio(source.data);
+}
+
+async function decodeAudioFile(file){
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC(); 
+  try{ await ctx.resume(); }catch{}
+  const arr = await file.arrayBuffer();
+  try{
+    const buf = await ctx.decodeAudioData(arr.slice(0));
+    return postDecode(buf, URL.createObjectURL(file));
+  }catch(e1){
+    try{
+      const buf = await new Promise((resolve,reject)=>{ 
+        ctx.decodeAudioData(arr.slice(0), b=>resolve(b), err=>reject(err)); 
+      });
+      return postDecode(buf, URL.createObjectURL(file));
+    }catch(e2){ throw e2||e1; }
+  }
+  
+  function postDecode(buf, url){
+    const bpm = 120;
+    return { 
+      sr: buf.sampleRate, 
+      bpm, 
+      duration: buf.duration, 
+      url,
+      audioBuffer: buf
+    };
+  }
+}
+
+async function decodeYouTubeAudio(video){
+  showAnalyzing('מוריד שמע מיוטיוב...');
+  try {
+    const url = `${SERVER}/api/youtube-download?videoId=${video.id}`;
+    const r = await fetch(url);
+    
+    if (!r.ok) {
+      const errorText = await r.text();
+      throw new Error(`Error: ${r.status} - ${errorText}`);
+    }
+    
+    showAnalyzing('מעבד אודיו...');
+    const audioBlob = await r.blob();
+    const file = new File([audioBlob], 'audio.mp3', { type: 'audio/mpeg' });
+    
+    if (!WHISPER_RUNNING) {
+      runWhisperInBackground(video.id);
+    }
+    
+    return await decodeAudioFile(file);
+  } catch (err) {
+    throw new Error('לא הצלחתי להוריד: ' + err.message);
+  }
+}
+
+function getHarmonicFunction(label, key){
+  const rootPc = parseRoot(label); 
+  if(rootPc<0) return '—';
+  const rel = engine.toPc(rootPc - key.root);
+  const scale = key.minor? engine.MINOR_SCALE : engine.MAJOR_SCALE;
+  let bestDeg = null, bestDist=999;
+  for(let d=0; d<scale.length; d++){
+    const dist = Math.min((rel-scale[d]+12)%12,(scale[d]-rel+12)%12);
+    if(dist<bestDist){ bestDist=dist; bestDeg=d; }
+  }
+  if(bestDeg===null) return '—';
+  const funcNames = key.minor ? ['i','ii°','III','iv','v','VI','VII'] : ['I','ii','iii','IV','V','vi','vii°'];
+  return funcNames[bestDeg] || '—';
+}
+
+function hookPlaybackLive(){
+  const st=window.__STATE; 
+  if(!st) return;
+  const isRTL = DETECTED_LANGUAGE === 'he';
+  liveSheetEl.className = `synced-sheet ${isRTL ? 'rtl' : 'ltr'}`;
+  gateChip.style.display='inline-flex';
+  LIVE_POINTER=0;
+  buildFullLyricsSheet(isRTL);
+  
+  player.ontimeupdate=()=>{
+    const t=player.currentTime;
+    if(t < (st.gateTime || 0)){ 
+      liveChordEl.textContent='—'; 
+      liveFunctionEl.textContent='—';
+      liveLyricEl.textContent='—';
+      return; 
+    }
+    if(gateChip.style.display!=='none') gateChip.style.display='none';
+    
+    const gateOffset = st.gateTime || 0;
+    let chordIdx = st.timeline.findIndex(x => (x.t + gateOffset) > t);
+    if(chordIdx === -1) chordIdx = st.timeline.length;
+    const ev = st.timeline[chordIdx - 1] || st.timeline[0];
+    if(!ev || !ev.label) return;
+    
+    const capo=parseInt(capoEl.value||'0',10);
+    const shown = displayChord(ev.label, capo);
+    
+    liveChordEl.textContent = shown;
+    liveFunctionEl.textContent = getHarmonicFunction(ev.label, st.key);
+    
+    const currentWord = WHISPER_WORDS.find(w => {
+      const wordStart = w.start + gateOffset;
+      const wordEnd = (w.end ? w.end : w.start + 0.3) + gateOffset;
+      return t >= wordStart && t < wordEnd;
+    });
+    
+    if(currentWord) {
+      liveLyricEl.textContent = currentWord.word || currentWord.text || '';
+    } else {
+      liveLyricEl.textContent = '';
+    }
+    
+    highlightCurrentChord(t);
+  };
+  
+  resetSheetBtn.onclick=()=>{ 
+    LIVE_POINTER=0; 
+    buildFullLyricsSheet(isRTL);
+  };
+}
+
+function buildFullLyricsSheet(isRTL) {
+  const st = window.__STATE;
+  if(!st || !st.timeline) {
+    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">ממתין...אקורדים...</div>';
+    return;
+  }
+  if(!WHISPER_WORDS || WHISPER_WORDS.length === 0) {
+    liveSheetEl.innerHTML = '<div style="color:#cbd5e1;padding:20px">ממתין...מילים... (אקורדים זוהו)</div>';
+    return;
+  }
+  
+  const capo = parseInt(capoEl.value || '0', 10);
+  const gateOffset = st.gateTime || 0;
+  
+  const isHebrew = (typeof DETECTED_LANGUAGE !== 'undefined' && 
+                    (DETECTED_LANGUAGE === 'he' || DETECTED_LANGUAGE === 'Hebrew' || DETECTED_LANGUAGE === 'hebrew'));
+  
+  if (isHebrew) {
+    let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;overflow-y:auto;max-height:500px" dir="rtl">';
+    html += '<div style="color:#38bdf8;font-weight:700;font-size:18px;margin-bottom:15px;text-align:center">🎸 אקורדים בלבד</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">';
+    
+    st.timeline.forEach((ch, idx) => {
+      if (!ch || !ch.label) return;
+      const displayLabel = displayChord(ch.label, capo);
+      html += `<span class="chord-marker" data-time="${ch.t}" style="color:#38bdf8;font-weight:700;font-size:20px;padding:6px 12px;background:#0b1221;border-radius:8px">${escapeHtml(displayLabel)}</span>`;
+    });
+    
+    html += '</div></div>';
+    liveSheetEl.innerHTML = html;
+    return;
+  }
+  
+  const lines = [];
+  let currentLine = [];
+  const maxWords = 8;
+  
+  WHISPER_WORDS.forEach((w, idx) => {
+    const text = (w.word || w.text || '').trim();
+    if(!text) return;
+    currentLine.push({
+      text: text,
+      time: w.start + gateOffset,
+      end: (w.end || w.start) + gateOffset,
+      id: `word-${idx}`
+    });
+    const endsWithPunct = /[.!?,;،؟]$/.test(text);
+    if(endsWithPunct || currentLine.length >= maxWords || idx === WHISPER_WORDS.length - 1) {
+      if(currentLine.length > 0) {
+        lines.push([...currentLine]);
+        currentLine = [];
+      }
+    }
+  });
+  
+  let html = '<div class="lyrics-container" style="background:#0a1324;padding:20px;border-radius:12px;font-family:\'Courier New\',monospace;white-space:pre;overflow-y:auto;overflow-x:auto;max-height:500px;scroll-behavior:smooth">';
+  for(const line of lines) {
+    const words = line;
+    const lineStart = words[0].time;
+    const lineEnd = words[words.length - 1].end;
+    const lineChords = st.timeline.filter(ch => {
+      const chordTimeWithGate = ch.t + gateOffset;
+      return chordTimeWithGate >= lineStart && chordTimeWithGate <= lineEnd;
+    });
+    const lyricText = words.map(w => w.text).join(' ');
+    const chordPositions = [];
+    for(const chord of lineChords) {
+      if (!chord || !chord.label) continue;
+      
+      const chordTimeWithGate = chord.t + gateOffset;
+      let position = 0;
+      let found = false;
+      for(let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const wordEnd = word.end || (word.time + 0.3);
+        if(chordTimeWithGate >= word.time && chordTimeWithGate <= wordEnd) {
+          const beforeText = words.slice(0, i).map(w => w.text).join(' ');
+          position = beforeText.length;
+          if(position > 0) position += 1;
+          found = true;
+          break;
+        }
+      }
+      if(!found) {
+        position = chordTimeWithGate < words[0].time ? 0 : lyricText.length + 1;
+      }
+      const chordLabel = displayChord(chord.label, capo);
+      chordPositions.push({ position, label: chordLabel, id: chord.t });
+    }
+    chordPositions.sort((a, b) => a.position - b.position);
+    let chordLine = '';
+    let lastPos = 0;
+    for(const cp of chordPositions) {
+      const spaces = Math.max(0, cp.position - lastPos);
+      chordLine += ' '.repeat(spaces);
+      chordLine += `<span class="chord-marker" data-time="${cp.id}">${escapeHtml(cp.label)}</span>`;
+      lastPos = cp.position + cp.label.length;
+    }
+    const dirAttr = isRTL ? 'dir="rtl"' : 'dir="ltr"';
+    html += `<div style="margin-bottom:25px" ${dirAttr}>`;
+    html += `<div style="color:#38bdf8;font-weight:700;font-size:16px;line-height:1.3;white-space:pre;font-family:monospace">${chordLine}</div>`;
+    html += `<div style="color:#ffffff;font-size:18px;line-height:1.3;white-space:pre">${escapeHtml(lyricText)}</div>`;
+    html += `</div>`;
+  }
+  html += '</div>';
+  liveSheetEl.innerHTML = html;
+}
+
+function highlightCurrentChord(currentTime) {
+  const st = window.__STATE;
+  if(!st) return;
+  const gateOffset = st.gateTime || 0;
+  liveSheetEl.querySelectorAll('.chord-marker').forEach(el => {
+    el.style.background = 'transparent';
+    el.style.color = '#38bdf8';
+    el.style.padding = '0';
+    el.style.borderRadius = '0';
+  });
+  const currentChord = st.timeline.find((ch, idx) => {
+    const nextChord = st.timeline[idx + 1];
+    const chordTime = ch.t + gateOffset;
+    const nextChordTime = nextChord ? (nextChord.t + gateOffset) : Infinity;
+    return chordTime <= currentTime && currentTime < nextChordTime;
+  });
+  if(currentChord) {
+    const marker = liveSheetEl.querySelector(`.chord-marker[data-time="${currentChord.t}"]`);
+    if(marker) {
+      marker.style.background = '#1e3a5f';
+      marker.style.color = '#60d5fd';
+      marker.style.padding = '2px 6px';
+      marker.style.borderRadius = '4px';
+      marker.style.transition = 'all 0.2s';
+      const lyricsContainer = liveSheetEl.querySelector('.lyrics-container');
+      if(lyricsContainer) {
+        const markerRect = marker.getBoundingClientRect();
+        const containerRect = lyricsContainer.getBoundingClientRect();
+        const isAboveView = markerRect.top < containerRect.top;
+        const isBelowView = markerRect.bottom > containerRect.bottom;
+        if(isAboveView || isBelowView) {
+          const markerTop = markerRect.top - containerRect.top + lyricsContainer.scrollTop;
+          const targetScrollTop = markerTop - (containerRect.height / 3);
+          lyricsContainer.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: 'smooth'
+          });
+        }
+      }
+    }
+  }
+}
+
+copyBtn.onclick = () => {
+  const text = fullSheetEl.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    copyBtn.textContent = '✅ הועתק!';
+    setTimeout(() => copyBtn.textContent = '📋 העתק דף', 1500);
+  });
+};
+
+exportBtn.onclick=()=>{
+  const text = fullSheetEl.textContent || '';
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); 
+  a.href = url; 
+  a.download = 'chords.txt'; 
+  a.click(); 
+  URL.revokeObjectURL(url);
+};
+
+let transposeOffset = 0;
+
+function transposeUp() {
+  if(!window.__STATE) return;
+  transposeOffset++;
+  applyTranspose();
+}
+
+function transposeDown() {
+  if(!window.__STATE) return;
+  transposeOffset--;
+  applyTranspose();
+}
+
+function applyTranspose() {
+  const st = window.__STATE;
+  if(!st) return;
+  const newRoot = engine.toPc(st.key.root + transposeOffset);
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(newRoot)] + (st.key.minor ? 'm' : '');
+  const capo = parseInt(capoEl.value || '0', 10);
+  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
+  st.timeline.forEach(ev => {
+    if (!ev || !ev.label) return;
+    const originalRoot = parseRoot(ev.label);
+    if(originalRoot < 0) return;
+    const quality = ev.label.replace(/^[A-G](?:#|b)?/, '');
+    const newChordRoot = engine.toPc(originalRoot + transposeOffset);
+    const newLabel = engine.NOTES_SHARP[engine.toPc(newChordRoot)] + quality;
+    if(!ev._originalLabel) ev._originalLabel = ev.label;
+    ev.label = newLabel;
+  });
+  refreshSheetTabView();
+  const circleChords = engine.buildCircleOfFifths({
+    root: engine.toPc(st.key.root + transposeOffset),
+    minor: st.key.minor
+  });
+  const circleEl = document.getElementById('circleOfFifths');
+  circleEl.innerHTML = circleChords.map(ch => {
+    const displayLabel = applyCapoToLabel(ch.label, capo);
+    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8;padding:4px 8px;border-radius:8px" title="${ch.function}">${displayLabel}</span>`;
+  }).join('');
+}
+
+function toggleMajorMinor() {
+  const st = window.__STATE;
+  if(!st) return;
+  st.key.minor = !st.key.minor;
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(st.key.root)] + (st.key.minor ? 'm' : '');
+  const capo = parseInt(capoEl.value || '0', 10);
+  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
+  modeBadge.textContent = st.key.minor ? 'Minor' : 'Major';
+  const circleChords = engine.buildCircleOfFifths(st.key);
+  const circleEl = document.getElementById('circleOfFifths');
+  circleEl.innerHTML = circleChords.map(ch => {
+    const displayLabel = applyCapoToLabel(ch.label, capo);
+    return `<span class="tag" style="background:#1a2332;border-color:#38bdf8;padding:4px 8px;border-radius:8px" title="${ch.function}">${displayLabel}</span>`;
+  }).join('');
+}
+
+function refreshKeyDisplay() {
+  if(!window.__STATE) return;
+  const capo = parseInt(capoEl.value || '0', 10);
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(window.__STATE.key.root)] + (window.__STATE.key.minor ? 'm' : '');
+  keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(registration => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              if (confirm('🔄 גרסה חדשה זמינה! לטעון מחדש?')) {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.location.reload();
+              }
+            }
+          });
+        });
+      })
+      .catch(error => {});
+    
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+  });
+}
+
+</script>
+
+</body>
+</html>
