@@ -852,6 +852,9 @@ class ChordEngineUltimate {
   // ═══════════════════════════════════════════════════════════
   
   detectTonicHybrid(features, startFrame) {
+    // 🔬 v16.38: Capture all detection steps
+    this._debugInfo = this._debugInfo || {};
+    
     // 1. טוניקה מהבס
     const bassTonic = this.detectTonicFromBass(features, startFrame);
 
@@ -863,6 +866,12 @@ class ChordEngineUltimate {
 
     // 4. אקורד דומיננטי (הכי הרבה פריימים)
     const dominantChord = this.getDominantChordFromChroma(features, startFrame);
+
+    // 🔬 v16.38: Save all sources
+    this._debugInfo.bassTonic = { root: bassTonic.root, note: this.NOTES_SHARP[bassTonic.root], confidence: bassTonic.confidence };
+    this._debugInfo.ksTonic = { root: ksTonic.root, note: this.NOTES_SHARP[ksTonic.root], confidence: ksTonic.confidence };
+    this._debugInfo.firstChord = firstChord ? { root: firstChord.root, note: this.NOTES_SHARP[firstChord.root], isMinor: firstChord.isMinor, score: firstChord.score } : null;
+    this._debugInfo.dominantChord = dominantChord ? { root: dominantChord.root, note: this.NOTES_SHARP[dominantChord.root], count: dominantChord.count } : null;
 
     console.log(`  Bass says: ${this.NOTES_SHARP[bassTonic.root]} (${bassTonic.confidence}%)`);
     console.log(`  KS says:   ${this.NOTES_SHARP[ksTonic.root]} (${ksTonic.confidence}%)`);
@@ -892,6 +901,9 @@ class ChordEngineUltimate {
       votes[dominantChord.root] += 2;
     }
 
+    // 🔬 v16.38: Save votes
+    this._debugInfo.votes = this.NOTES_SHARP.map((n, i) => ({ note: n, votes: votes[i] })).filter(v => v.votes > 0);
+
     // מציאת המנצח לפי הצבעות
     let bestRoot = 0;
     let bestVotes = -1;
@@ -913,6 +925,7 @@ class ChordEngineUltimate {
           console.log(
             `  ⛔ IV/I trap detected – using FIRST CHORD ${this.NOTES_SHARP[firstChord.root]} as tonic instead of its IV (${this.NOTES_SHARP[bestRoot]})`
           );
+          this._debugInfo.ivTrap = { detected: true, from: this.NOTES_SHARP[bestRoot], to: this.NOTES_SHARP[firstChord.root] };
           bestRoot = firstChord.root;
           bestVotes = Math.max(bestVotes, firstVotes + 1);
         }
@@ -921,6 +934,9 @@ class ChordEngineUltimate {
 
     console.log(`  Votes: ${this.NOTES_SHARP.map((n, i) => votes[i] > 0 ? `${n}:${votes[i]}` : '').filter(x => x).join(', ')}`);
     console.log(`  Winner: ${this.NOTES_SHARP[bestRoot]} (${bestVotes} votes)`);
+
+    // 🔬 v16.38: Save winner
+    this._debugInfo.winner = { root: bestRoot, note: this.NOTES_SHARP[bestRoot], votes: bestVotes };
 
     // חישוב confidence לפי כמה מקורות מסכימים
     const agreers = [
@@ -937,7 +953,8 @@ class ChordEngineUltimate {
     return {
       root: bestRoot,
       confidence: Math.round(confidence),
-      method: `vote_${agreers}agree`
+      method: `vote_${agreers}agree`,
+      _debug: this._debugInfo // 🔬 Include debug info in result
     };
   }
 
