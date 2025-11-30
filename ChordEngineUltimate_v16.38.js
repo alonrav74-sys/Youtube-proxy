@@ -1,5 +1,5 @@
 /**
- * ChordEngine v16.38 - Conservative Filtering
+ * ChordEngine v16.39 - Conservative Filtering
  * 
  * Based on v16.8 (which works!) + Conservative filters from v14.36:
  * 1. HIGHER THRESHOLD: 45 (was 35) - only confident chords
@@ -28,7 +28,7 @@ class ChordEngineUltimate {
     const timings = {};
     const t0 = this.now();
 
-    console.log('🎵 ChordEngine v16.38 (Conservative - Fewer but Solid Chords)');
+    console.log('🎵 ChordEngine v16.39 (Conservative - Fewer but Solid Chords)');
 
     const audio = this.processAudio(audioBuffer);
     console.log(`✅ Audio: ${audio.duration.toFixed(1)}s @ ${audio.bpm} BPM`);
@@ -53,11 +53,11 @@ class ChordEngineUltimate {
     };
     console.log(`✅ Mode: ${key.minor ? 'MINOR' : 'MAJOR'} (${modeResult.confidence}%) [third_only]`);
 
-    // v16.38: START FROM FRAME 0 to catch intro chords (like v14.36)
+    // v16.39: START FROM FRAME 0 to catch intro chords (like v14.36)
     let timeline = this.buildChordsStableBass(features, key, 0, audio.bpm);
     console.log(`🎸 Bass engine: ${timeline.length} chords`);
     
-    // v16.38: Run HMM engine from frame 0 too
+    // v16.39: Run HMM engine from frame 0 too
     const hmmTimeline = this.buildChordsHMM(features, key, 0);
     console.log(`🎹 HMM engine: ${hmmTimeline.length} chords`);
     
@@ -65,7 +65,7 @@ class ChordEngineUltimate {
     timeline = this.mergeEngines(timeline, hmmTimeline, features, key);
     console.log(`🤝 Consensus: ${timeline.length} chords`);
 
-    // v16.38: TONIC VALIDATION after timeline (section 6)
+    // v16.39: TONIC VALIDATION after timeline (section 6)
     const validatedKey = this.validateTonicFromChords(timeline, key, features);
     if (validatedKey.root !== key.root || validatedKey.minor !== key.minor) {
       key = validatedKey;
@@ -79,13 +79,13 @@ class ChordEngineUltimate {
     timeline = this.validateWithCircleOfFifths(timeline, key, features);
     timeline = this.applyLightHMM(timeline, key);
     
-    // v16.38: Enhanced slash chord detection (section 6)
+    // v16.39: Enhanced slash chord detection (section 6)
     timeline = this.addSlashChordsEnhanced(timeline, features, key);
     
     timeline = this.addExtensions(timeline, features, key, opts);
     timeline = this.finalizeTimeline(timeline, audio.bpm, features, key);
 
-    // v16.38: AUTOMATIC STYLE PROFILE DETECTION
+    // v16.39: AUTOMATIC STYLE PROFILE DETECTION
     const stats = this.buildStats(timeline, key);
     const styleProfile = this.detectStyleProfile(stats, audio, key);
     
@@ -104,7 +104,7 @@ class ChordEngineUltimate {
       // לא מריצים enforceEasyDiatonic או smoothOutliers
     }
     
-    // v16.38: Pattern memory V2 (section 6 - fixes anomalies in repeated patterns)
+    // v16.39: Pattern memory V2 (section 6 - fixes anomalies in repeated patterns)
     timeline = this.applyPatternMemoryV2(timeline, key);
 
     timeline = timeline.filter(ev => 
@@ -124,7 +124,7 @@ class ChordEngineUltimate {
         method: tonicResult.method
       },
       mode: modeResult,
-      styleProfile,  // v16.38: easy_pop / colorful_pop / jazz_like
+      styleProfile,  // v16.39: easy_pop / colorful_pop / jazz_like
       musicStart: musicStart.time,
       bpm: audio.bpm,
       duration: audio.duration,
@@ -152,7 +152,7 @@ class ChordEngineUltimate {
     const sr0 = audioBuffer.sampleRate || 44100;
     const sr = 22050;
     
-    // v16.38: Clean signal before processing
+    // v16.39: Clean signal before processing
     const cleaned = this.cleanSignal(mono, sr0);
     const x = this.resample(cleaned, sr0, sr);
     const bpm = this.estimateTempo(x, sr);
@@ -160,7 +160,7 @@ class ChordEngineUltimate {
     return { x, sr, bpm, duration: x.length / sr };
   }
 
-  // v16.38: Clean signal - pre-emphasis + noise gate + smoothing
+  // v16.39: Clean signal - pre-emphasis + noise gate + smoothing
   cleanSignal(x, sr) {
     const out = new Float32Array(x.length);
 
@@ -261,7 +261,7 @@ class ChordEngineUltimate {
 
       const { mags, N } = this.fft(windowed);
 
-      // v16.38: Improved chroma with harmonic weighting
+      // v16.39: Improved chroma with harmonic weighting
       const chromaFrame = new Float32Array(12);
       for (let bin = 1; bin < mags.length; bin++) {
         const freq = bin * sr / N;
@@ -270,7 +270,7 @@ class ChordEngineUltimate {
         const midi = 69 + 12 * Math.log2(freq / 440);
         const pc = this.toPc(Math.round(midi));
         
-        // v16.38: Weight by harmonic clarity
+        // v16.39: Weight by harmonic clarity
         // Lower harmonics (2nd, 3rd) get more weight than high harmonics
         const octave = Math.floor(midi / 12);
         const harmonicWeight = octave >= 3 && octave <= 6 ? 1.2 : // Sweet spot
@@ -314,14 +314,14 @@ class ChordEngineUltimate {
     const sortedE = [...energy].sort((a, b) => a - b);
     const percentile = (p) => sortedE[Math.floor(p / 100 * (sortedE.length - 1))] || 0;
 
-    // v16.38: Compute spectral flux for chord change detection
+    // v16.39: Compute spectral flux for chord change detection
     const flux = this.computeSpectralFlux(chroma);
     const sortedFlux = [...flux].sort((a, b) => a - b);
     const fluxP80 = sortedFlux[Math.floor(0.80 * (sortedFlux.length - 1))] || 0;
 
     return {
       chroma, bass, bassRaw, energy, globalChroma,
-      flux, fluxP80, // v16.38: Added flux
+      flux, fluxP80, // v16.39: Added flux
       hop, sr, numFrames: chroma.length,
       secPerFrame: hop / sr,
       energyP30: percentile(30),
@@ -331,7 +331,7 @@ class ChordEngineUltimate {
     };
   }
 
-  // v16.38: Spectral flux - detects changes in chroma
+  // v16.39: Spectral flux - detects changes in chroma
   computeSpectralFlux(chroma) {
     const flux = new Float32Array(chroma.length);
     for (let i = 1; i < chroma.length; i++) {
@@ -347,7 +347,7 @@ class ChordEngineUltimate {
     return flux;
   }
 
-  // v16.38: Beat grid based on BPM
+  // v16.39: Beat grid based on BPM
   getBeatGrid(duration, bpm) {
     const spb = 60 / Math.max(60, Math.min(200, bpm));
     const beats = [];
@@ -357,7 +357,7 @@ class ChordEngineUltimate {
     return beats;
   }
 
-  // v16.38: Find candidate frames for chord changes
+  // v16.39: Find candidate frames for chord changes
   getChordChangeCandidates(features, bpm, startFrame = 0) {
     const { secPerFrame, bass, flux, fluxP80, numFrames } = features;
     const beats = this.getBeatGrid(numFrames * secPerFrame, bpm);
@@ -385,7 +385,7 @@ class ChordEngineUltimate {
   }
 
   detectBassNote(mags, sr, N) {
-    const fmin = 40, fmax = 300; // v16.38: Extended range (was 250)
+    const fmin = 40, fmax = 300; // v16.39: Extended range (was 250)
     const yLP = new Float32Array(N);
 
     // Low-pass filter for bass frequencies
@@ -395,7 +395,7 @@ class ChordEngineUltimate {
       if (freq >= fmin) {
         const omega = 2 * Math.PI * freq / sr;
         // Weight lower frequencies more
-        const weight = freq < 150 ? 1.5 : 1.0; // v16.38: Boost very low freqs
+        const weight = freq < 150 ? 1.5 : 1.0; // v16.39: Boost very low freqs
         for (let n = 0; n < N; n++) yLP[n] += mags[bin] * Math.cos(omega * n) * weight;
       }
     }
@@ -420,7 +420,7 @@ class ChordEngineUltimate {
       if (r > bestR) { bestR = r; bestLag = lag; }
     }
 
-    // v16.38: Stricter threshold (was 0.25)
+    // v16.39: Stricter threshold (was 0.25)
     if (bestLag > 0 && bestR > 0.30) {
       const f0 = sr / bestLag;
       if (f0 >= fmin && f0 <= fmax) {
@@ -471,7 +471,7 @@ class ChordEngineUltimate {
     return { mags, N };
   }
 
-  // v16.38: Improved - also detect clear pitch without bass (guitar/piano intros)
+  // v16.39: Improved - also detect clear pitch without bass (guitar/piano intros)
   findMusicStart(features) {
     const { energy, bass, chroma, secPerFrame, energyP50 } = features;
     
@@ -482,7 +482,7 @@ class ChordEngineUltimate {
       const isHighEnergy = energy[i] >= energyP50 * 0.7;
       const hasBass = bass[i] >= 0;
       
-      // v16.38: Check for clear musical pitch in chroma (for guitar/piano intros)
+      // v16.39: Check for clear musical pitch in chroma (for guitar/piano intros)
       let hasClearPitch = false;
       if (chroma && chroma[i]) {
         const c = chroma[i];
@@ -513,7 +513,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: SONG PROFILE ANALYSIS (Dynamic thresholds) - section 6
+  // v16.39: SONG PROFILE ANALYSIS (Dynamic thresholds) - section 6
   // ═══════════════════════════════════════════════════════════
 
   analyzeSongProfile(features) {
@@ -560,7 +560,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: TONIC VALIDATION FROM CHORDS - section 6
+  // v16.39: TONIC VALIDATION FROM CHORDS - section 6
   // ═══════════════════════════════════════════════════════════
 
   validateTonicFromChords(timeline, initialKey, features) {
@@ -720,7 +720,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: BETTER SLASH CHORD DETECTION - section 6
+  // v16.39: BETTER SLASH CHORD DETECTION - section 6
   // ═══════════════════════════════════════════════════════════
 
   addSlashChordsEnhanced(timeline, features, key) {
@@ -766,7 +766,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: IMPROVED PATTERN MEMORY (3+4 chord patterns) - section 6
+  // v16.39: IMPROVED PATTERN MEMORY (3+4 chord patterns) - section 6
   // ═══════════════════════════════════════════════════════════
 
   applyPatternMemoryV2(timeline, key) {
@@ -852,7 +852,7 @@ class ChordEngineUltimate {
   // ═══════════════════════════════════════════════════════════
   
   detectTonicHybrid(features, startFrame) {
-    // 🔬 v16.38: Capture all detection steps
+    // 🔬 v16.39: Capture all detection steps
     this._debugInfo = this._debugInfo || {};
     
     // 1. טוניקה מהבס
@@ -867,7 +867,7 @@ class ChordEngineUltimate {
     // 4. אקורד דומיננטי (הכי הרבה פריימים)
     const dominantChord = this.getDominantChordFromChroma(features, startFrame);
 
-    // 🔬 v16.38: Save all sources
+    // 🔬 v16.39: Save all sources
     this._debugInfo.bassTonic = { root: bassTonic.root, note: this.NOTES_SHARP[bassTonic.root], confidence: bassTonic.confidence };
     this._debugInfo.ksTonic = { root: ksTonic.root, note: this.NOTES_SHARP[ksTonic.root], confidence: ksTonic.confidence };
     this._debugInfo.firstChord = firstChord ? { root: firstChord.root, note: this.NOTES_SHARP[firstChord.root], isMinor: firstChord.isMinor, score: firstChord.score } : null;
@@ -885,15 +885,31 @@ class ChordEngineUltimate {
     // 🗳️ הצבעה בין כל המקורות
     const votes = new Array(12).fill(0);
 
-    // הבס - משקל בינוני (יכול להתבלבל עם IV)
-    votes[bassTonic.root] += (bassTonic.confidence >= 80 ? 2 : 1);
+    // 🔧 v16.39: הבס - משקל גבוה כשה-confidence גבוה מאוד!
+    // Bass עם 90%+ confidence הוא מאוד אמין
+    if (bassTonic.confidence >= 95) {
+      votes[bassTonic.root] += 5; // Very high confidence = 5 votes
+    } else if (bassTonic.confidence >= 85) {
+      votes[bassTonic.root] += 4;
+    } else if (bassTonic.confidence >= 75) {
+      votes[bassTonic.root] += 3;
+    } else {
+      votes[bassTonic.root] += 2;
+    }
 
     // KS
     votes[ksTonic.root] += (ksTonic.confidence >= 75 ? 2 : 1);
 
-    // אקורד ראשון - משקל גבוה מאוד!
+    // 🔧 v16.39: אקורד ראשון - פחות משקל אם הבס לא מסכים!
+    // שירים רבים מתחילים ב-bVI או IV, לא בטוניקה
     if (firstChord && firstChord.score >= 0.25) {
-      votes[firstChord.root] += (firstChord.score >= 0.45 ? 4 : 3);
+      // If bass strongly disagrees, reduce first chord weight
+      if (bassTonic.confidence >= 90 && bassTonic.root !== firstChord.root) {
+        votes[firstChord.root] += 2; // Reduced from 3-4
+        console.log(`  ⚠️ First chord conflicts with high-confidence bass - reducing weight`);
+      } else {
+        votes[firstChord.root] += (firstChord.score >= 0.45 ? 4 : 3);
+      }
     }
 
     // אקורד דומיננטי
@@ -901,7 +917,7 @@ class ChordEngineUltimate {
       votes[dominantChord.root] += 2;
     }
 
-    // 🔬 v16.38: Save votes
+    // 🔬 v16.39: Save votes
     this._debugInfo.votes = this.NOTES_SHARP.map((n, i) => ({ note: n, votes: votes[i] })).filter(v => v.votes > 0);
 
     // מציאת המנצח לפי הצבעות
@@ -935,7 +951,7 @@ class ChordEngineUltimate {
     console.log(`  Votes: ${this.NOTES_SHARP.map((n, i) => votes[i] > 0 ? `${n}:${votes[i]}` : '').filter(x => x).join(', ')}`);
     console.log(`  Winner: ${this.NOTES_SHARP[bestRoot]} (${bestVotes} votes)`);
 
-    // 🔬 v16.38: Save winner
+    // 🔬 v16.39: Save winner
     this._debugInfo.winner = { root: bestRoot, note: this.NOTES_SHARP[bestRoot], votes: bestVotes };
 
     // חישוב confidence לפי כמה מקורות מסכימים
@@ -991,7 +1007,11 @@ class ChordEngineUltimate {
   }
 
   getFirstStrongChord(features, startFrame) {
-    const { chroma, bass, energy, energyP70 } = features;
+    const { chroma, bass, energy, energyP70, secPerFrame } = features;
+    
+    // 🔬 DEBUG: Show chroma of first frames
+    this._debugInfo = this._debugInfo || {};
+    this._debugInfo.firstFramesChroma = [];
     
     // בודקים יותר פריימים ועם threshold נמוך יותר
     let framesChecked = 0;
@@ -1000,9 +1020,29 @@ class ChordEngineUltimate {
     for (let i = startFrame; i < chroma.length && framesChecked < 20; i++) {
       if (energy[i] >= energyP70 * 0.4) {
         framesChecked++;
+        
+        // 🔬 DEBUG: Log first 5 frames chroma
+        if (framesChecked <= 5) {
+          const chromaStr = this.NOTES_SHARP.map((n, idx) => 
+            `${n}:${chroma[i][idx].toFixed(2)}`
+          ).join(' ');
+          const timeStr = (i * secPerFrame).toFixed(2);
+          console.log(`  Frame ${i} (${timeStr}s): bass=${bass[i]>=0?this.NOTES_SHARP[bass[i]]:'?'} | ${chromaStr}`);
+          
+          this._debugInfo.firstFramesChroma.push({
+            frame: i,
+            time: parseFloat(timeStr),
+            bass: bass[i] >= 0 ? this.NOTES_SHARP[bass[i]] : null,
+            chroma: Object.fromEntries(this.NOTES_SHARP.map((n, idx) => [n, chroma[i][idx]]))
+          });
+        }
+        
         const triad = this.detectTriadFromChroma(chroma[i], bass[i]);
         if (triad && triad.score > 0.2) {
           candidates.push({ ...triad, frame: i });
+          if (framesChecked <= 5) {
+            console.log(`    → Detected: ${this.NOTES_SHARP[triad.root]}${triad.isMinor?'m':''} (score=${triad.score.toFixed(2)})`);
+          }
         }
       }
     }
@@ -1338,7 +1378,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 🎯 v16.38: STABLE BASS CHORD BUILDING with Beat-Aware Detection
+  // 🎯 v16.39: STABLE BASS CHORD BUILDING with Beat-Aware Detection
   // ═══════════════════════════════════════════════════════════
   
   buildChordsStableBass(features, key, startFrame, bpm) {
@@ -1346,7 +1386,7 @@ class ChordEngineUltimate {
     const timeline = [];
     const diatonic = this.getDiatonicInfo(key);
     
-    // v16.38: MUCH STRICTER thresholds to avoid noise
+    // v16.39: MUCH STRICTER thresholds to avoid noise
     const MIN_DURATION_SEC = 1.0;  // Was 0.6 - now full second minimum
     const CHROMA_CHANGE_THRESHOLD = 0.45;  // Was 0.35 - need bigger change
     const MIN_CONFIDENCE = 50;  // Minimum confidence to accept chord
@@ -1355,9 +1395,9 @@ class ChordEngineUltimate {
     let currentStart = startFrame;
     let currentChroma = null;
     
-    // v16.38: Get chord change candidate frames (beat-aligned + flux + bass changes)
+    // v16.39: Get chord change candidate frames (beat-aligned + flux + bass changes)
     const changeFrames = this.getChordChangeCandidates(features, bpm, startFrame);
-    console.log(`🎵 v16.38: ${changeFrames.length} chord change candidates (beat-aligned)`);
+    console.log(`🎵 v16.39: ${changeFrames.length} chord change candidates (beat-aligned)`);
     
     for (const i of changeFrames) {
       if (i >= bass.length) continue;
@@ -1602,7 +1642,7 @@ class ChordEngineUltimate {
     
     if (!key.minor) {
       borrowed.push({ root: this.toPc(key.root + 10), minor: false, from: 'bVII' }); // Bb in C
-      // v16.38: REMOVED bVI (Ab/G#) - causes confusion with E
+      // v16.39: REMOVED bVI (Ab/G#) - causes confusion with E
       borrowed.push({ root: this.toPc(key.root + 3), minor: false, from: 'bIII' });  // Eb in C
       borrowed.push({ root: this.toPc(key.root + 5), minor: true, from: 'iv' });     // Fm in C
     } else {
@@ -1658,10 +1698,10 @@ class ChordEngineUltimate {
     }
     
     if (candidates.length === 0) {
-      // v16.38: Chromatic fallback - only if VERY clear
+      // v16.39: Chromatic fallback - only if VERY clear
       for (const isMinor of [false, true]) {
         const score = this.scoreChordCandidate(avg, bassNote, isMinor, bassNote, false);
-        if (score > 60) { // v16.38: Higher threshold (was 40)
+        if (score > 60) { // v16.39: Higher threshold (was 40)
           // Check if this chromatic makes sense
           const isReasonable = this.isReasonableChromaticChord(bassNote, key, null);
           if (isReasonable || score > 80) { // Only if reasonable OR super strong
@@ -1670,8 +1710,8 @@ class ChordEngineUltimate {
               isMinor,
               inversionBass: null,
               chordType: 'chromatic',
-              score: score - 30, // v16.38: Bigger penalty (was -20)
-              priority: 20        // v16.38: Lower priority (was 30)
+              score: score - 30, // v16.39: Bigger penalty (was -20)
+              priority: 20        // v16.39: Lower priority (was 30)
             });
           }
         }
@@ -1683,9 +1723,9 @@ class ChordEngineUltimate {
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
     
-    if (best.score < 45 && durSec < 0.40) return null; // v16.38: Stricter threshold
+    if (best.score < 45 && durSec < 0.40) return null; // v16.39: Stricter threshold
     
-    // v16.38: Enharmonic substitution for unlikely chromatics
+    // v16.39: Enharmonic substitution for unlikely chromatics
     // Example: G# in C major → FORCE to E (modal interchange)
     let finalRoot = best.root;
     
@@ -1713,7 +1753,7 @@ class ChordEngineUltimate {
       }
     }
     
-    // v16.38: AUTO-CORRECT quality based on actual third (use finalRoot!)
+    // v16.39: AUTO-CORRECT quality based on actual third (use finalRoot!)
     const m3 = avg[this.toPc(finalRoot + 3)];
     const M3 = avg[this.toPc(finalRoot + 4)];
     
@@ -1755,7 +1795,7 @@ class ChordEngineUltimate {
     const M3 = this.toPc(root + 4);  // major third (E→G#)
     const fifth = this.toPc(root + 7);
     
-    // v16.38: AUTO-DETECT which third is actually present!
+    // v16.39: AUTO-DETECT which third is actually present!
     const m3Strength = avg[m3];
     const M3Strength = avg[M3];
     
@@ -1788,8 +1828,8 @@ class ChordEngineUltimate {
     }
     
     if (bassNote === root) score += 15;
-    else if (bassNote === actualThird) score += 10; // v16.38: Slightly lower for first inversion
-    else if (bassNote === fifth) score += 8;        // v16.38: Slightly lower for second inversion
+    else if (bassNote === actualThird) score += 10; // v16.39: Slightly lower for first inversion
+    else if (bassNote === fifth) score += 8;        // v16.39: Slightly lower for second inversion
     
     if (inScale) score += 8;
     
@@ -1812,7 +1852,7 @@ class ChordEngineUltimate {
     return { pcs, chords };
   }
 
-  // v16.38: Check if chromatic chord makes harmonic sense
+  // v16.39: Check if chromatic chord makes harmonic sense
   isReasonableChromaticChord(root, key, prevChord) {
     const tonicPc = key.root;
     const scale = key.minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
@@ -1823,7 +1863,7 @@ class ChordEngineUltimate {
       const bIII = this.toPc(tonicPc + 3);  // Eb in C major (common!)
       const iv = this.toPc(tonicPc + 5);    // Fm in C major (minor iv, common!)
       
-      // v16.38: REMOVED bVI (Ab/G#) - too rare and often confused with E
+      // v16.39: REMOVED bVI (Ab/G#) - too rare and often confused with E
       
       if (root === bVII || root === bIII || root === iv) {
         return true; // Common modal borrowing
@@ -1896,7 +1936,7 @@ class ChordEngineUltimate {
         continue;
       }
       
-      // v16.38: STRICT chromatic filtering
+      // v16.39: STRICT chromatic filtering
       // Non-diatonic chords must be:
       // 1. LONG (>0.8s) OR very confident (95+)
       // 2. Make harmonic sense (borrowed/secondary dominant)
@@ -1982,7 +2022,7 @@ class ChordEngineUltimate {
       const root = ev.root;
       const isMinor = ev.type === 'minor';
       
-      // v16.38: Check all chord tones properly
+      // v16.39: Check all chord tones properly
       const r = avg[root];                            // 1 (root)
       const m3 = avg[this.toPc(root + 3)];           // m3
       const M3 = avg[this.toPc(root + 4)];           // M3
@@ -2007,18 +2047,18 @@ class ChordEngineUltimate {
         label = label.replace(/m?$/, 'aug');
       }
       
-      // 3. Check for 7th chords - v16.38: More precise detection
+      // 3. Check for 7th chords - v16.39: More precise detection
       if (!label.includes('7') && !label.includes('dim') && !label.includes('aug')) {
         // Major 7th (Cmaj7) - need clear M7 without b7
         if (!isMinor && M7 > 0.10 && M7 > b7 * 1.5 && M3 > 0.08) {
-          // v16.38: Also check that M7 is significant relative to root
+          // v16.39: Also check that M7 is significant relative to root
           if (M7 > r * 0.15) {
             label = label.replace(/m$/, '') + 'maj7';
           }
         }
         // Dominant 7th (C7, G7) - only for major chords with clear b7
         else if (!isMinor && b7 > 0.10 && b7 > M7 * 1.2 && M3 > 0.08) {
-          // v16.38: b7 must be prominent enough
+          // v16.39: b7 must be prominent enough
           if (b7 > r * 0.12) {
             label += '7';
           }
@@ -2031,7 +2071,7 @@ class ChordEngineUltimate {
         }
       }
       
-      // 4. Check for sus chords - v16.38: More precise
+      // 4. Check for sus chords - v16.39: More precise
       if (!label.includes('7') && !label.includes('dim') && !label.includes('aug')) {
         const thirdPresent = M3 > 0.06 || m3 > 0.06;
         
@@ -2045,7 +2085,7 @@ class ChordEngineUltimate {
         }
       }
       
-      // 5. Add 6 if present (C6, Am6) - v16.38: Stricter to avoid melodic 6ths
+      // 5. Add 6 if present (C6, Am6) - v16.39: Stricter to avoid melodic 6ths
       if (!label.includes('7') && !label.includes('6') && !label.includes('sus')) {
         // 6 must be strong AND consistent (not just melodic passing tone)
         if (M6 > 0.12 && M6 > b7 * 1.5 && M6 > M7 * 1.5) {
@@ -2060,7 +2100,7 @@ class ChordEngineUltimate {
     });
   }
 
-  // v16.38: Enhanced filtering from v14.36 with KEY parameter
+  // v16.39: Enhanced filtering from v14.36 with KEY parameter
   finalizeTimeline(timeline, bpm, features, key) {
     if (!timeline.length) return [];
     
@@ -2077,7 +2117,7 @@ class ChordEngineUltimate {
       const energy = features.energy[ev.fi] || 0;
       const isWeak = energy < energyMedian * 0.85;
 
-      // v16.38: Use KEY to determine if diatonic (not relying on ev.inScale)
+      // v16.39: Use KEY to determine if diatonic (not relying on ev.inScale)
       const r = ev.root != null ? ev.root : this.parseRoot(ev.label);
       const isDiatonic = r >= 0 && this.inKey(r, key.root, key.minor);
 
@@ -2105,7 +2145,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: ENFORCE EARLY DIATONIC (from v14.36)
+  // v16.39: ENFORCE EARLY DIATONIC (from v14.36)
   // Forces intro chords to be diatonic, prevents noise chords
   // ═══════════════════════════════════════════════════════════
 
@@ -2204,7 +2244,7 @@ class ChordEngineUltimate {
     return -1;
   }
 
-  // v16.38: Check if pitch class is in key (from v14.36)
+  // v16.39: Check if pitch class is in key (from v14.36)
   inKey(pc, keyRoot, minor) {
     const scale = minor ? this.MINOR_SCALE : this.MAJOR_SCALE;
     const diatonic = scale.map(iv => this.toPc(keyRoot + iv));
@@ -2230,7 +2270,7 @@ class ChordEngineUltimate {
     };
   }
 
-  // v16.38: Detect if song is "easy rock" (mostly diatonic)
+  // v16.39: Detect if song is "easy rock" (mostly diatonic)
   isEasyRockSong(stats, key) {
     const total = stats.totalChords || 1;
     const inScaleRatio = stats.inScale / total;
@@ -2246,7 +2286,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: AUTOMATIC STYLE PROFILE DETECTION
+  // v16.39: AUTOMATIC STYLE PROFILE DETECTION
   // Detects: easy_pop / colorful_pop / jazz_like
   // ═══════════════════════════════════════════════════════════
 
@@ -2291,7 +2331,7 @@ class ChordEngineUltimate {
     return { mode: 'jazz_like', confidence: 0.8 };
   }
 
-  // v16.38: Force non-diatonic chords to nearest diatonic
+  // v16.39: Force non-diatonic chords to nearest diatonic
   enforceEasyDiatonic(timeline, key) {
     const diatonic = this.getDiatonicInfo(key);
     const diatonicRoots = new Set(diatonic.pcs);
@@ -2335,7 +2375,7 @@ class ChordEngineUltimate {
     });
   }
 
-  // v16.38: Remove isolated chromatic chords between identical neighbors
+  // v16.39: Remove isolated chromatic chords between identical neighbors
   smoothOutliers(timeline, key, diatonic) {
     if (timeline.length < 3) return timeline;
     const result = [...timeline];
@@ -2403,7 +2443,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: HMM ENGINE (parallel to Bass engine)
+  // v16.39: HMM ENGINE (parallel to Bass engine)
   // ═══════════════════════════════════════════════════════════
   
   buildChordsHMM(features, key, startFrame) {
@@ -2564,7 +2604,7 @@ class ChordEngineUltimate {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // v16.38: MERGE ENGINES - Compare and choose best
+  // v16.39: MERGE ENGINES - Compare and choose best
   // ═══════════════════════════════════════════════════════════
   
   mergeEngines(bassTimeline, hmmTimeline, features, key) {
