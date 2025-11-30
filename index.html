@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ChordFinderPro v16.36 🎵 Ultimate Precision</title>
+  <title>ChordFinderPro v16.39 🎵 Ultimate Precision</title>
   
   <!-- PWA Meta Tags -->
   <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, וסנכרון lyrics" />
@@ -81,7 +81,7 @@
 <body>
 
   <div class="wrap">
-    <h1>Chord Finder Pro v16.36
+    <h1>Chord Finder Pro v16.39
       <span class="badge pro">AI + Profiles</span>
       <span class="badge whisper">Groq Whisper</span>
     </h1>
@@ -218,10 +218,10 @@ C Am F G C Am F G Em
         <span class="badge">משך: <b id="dur">—</b></span>
         <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
           סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
-          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v16.36</button>
+          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v16.39</button>
         </div>
         <div id="debugPanel" style="display:none;background:#0a0f1a;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-top:10px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;">
-          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v16.36</div>
+          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v16.39</div>
           <pre id="debugOutput" style="color:#a0e0ff;white-space:pre-wrap;margin:0;max-height:300px;overflow-y:auto;">Waiting for analysis...</pre>
         </span>
         <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
@@ -290,7 +290,7 @@ C Am F G C Am F G Em
     </section>
   </div>
 
-<!-- Load ChordEngine v16.36 + ChordEvalSimple -->
+<!-- Load ChordEngine v16.39 + ChordEvalSimple -->
 <script src="ChordEngineUltimate_v16.38.js"></script>
 <script src="SyncEngine_v6.14_FIXED.js"></script>
 <script src="ChordEvalSimple.js"></script>
@@ -306,7 +306,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   try {
     engine = new ChordEngineUltimate();
-    console.log('✅ Engine v16.36 with AI Profiles initialized');
+    console.log('✅ Engine v16.39 with AI Profiles initialized');
   } catch(e) {
     alert('❌ שגיאה ביצירת Engine: ' + e.message);
     throw e;
@@ -898,12 +898,12 @@ analyzeBtn.onclick=async()=>{
     durEl.textContent = audioData.duration.toFixed(1)+'s';
     if(audioData.url) player.src = audioData.url;
     
-    showAnalyzing('שלב 2/3: זיהוי אקורדים (v16.36 AI Profiles)');
+    showAnalyzing('שלב 2/3: זיהוי אקורדים (v16.39 AI Profiles)');
     
-    // v16.36 - AUTO profile detection
+    // v16.39 - AUTO profile detection
     const result = await engine.detect(audioData.audioBuffer, {});
     
-    // 🔬 v16.36 OUTPUT
+    // 🔬 v16.39 OUTPUT
     const debugEl = document.getElementById('debugOutput');
     if (debugEl && result) {
       const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -958,6 +958,18 @@ analyzeBtn.onclick=async()=>{
         dbg += `   M3: ${result.mode.M3?.toFixed(3) || 'N/A'}\n`;
         dbg += `   ratio: ${result.mode.ratio?.toFixed(2) || 'N/A'}\n`;
       }
+      
+      // 🔬 Show first frames chroma analysis
+      if (tonicDebug && tonicDebug.firstFramesChroma && tonicDebug.firstFramesChroma.length > 0) {
+        dbg += `\n🔬 FIRST FRAMES CHROMA:\n`;
+        tonicDebug.firstFramesChroma.forEach((f, i) => {
+          dbg += `   Frame ${i+1} @ ${f.time}s (bass=${f.bass || '?'}):\n`;
+          // Show top 4 notes
+          const sorted = Object.entries(f.chroma).sort((a,b) => b[1] - a[1]).slice(0,4);
+          dbg += `     Top: ${sorted.map(([n,v]) => `${n}:${v.toFixed(2)}`).join(' ')}\n`;
+        });
+      }
+      
       if (result.chords && result.chords.length > 0) {
         dbg += `\n🎸 FIRST 10 CHORDS:\n`;
         result.chords.slice(0, 10).forEach((c, i) => {
@@ -1024,7 +1036,7 @@ analyzeBtn.onclick=async()=>{
     
     modeBadge.textContent = modeString + ` (${modeObj.confidence}%)`;
     
-    // v16.36: הצגת פרופיל
+    // v16.39: הצגת פרופיל
     if (detectedProfile) {
       profileBadge.style.display = 'inline-flex';
       profileValue.textContent = detectedProfile.toUpperCase();
@@ -1054,7 +1066,7 @@ analyzeBtn.onclick=async()=>{
       buildFullLyricsSheet(isRTL);
     }
     
-    ok(`✅ v16.36 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
+    ok(`✅ v16.39 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
     hookPlaybackLive(); 
     refreshSheetTabView();
     playBtn.disabled=false; 
