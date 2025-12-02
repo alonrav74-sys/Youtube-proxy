@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ChordFinderPro v14.50 🎵 Ultimate Precision</title>
+  <title>ChordFinderPro v14.51 🎵 Ultimate Precision</title>
   
   <!-- PWA Meta Tags -->
   <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, וסנכרון lyrics" />
@@ -81,7 +81,7 @@
 <body>
 
   <div class="wrap">
-    <h1>Chord Finder Pro v14.50
+    <h1>Chord Finder Pro v14.51
       <span class="badge pro">AI + Profiles</span>
       <span class="badge whisper">Groq Whisper</span>
     </h1>
@@ -218,10 +218,10 @@ C Am F G C Am F G Em
         <span class="badge">משך: <b id="dur">—</b></span>
         <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
           סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
-          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v14.50</button>
+          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v14.51</button>
         </div>
         <div id="debugPanel" style="display:none;background:#0a0f1a;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-top:10px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;">
-          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v14.50</div>
+          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v14.51</div>
           <pre id="debugOutput" style="color:#a0e0ff;white-space:pre-wrap;margin:0;max-height:300px;overflow-y:auto;">Waiting for analysis...</pre>
         </span>
         <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
@@ -290,8 +290,8 @@ C Am F G C Am F G Em
     </section>
   </div>
 
-<!-- Load ChordEngine v14.50 + ChordEvalSimple -->
-<script src="ChordEngineEnhanced_v14.50.js"></script>
+<!-- Load ChordEngine v14.51 + ChordEvalSimple -->
+<script src="ChordEngineEnhanced_v14.51.js"></script>
 <script src="SyncEngine_v6.14_FIXED.js"></script>
 <script src="ChordEvalSimple.js"></script>
 <script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded')"></script>
@@ -301,12 +301,12 @@ C Am F G C Am F G Em
 let engine;
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngineEnhanced_v14.50.js לא נטען!');
+    alert('❌ ChordEngineEnhanced_v14.51.js לא נטען!');
     throw new Error('Engine not loaded');
   }
   try {
     engine = new ChordEngineEnhanced();
-    console.log('✅ Engine v14.50 with AI Profiles initialized');
+    console.log('✅ Engine v14.51 with AI Profiles initialized');
   } catch(e) {
     alert('❌ שגיאה ביצירת Engine: ' + e.message);
     throw e;
@@ -898,12 +898,12 @@ analyzeBtn.onclick=async()=>{
     durEl.textContent = audioData.duration.toFixed(1)+'s';
     if(audioData.url) player.src = audioData.url;
     
-    showAnalyzing('שלב 2/3: זיהוי אקורדים (v14.50 AI Profiles)');
+    showAnalyzing('שלב 2/3: זיהוי אקורדים (v14.51 AI Profiles)');
     
-    // v14.50 - AUTO profile detection
+    // v14.51 - AUTO profile detection
     const result = await engine.detect(audioData.audioBuffer, {});
     
-    // 🔬 v14.50 OUTPUT
+    // 🔬 v14.51 OUTPUT
     const debugEl = document.getElementById('debugOutput');
     if (debugEl && result) {
       const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -938,7 +938,7 @@ analyzeBtn.onclick=async()=>{
         }
         dbg += `───────────────────────────────────────\n`;
         
-        // v14.50: Show bass histogram
+        // v14.51: Show bass histogram
         if (tonicDebug.bassHist && tonicDebug.bassHist.length > 0) {
           dbg += `   BASS NOTES: ${tonicDebug.bassHist.slice(0, 6).map(b => `${b.note}:${b.count}`).join(', ')}\n`;
         }
@@ -1047,7 +1047,7 @@ analyzeBtn.onclick=async()=>{
     
     modeBadge.textContent = modeString + ` (${modeObj.confidence}%)`;
     
-    // v14.50: הצגת פרופיל
+    // v14.51: הצגת פרופיל
     if (detectedProfile) {
       profileBadge.style.display = 'inline-flex';
       profileValue.textContent = detectedProfile.toUpperCase();
@@ -1077,7 +1077,7 @@ analyzeBtn.onclick=async()=>{
       buildFullLyricsSheet(isRTL);
     }
     
-    ok(`✅ v14.50 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
+    ok(`✅ v14.51 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
     hookPlaybackLive(); 
     refreshSheetTabView();
     playBtn.disabled=false; 
