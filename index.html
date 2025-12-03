@@ -950,15 +950,20 @@ analyzeBtn.onclick=async()=>{
     
     showAnalyzing('שלב 2/3: זיהוי אקורדים (v16.0 Modular)');
     
-    // ✅ v16.0 - Call with options to enable Bass + Refiner
-    const result = await engine.detect(audioData.audioBuffer, {
+    // ✅ v16.0 - Support both ChordEngine.detect and ChordIntegrator.analyze
+    const options = {
       useBassEngine: true,          // Enable bass analysis
       useMajorMinorRefiner: true,   // Enable major/minor refinement
       bassEnergyPercentile: 75,
       refinerDecisionThreshold: 0.20,
       refinerMinConfidenceToOverride: 0.65,
       debug: true
-    });
+    };
+    
+    // Check if using integrator or direct engine
+    const result = integrator 
+      ? await integrator.analyze(audioData.audioBuffer, options)
+      : await engine.detect(audioData.audioBuffer, options);
     
     // 🔬 v16.0 OUTPUT
     const debugEl = document.getElementById('debugOutput');
@@ -973,7 +978,17 @@ analyzeBtn.onclick=async()=>{
         dbg += `   Music Start: ${result.musicStart.toFixed(2)}s\n`;
       }
       
-      // Show if engines were used
+      // ✅ Show integration stats if using ChordIntegrator
+      if (result.integrationStats) {
+        dbg += `\n📊 INTEGRATION STATS:\n`;
+        dbg += `   Total chords: ${result.integrationStats.total}\n`;
+        dbg += `   ✅ Agreements: ${result.integrationStats.agreements}\n`;
+        dbg += `   ⚠️ Conflicts resolved: ${result.integrationStats.conflictsResolved}\n`;
+        dbg += `   🎸 Bass overrides: ${result.integrationStats.bassOverrides}\n`;
+        dbg += `   🎹 Refiner overrides: ${result.integrationStats.refinerOverrides}\n`;
+      }
+      
+      // Show if engines were used (old format for backward compatibility)
       if (result.bassTimeline && result.bassTimeline.length > 0) {
         dbg += `   🎸 BassEngine: ${result.bassTimeline.length} segments\n`;
       }
@@ -992,7 +1007,14 @@ analyzeBtn.onclick=async()=>{
         dbg += `\n🎸 FIRST 10 CHORDS:\n`;
         result.chords.slice(0, 10).forEach((c, i) => {
           const refined = c.refinedBy ? ' [REFINED]' : '';
-          dbg += `   ${i+1}. ${c.label}${refined} @ ${c.t?.toFixed(2)}s\n`;
+          const confidence = c.confidence ? ` (${c.confidence})` : '';
+          const flags = [];
+          if (c.engineAgreement) flags.push('✅');
+          if (c.conflictResolved) flags.push('⚠️');
+          if (c.bassOverride) flags.push('🎸');
+          if (c.refinerOverride) flags.push('🎹');
+          const flagStr = flags.length ? ` ${flags.join('')}` : '';
+          dbg += `   ${i+1}. ${c.label}${refined}${confidence}${flagStr} @ ${c.t?.toFixed(2)}s\n`;
         });
       }
       
