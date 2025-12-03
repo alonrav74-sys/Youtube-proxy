@@ -300,14 +300,14 @@ C Am F G C Am F G Em
 <!-- ChordEngine will automatically use Bass + Refiner if available          -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
-<!-- 1️⃣ ChordEngine v14.50 (baseline) -->
-<script src="ChordEngine_v14.50.js"></script>
-
-<!-- 2️⃣ BassEngine (optional - comment out to disable) -->
+<!-- 1️⃣ BassEngine (optional - comment out to disable) -->
 <script src="BassEngine_v2.0.js"></script>
 
-<!-- 3️⃣ MajorMinorRefiner (optional - comment out to disable) -->
+<!-- 2️⃣ MajorMinorRefiner (optional - comment out to disable) -->
 <script src="MajorMinorRefiner_v2.0.js"></script>
+
+<!-- 3️⃣ ChordEngine (required - uses engines above if loaded) -->
+<script src="ChordEngine_v14.50_OPTIMIZED.js"></script>
 
 <!-- 4️⃣ ChordIntegrator (combines all engines) -->
 <script src="ChordIntegrator.js"></script>
@@ -319,16 +319,14 @@ C Am F G C Am F G Em
 <script src="hebrew-spell-checker.js" onerror="console.warn('hebrew-spell-checker not loaded')"></script>
 
 <script>
-// Global engine variables
-window.engine = null;
-window.integrator = null;
+let engine;
+let integrator = null;
 
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngine_v14.50.js לא נטען!');
+    alert('❌ ChordEngine_v14.50_OPTIMIZED.js לא נטען!');
     throw new Error('Engine not loaded');
   }
-  
   try {
     const chordEngine = new ChordEngineEnhanced();
     
@@ -337,39 +335,31 @@ window.addEventListener('DOMContentLoaded', () => {
     const hasRefiner = typeof MajorMinorRefiner !== 'undefined';
     const hasIntegrator = typeof ChordIntegrator !== 'undefined';
     
-    console.log('🔍 Checking engines...');
-    console.log(`   ChordEngineEnhanced: ${typeof ChordEngineEnhanced !== 'undefined' ? '✅' : '❌'}`);
+    // Try to create integrator if all engines available
+    if (hasIntegrator && hasBass && hasRefiner) {
+      try {
+        const bassEngine = new BassEngine();
+        const refiner = new MajorMinorRefiner();
+        integrator = new ChordIntegrator(chordEngine, bassEngine, refiner);
+        engine = chordEngine; // Keep original for compatibility
+        console.log('✅ ChordFinderPro v16.0 MODULAR initialized');
+        console.log(`   ChordIntegrator: ✅ (all 4 engines active)`);
+      } catch(e) {
+        console.warn('⚠️ Failed to create integrator:', e);
+        engine = chordEngine;
+      }
+    } else {
+      engine = chordEngine;
+      console.log('✅ ChordFinderPro v16.0 initialized');
+    }
+    
+    console.log(`   ChordEngine: ✅`);
     console.log(`   BassEngine: ${hasBass ? '✅' : '❌'}`);
     console.log(`   MajorMinorRefiner: ${hasRefiner ? '✅' : '❌'}`);
-    console.log(`   ChordIntegrator: ${hasIntegrator ? '✅' : '❌'}`);
-    
-    // Initialize engines
-    const bassEngine = hasBass ? new BassEngine() : null;
-    const refiner = hasRefiner ? new MajorMinorRefiner() : null;
-    
-    // Create integrator if available, otherwise use ChordEngine directly
-    if (hasIntegrator && bassEngine && refiner) {
-      window.integrator = new ChordIntegrator(chordEngine, bassEngine, refiner);
-      window.engine = window.integrator; // For backward compatibility
-      console.log('✅ ChordFinderPro v16.0 MODULAR initialized');
-      console.log(`   All 4 engines active! 🚀`);
-    } else {
-      window.engine = chordEngine;
-      console.log('✅ ChordFinderPro v16.0 initialized (ChordEngine only)');
-      if (!hasBass) console.warn('⚠️ BassEngine not loaded');
-      if (!hasRefiner) console.warn('⚠️ MajorMinorRefiner not loaded');
-      if (!hasIntegrator) console.warn('⚠️ ChordIntegrator not loaded');
-    }
-    
-    // Verify engine is accessible
-    if (!window.engine) {
-      throw new Error('Engine initialization failed!');
-    }
-    console.log('✅ Engine is ready:', typeof window.engine);
+    console.log(`   ChordIntegrator: ${integrator ? '✅' : '❌'}`);
     
   } catch(e) {
     alert('❌ שגיאה ביצירת Engine: ' + e.message);
-    console.error('Engine initialization error:', e);
     throw e;
   }
 });
@@ -820,7 +810,7 @@ function parseRoot(label){
   const m=label?.match?.(/^([A-G](?:#|b)?)/); 
   if(!m) return -1; 
   const nm=m[1].replace('b','#'); 
-  return window.engine.NOTES_SHARP.indexOf(nm); 
+  return engine.NOTES_SHARP.indexOf(nm); 
 }
 
 function applyCapoToLabel(label, capo){
@@ -866,7 +856,7 @@ function sanitizeLabel(lbl){
 }
 
 function smartEnharmonic(label, key) {
-  if (!label || !key || !window.engine) return label;
+  if (!label || !key || !engine) return label;
   
   const keySignatures = {
     'G': 1, 'D': 2, 'A': 3, 'E': 4, 'B': 5, 'F#': 6, 'C#': 7,
@@ -876,7 +866,7 @@ function smartEnharmonic(label, key) {
     'C': 0, 'Am': 0
   };
   
-  const keyName = window.engine.NOTES_SHARP[window.engine.toPc(key.root)] + (key.minor ? 'm' : '');
+  const keyName = engine.NOTES_SHARP[engine.toPc(key.root)] + (key.minor ? 'm' : '');
   const signature = keySignatures[keyName] || 0;
   const useFlats = signature < 0;
   
@@ -961,25 +951,19 @@ analyzeBtn.onclick=async()=>{
     
     showAnalyzing('שלב 2/3: זיהוי אקורדים (v16.0 Modular)');
     
-    // ✅ v16.0 - Support both ChordEngine.detect and ChordIntegrator.analyze
+    // ✅ v16.0 - Use integrator if available, else ChordEngine
     const options = {
-      useBassEngine: true,          // Enable bass analysis
-      useMajorMinorRefiner: true,   // Enable major/minor refinement
+      useBassEngine: true,
+      useMajorMinorRefiner: true,
       bassEnergyPercentile: 75,
       refinerDecisionThreshold: 0.20,
       refinerMinConfidenceToOverride: 0.65,
       debug: true
     };
     
-    // Verify engine is ready
-    if (!window.engine) {
-      throw new Error('Engine לא הוגדר נכון! נסה לרענן את הדף.');
-    }
-    
-    // Check if using integrator or direct engine
-    const result = window.integrator 
-      ? await window.integrator.analyze(audioData.audioBuffer, options)
-      : await window.engine.detect(audioData.audioBuffer, options);
+    const result = integrator 
+      ? await integrator.analyze(audioData.audioBuffer, options)
+      : await engine.detect(audioData.audioBuffer, options);
     
     // 🔬 v16.0 OUTPUT
     const debugEl = document.getElementById('debugOutput');
@@ -987,24 +971,24 @@ analyzeBtn.onclick=async()=>{
       const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       let dbg = '';
       dbg += `═══════════════════════════════════════\n`;
-      dbg += `🎯 FINAL RESULT (v16.0 MODULAR):\n`;
+      dbg += `🎯 FINAL RESULT (v16.0 ${integrator ? 'MODULAR' : 'STANDARD'}):\n`;
       dbg += `   Key: ${NOTES[result.key.root]} ${result.key.minor ? 'minor' : 'major'}\n`;
       dbg += `   Confidence: ${(result.key.confidence * 100).toFixed(0)}%\n`;
       if (result.musicStart !== undefined) {
         dbg += `   Music Start: ${result.musicStart.toFixed(2)}s\n`;
       }
       
-      // ✅ Show integration stats if using ChordIntegrator
+      // Show integration stats if available
       if (result.integrationStats) {
         dbg += `\n📊 INTEGRATION STATS:\n`;
-        dbg += `   Total chords: ${result.integrationStats.total}\n`;
+        dbg += `   Total: ${result.integrationStats.total}\n`;
         dbg += `   ✅ Agreements: ${result.integrationStats.agreements}\n`;
-        dbg += `   ⚠️ Conflicts resolved: ${result.integrationStats.conflictsResolved}\n`;
+        dbg += `   ⚠️ Conflicts: ${result.integrationStats.conflictsResolved}\n`;
         dbg += `   🎸 Bass overrides: ${result.integrationStats.bassOverrides}\n`;
         dbg += `   🎹 Refiner overrides: ${result.integrationStats.refinerOverrides}\n`;
       }
       
-      // Show if engines were used (old format for backward compatibility)
+      // Show if engines were used (old format)
       if (result.bassTimeline && result.bassTimeline.length > 0) {
         dbg += `   🎸 BassEngine: ${result.bassTimeline.length} segments\n`;
       }
@@ -1023,14 +1007,7 @@ analyzeBtn.onclick=async()=>{
         dbg += `\n🎸 FIRST 10 CHORDS:\n`;
         result.chords.slice(0, 10).forEach((c, i) => {
           const refined = c.refinedBy ? ' [REFINED]' : '';
-          const confidence = c.confidence ? ` (${c.confidence})` : '';
-          const flags = [];
-          if (c.engineAgreement) flags.push('✅');
-          if (c.conflictResolved) flags.push('⚠️');
-          if (c.bassOverride) flags.push('🎸');
-          if (c.refinerOverride) flags.push('🎹');
-          const flagStr = flags.length ? ` ${flags.join('')}` : '';
-          dbg += `   ${i+1}. ${c.label}${refined}${confidence}${flagStr} @ ${c.t?.toFixed(2)}s\n`;
+          dbg += `   ${i+1}. ${c.label}${refined} @ ${c.t?.toFixed(2)}s\n`;
         });
       }
       
@@ -1069,7 +1046,7 @@ analyzeBtn.onclick=async()=>{
     
     const capo=parseInt(capoEl.value||'0',10);
     
-    if (!window.engine || !window.engine.NOTES_SHARP) {
+    if (!engine || !engine.NOTES_SHARP) {
       console.error('Engine not properly initialized!');
       err('שגיאה: Engine לא הוגדר נכון');
       return;
@@ -1077,7 +1054,7 @@ analyzeBtn.onclick=async()=>{
     
     const updateKeyDisplay = () => {
       const currentKey = window.__STATE ? window.__STATE.key : key;
-      const displayKey = applyCapoToLabel(window.engine.NOTES_SHARP[window.engine.toPc(currentKey.root)]+(currentKey.minor?'m':''), capo);
+      const displayKey = applyCapoToLabel(engine.NOTES_SHARP[engine.toPc(currentKey.root)]+(currentKey.minor?'m':''), capo);
       if (keyBadge.textContent !== displayKey) {
         keyBadge.textContent = displayKey;
       }
@@ -1100,9 +1077,9 @@ analyzeBtn.onclick=async()=>{
       profileValue.textContent = detectedProfile.toUpperCase();
     }
     
-    const tonic = window.engine.NOTES_SHARP[window.engine.toPc(key.root)];
+    const tonic = engine.NOTES_SHARP[engine.toPc(key.root)];
     const keyMode = key.minor ? 'minor' : 'major';
-    const diatonicChords = window.engine.getDiatonicChords(tonic, keyMode);
+    const diatonicChords = engine.getDiatonicChords(tonic, keyMode);
     const circleEl = document.getElementById('circleOfFifths');
     circleEl.innerHTML = diatonicChords.map(name => {
       const displayLabel = applyCapoToLabel(name, capo);
@@ -1205,8 +1182,8 @@ async function decodeYouTubeAudio(video){
 function getHarmonicFunction(label, key){
   const rootPc = parseRoot(label); 
   if(rootPc<0) return '—';
-  const rel = window.engine.toPc(rootPc - key.root);
-  const scale = key.minor? window.engine.MINOR_SCALE : window.engine.MAJOR_SCALE;
+  const rel = engine.toPc(rootPc - key.root);
+  const scale = key.minor? engine.MINOR_SCALE : engine.MAJOR_SCALE;
   let bestDeg = null, bestDist=999;
   for(let d=0; d<scale.length; d++){
     const dist = Math.min((rel-scale[d]+12)%12,(scale[d]-rel+12)%12);
@@ -1456,8 +1433,8 @@ function transposeDown() {
 function applyTranspose() {
   const st = window.__STATE;
   if(!st) return;
-  const newRoot = window.engine.toPc(st.key.root + transposeOffset);
-  const keyLabel = window.engine.NOTES_SHARP[window.engine.toPc(newRoot)] + (st.key.minor ? 'm' : '');
+  const newRoot = engine.toPc(st.key.root + transposeOffset);
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(newRoot)] + (st.key.minor ? 'm' : '');
   const capo = parseInt(capoEl.value || '0', 10);
   keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
   st.timeline.forEach(ev => {
@@ -1465,14 +1442,14 @@ function applyTranspose() {
     const originalRoot = parseRoot(ev.label);
     if(originalRoot < 0) return;
     const quality = ev.label.replace(/^[A-G](?:#|b)?/, '');
-    const newChordRoot = window.engine.toPc(originalRoot + transposeOffset);
-    const newLabel = window.engine.NOTES_SHARP[window.engine.toPc(newChordRoot)] + quality;
+    const newChordRoot = engine.toPc(originalRoot + transposeOffset);
+    const newLabel = engine.NOTES_SHARP[engine.toPc(newChordRoot)] + quality;
     if(!ev._originalLabel) ev._originalLabel = ev.label;
     ev.label = newLabel;
   });
   refreshSheetTabView();
-  const circleChords = window.engine.buildCircleOfFifths({
-    root: window.engine.toPc(st.key.root + transposeOffset),
+  const circleChords = engine.buildCircleOfFifths({
+    root: engine.toPc(st.key.root + transposeOffset),
     minor: st.key.minor
   });
   const circleEl = document.getElementById('circleOfFifths');
@@ -1486,11 +1463,11 @@ function toggleMajorMinor() {
   const st = window.__STATE;
   if(!st) return;
   st.key.minor = !st.key.minor;
-  const keyLabel = window.engine.NOTES_SHARP[window.engine.toPc(st.key.root)] + (st.key.minor ? 'm' : '');
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(st.key.root)] + (st.key.minor ? 'm' : '');
   const capo = parseInt(capoEl.value || '0', 10);
   keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
   modeBadge.textContent = st.key.minor ? 'Minor' : 'Major';
-  const circleChords = window.engine.buildCircleOfFifths(st.key);
+  const circleChords = engine.buildCircleOfFifths(st.key);
   const circleEl = document.getElementById('circleOfFifths');
   circleEl.innerHTML = circleChords.map(ch => {
     const displayLabel = applyCapoToLabel(ch.label, capo);
@@ -1501,7 +1478,7 @@ function toggleMajorMinor() {
 function refreshKeyDisplay() {
   if(!window.__STATE) return;
   const capo = parseInt(capoEl.value || '0', 10);
-  const keyLabel = window.engine.NOTES_SHARP[window.engine.toPc(window.__STATE.key.root)] + (window.__STATE.key.minor ? 'm' : '');
+  const keyLabel = engine.NOTES_SHARP[engine.toPc(window.__STATE.key.root)] + (window.__STATE.key.minor ? 'm' : '');
   keyBadge.textContent = applyCapoToLabel(keyLabel, capo);
 }
 
