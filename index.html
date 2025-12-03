@@ -300,14 +300,17 @@ C Am F G C Am F G Em
 <!-- ChordEngine will automatically use Bass + Refiner if available          -->
 <!-- ═══════════════════════════════════════════════════════════════════════ -->
 
-<!-- 1️⃣ BassEngine (optional - comment out to disable) -->
+<!-- 1️⃣ ChordEngine v14.50 (baseline) -->
+<script src="ChordEngine_v14.50.js"></script>
+
+<!-- 2️⃣ BassEngine (optional - comment out to disable) -->
 <script src="BassEngine_v2.0.js"></script>
 
-<!-- 2️⃣ MajorMinorRefiner (optional - comment out to disable) -->
+<!-- 3️⃣ MajorMinorRefiner (optional - comment out to disable) -->
 <script src="MajorMinorRefiner_v2.0.js"></script>
 
-<!-- 3️⃣ ChordEngine (required - uses engines above if loaded) -->
-<script src="ChordEngine_v14.50_OPTIMIZED.js"></script>
+<!-- 4️⃣ ChordIntegrator (combines all engines) -->
+<script src="ChordIntegrator.js"></script>
 
 <!-- Support files -->
 <script src="SyncEngine_v6.14_FIXED.js" onerror="console.warn('SyncEngine not loaded')"></script>
@@ -317,22 +320,43 @@ C Am F G C Am F G Em
 
 <script>
 let engine;
+let integrator;
+
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngine_v14.50_OPTIMIZED.js לא נטען!');
+    alert('❌ ChordEngine_v14.50.js לא נטען!');
     throw new Error('Engine not loaded');
   }
+  
   try {
-    engine = new ChordEngineEnhanced();
+    const chordEngine = new ChordEngineEnhanced();
     
     // Check which engines are available
     const hasBass = typeof BassEngine !== 'undefined';
     const hasRefiner = typeof MajorMinorRefiner !== 'undefined';
+    const hasIntegrator = typeof ChordIntegrator !== 'undefined';
     
-    console.log('✅ ChordFinderPro v16.0 initialized');
-    console.log(`   ChordEngine: ✅`);
-    console.log(`   BassEngine: ${hasBass ? '✅' : '❌ (not loaded)'}`);
-    console.log(`   MajorMinorRefiner: ${hasRefiner ? '✅' : '❌ (not loaded)'}`);
+    // Initialize engines
+    const bassEngine = hasBass ? new BassEngine() : null;
+    const refiner = hasRefiner ? new MajorMinorRefiner() : null;
+    
+    // Create integrator if available, otherwise use ChordEngine directly
+    if (hasIntegrator && bassEngine && refiner) {
+      integrator = new ChordIntegrator(chordEngine, bassEngine, refiner);
+      engine = integrator; // For backward compatibility
+      console.log('✅ ChordFinderPro v16.0 MODULAR initialized');
+      console.log(`   ChordEngine: ✅`);
+      console.log(`   BassEngine: ✅`);
+      console.log(`   MajorMinorRefiner: ✅`);
+      console.log(`   ChordIntegrator: ✅`);
+    } else {
+      engine = chordEngine;
+      console.log('✅ ChordFinderPro v16.0 initialized (ChordEngine only)');
+      console.log(`   ChordEngine: ✅`);
+      console.log(`   BassEngine: ${hasBass ? '✅' : '❌ (not loaded)'}`);
+      console.log(`   MajorMinorRefiner: ${hasRefiner ? '✅' : '❌ (not loaded)'}`);
+      console.log(`   ChordIntegrator: ${hasIntegrator ? '⚠️ (engines missing)' : '❌ (not loaded)'}`);
+    }
   } catch(e) {
     alert('❌ שגיאה ביצירת Engine: ' + e.message);
     throw e;
