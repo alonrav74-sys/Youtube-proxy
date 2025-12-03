@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ChordFinderPro v14.50 🎵 Ultimate Precision</title>
+  <title>ChordFinderPro v16.0 🎵 Ultimate Precision</title>
   
   <!-- PWA Meta Tags -->
   <meta name="description" content="🎵 זיהוי אקורדים מתקדם עם AI - תמיכה ב-YouTube, inversions, extensions, וסנכרון lyrics" />
@@ -35,6 +35,8 @@
     .badge{display:inline-flex;gap:6px;align-items:center;background:#0b1221;border:1px solid #1f2937;color:#cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px}
     .badge.pro{border-color:#664d23;background:#2e1f0d;color:#ffd7a3}
     .badge.whisper{border-color:#38bdf8;background:#0a1f2e;color:#bae6fd}
+    .badge.bass{border-color:#f59e0b;background:#3a2a0c;color:#fff0d9}
+    .badge.refiner{border-color:#a855f7;background:#2e1f3a;color:#e9d5ff}
     .live{background:#0c162b;border:1px solid #1f2a40;border-radius:16px;padding:18px;margin-top:10px}
     .live .title{color:#a9b4c8;font-size:13px}
     .live .ch{font-weight:800;font-size:42px}
@@ -81,15 +83,17 @@
 <body>
 
   <div class="wrap">
-    <h1>Chord Finder Pro v14.50
+    <h1>Chord Finder Pro v16.0
       <span class="badge pro">AI + Profiles</span>
       <span class="badge whisper">Groq Whisper</span>
+      <span class="badge bass">🎸 Bass</span>
+      <span class="badge refiner">🎵 M/m</span>
     </h1>
     <div class="muted">
       אקורדים מעל מילים בזמן אמת + דף נגינה מלא. RTL/LTR אוטומטי.<br>
       <small style="opacity:0.7;font-size:11px">
         Powered by <strong>Groq Whisper</strong> • 
-        Harmonic AI + Auto Profiles • 
+        Harmonic AI + Auto Profiles + BassEngine + MajorMinorRefiner • 
         Built by <strong>Alon</strong>
       </small>
     </div>
@@ -218,12 +222,12 @@ C Am F G C Am F G Em
         <span class="badge">משך: <b id="dur">—</b></span>
         <span class="badge" style="cursor:pointer" title="לחץ להחלפת מז'ור/מינור">
           סולם: <b id="keyBadge" onclick="toggleMajorMinor()">—</b>
-          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v14.50</button>
-        </div>
-        <div id="debugPanel" style="display:none;background:#0a0f1a;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-top:10px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;">
-          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 TONIC DETECTION v14.50</div>
-          <pre id="debugOutput" style="color:#a0e0ff;white-space:pre-wrap;margin:0;max-height:300px;overflow-y:auto;">Waiting for analysis...</pre>
+          <button onclick="document.getElementById('debugPanel').style.display=document.getElementById('debugPanel').style.display==='none'?'block':'none'" style="margin-right:10px;background:#1a1a2e;border:1px solid #38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;">🔍 v16.0</button>
         </span>
+        <div id="debugPanel" style="display:none;background:#0a0f1a;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-top:10px;font-family:monospace;font-size:12px;direction:ltr;text-align:left;">
+          <div style="color:#f59e0b;font-weight:bold;margin-bottom:8px;">🔬 MODULAR SYSTEM v16.0</div>
+          <pre id="debugOutput" style="color:#a0e0ff;white-space:pre-wrap;margin:0;max-height:300px;overflow-y:auto;">Waiting for analysis...</pre>
+        </div>
         <button onclick="refreshKeyDisplay()" style="padding:4px 10px;font-size:12px" title="רענן סולם">🔄</button>
         <button onclick="transposeDown()" style="padding:4px 10px;font-size:12px" title="הורד חצי טון">♭</button>
         <button onclick="transposeUp()" style="padding:4px 10px;font-size:12px" title="העלה חצי טון">♯</button>
@@ -290,10 +294,24 @@ C Am F G C Am F G Em
     </section>
   </div>
 
-<!-- Load ChordEngine v14.50 + ChordEvalSimple -->
-<script src="ChordEngineEnhanced_v14.50.js"></script>
-<script src="SyncEngine_v6.14_FIXED.js"></script>
-<script src="ChordEvalSimple.js"></script>
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- 🎵 CHORDFINDERPRO v16.0 - MODULAR SYSTEM                                -->
+<!-- Load 3 engines in order: Bass → Refiner → ChordEngine                   -->
+<!-- ChordEngine will automatically use Bass + Refiner if available          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- 1️⃣ BassEngine (optional - comment out to disable) -->
+<script src="BassEngine_v2.0.js"></script>
+
+<!-- 2️⃣ MajorMinorRefiner (optional - comment out to disable) -->
+<script src="MajorMinorRefiner_v2.0.js"></script>
+
+<!-- 3️⃣ ChordEngine (required - uses engines above if loaded) -->
+<script src="ChordEngine_v14.50_OPTIMIZED.js"></script>
+
+<!-- Support files -->
+<script src="SyncEngine_v6.14_FIXED.js" onerror="console.warn('SyncEngine not loaded')"></script>
+<script src="ChordEvalSimple.js" onerror="console.warn('ChordEval not loaded')"></script>
 <script src="sync-engine-v6.14.js" onerror="console.warn('sync-engine not loaded')"></script>
 <script src="hebrew-spell-checker.js" onerror="console.warn('hebrew-spell-checker not loaded')"></script>
 
@@ -301,12 +319,20 @@ C Am F G C Am F G Em
 let engine;
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngineEnhanced_v14.50.js לא נטען!');
+    alert('❌ ChordEngine_v14.50_OPTIMIZED.js לא נטען!');
     throw new Error('Engine not loaded');
   }
   try {
     engine = new ChordEngineEnhanced();
-    console.log('✅ Engine v14.50 with AI Profiles initialized');
+    
+    // Check which engines are available
+    const hasBass = typeof BassEngine !== 'undefined';
+    const hasRefiner = typeof MajorMinorRefiner !== 'undefined';
+    
+    console.log('✅ ChordFinderPro v16.0 initialized');
+    console.log(`   ChordEngine: ✅`);
+    console.log(`   BassEngine: ${hasBass ? '✅' : '❌ (not loaded)'}`);
+    console.log(`   MajorMinorRefiner: ${hasRefiner ? '✅' : '❌ (not loaded)'}`);
   } catch(e) {
     alert('❌ שגיאה ביצירת Engine: ' + e.message);
     throw e;
@@ -898,95 +924,54 @@ analyzeBtn.onclick=async()=>{
     durEl.textContent = audioData.duration.toFixed(1)+'s';
     if(audioData.url) player.src = audioData.url;
     
-    showAnalyzing('שלב 2/3: זיהוי אקורדים (v14.50 AI Profiles)');
+    showAnalyzing('שלב 2/3: זיהוי אקורדים (v16.0 Modular)');
     
-    // v14.50 - AUTO profile detection
-    const result = await engine.detect(audioData.audioBuffer, {});
+    // ✅ v16.0 - Call with options to enable Bass + Refiner
+    const result = await engine.detect(audioData.audioBuffer, {
+      useBassEngine: true,          // Enable bass analysis
+      useMajorMinorRefiner: true,   // Enable major/minor refinement
+      bassEnergyPercentile: 75,
+      refinerDecisionThreshold: 0.20,
+      refinerMinConfidenceToOverride: 0.65,
+      debug: true
+    });
     
-    // 🔬 v14.50 OUTPUT
+    // 🔬 v16.0 OUTPUT
     const debugEl = document.getElementById('debugOutput');
     if (debugEl && result) {
       const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
       let dbg = '';
       dbg += `═══════════════════════════════════════\n`;
-      dbg += `🎯 FINAL RESULT:\n`;
+      dbg += `🎯 FINAL RESULT (v16.0 MODULAR):\n`;
       dbg += `   Key: ${NOTES[result.key.root]} ${result.key.minor ? 'minor' : 'major'}\n`;
       dbg += `   Confidence: ${(result.key.confidence * 100).toFixed(0)}%\n`;
       if (result.musicStart !== undefined) {
         dbg += `   Music Start: ${result.musicStart.toFixed(2)}s\n`;
       }
+      
+      // Show if engines were used
+      if (result.bassTimeline && result.bassTimeline.length > 0) {
+        dbg += `   🎸 BassEngine: ${result.bassTimeline.length} segments\n`;
+      }
+      if (result.refinementResult && result.refinementResult.length > 0) {
+        const corrections = result.refinementResult.filter(r => r.shouldOverride).length;
+        dbg += `   🎵 MajorMinorRefiner: ${corrections} corrections\n`;
+      }
+      
       dbg += `═══════════════════════════════════════\n`;
       
-      // Show tonic detection debug if available
-      const tonicDebug = result.tonic?._debug || (engine ? engine._debugInfo : null);
-      if (tonicDebug) {
-        dbg += `\n🔬 TONIC DETECTION BREAKDOWN:\n`;
-        dbg += `───────────────────────────────────────\n`;
-        if (tonicDebug.bassTonic) {
-          dbg += `   Bass says:     ${tonicDebug.bassTonic.note} (pc=${tonicDebug.bassTonic.root}, conf=${tonicDebug.bassTonic.confidence}%)\n`;
-        }
-        if (tonicDebug.ksTonic) {
-          dbg += `   KS says:       ${tonicDebug.ksTonic.note} (pc=${tonicDebug.ksTonic.root}, conf=${tonicDebug.ksTonic.confidence}%)\n`;
-        }
-        if (tonicDebug.firstChord) {
-          dbg += `   First chord:   ${tonicDebug.firstChord.note}${tonicDebug.firstChord.isMinor?'m':''} (pc=${tonicDebug.firstChord.root}, score=${tonicDebug.firstChord.score?.toFixed(2)})\n`;
-        } else {
-          dbg += `   First chord:   ❌ NOT DETECTED!\n`;
-        }
-        if (tonicDebug.dominantChord) {
-          dbg += `   Dominant:      ${tonicDebug.dominantChord.note} (pc=${tonicDebug.dominantChord.root}, ${tonicDebug.dominantChord.count} frames)\n`;
-        }
-        dbg += `───────────────────────────────────────\n`;
-        
-        // v14.50: Show bass histogram
-        if (tonicDebug.bassHist && tonicDebug.bassHist.length > 0) {
-          dbg += `   BASS NOTES: ${tonicDebug.bassHist.slice(0, 6).map(b => `${b.note}:${b.count}`).join(', ')}\n`;
-        }
-        
-        if (tonicDebug.votes) {
-          dbg += `   VOTES: ${tonicDebug.votes.map(v => `${v.note}:${v.votes}`).join(', ')}\n`;
-        }
-        if (tonicDebug.winner) {
-          dbg += `   WINNER: ${tonicDebug.winner.note} (${tonicDebug.winner.votes} votes)\n`;
-        }
-        if (tonicDebug.ivTrap) {
-          dbg += `   ⛔ IV/I TRAP: ${tonicDebug.ivTrap.from} → ${tonicDebug.ivTrap.to}\n`;
-        }
-      }
-      
       if (result.tonic) {
-        dbg += `\n🎹 TONIC RESULT:\n`;
-        dbg += `   Root: ${result.tonic.label} (pc=${result.tonic.root})\n`;
-        dbg += `   Confidence: ${result.tonic.confidence}%\n`;
-        dbg += `   Method: ${result.tonic.method}\n`;
-      }
-      if (result.mode) {
-        dbg += `\n🎵 MODE DETECTION:\n`;
-        dbg += `   isMinor: ${result.mode.isMinor}\n`;
-        dbg += `   m3: ${result.mode.m3?.toFixed(3) || 'N/A'}\n`;
-        dbg += `   M3: ${result.mode.M3?.toFixed(3) || 'N/A'}\n`;
-        dbg += `   ratio: ${result.mode.ratio?.toFixed(2) || 'N/A'}\n`;
-      }
-      
-      // 🔬 Show first frames chroma analysis
-      if (tonicDebug && tonicDebug.firstFramesChroma && tonicDebug.firstFramesChroma.length > 0) {
-        dbg += `\n🔬 FIRST FRAMES CHROMA:\n`;
-        tonicDebug.firstFramesChroma.forEach((f, i) => {
-          dbg += `   Frame ${i+1} @ ${f.time}s (bass=${f.bass || '?'}):\n`;
-          // Show top 4 notes
-          const sorted = Object.entries(f.chroma).sort((a,b) => b[1] - a[1]).slice(0,4);
-          dbg += `     Top: ${sorted.map(([n,v]) => `${n}:${v.toFixed(2)}`).join(' ')}\n`;
-        });
+        dbg += `\n🎹 TONIC: ${result.tonic.label} (conf: ${result.tonic.confidence}%)\n`;
       }
       
       if (result.chords && result.chords.length > 0) {
-        const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         dbg += `\n🎸 FIRST 10 CHORDS:\n`;
         result.chords.slice(0, 10).forEach((c, i) => {
-          const bassStr = c.bassNote >= 0 ? NOTES[c.bassNote] : '?';
-          dbg += `   ${i+1}. ${c.label} @ ${c.t?.toFixed(2)}s (fi=${c.fi || '?'}, bass=${bassStr}, type=${c.chordType || '?'})\n`;
+          const refined = c.refinedBy ? ' [REFINED]' : '';
+          dbg += `   ${i+1}. ${c.label}${refined} @ ${c.t?.toFixed(2)}s\n`;
         });
       }
+      
       debugEl.textContent = dbg;
     }
     
@@ -1007,7 +992,7 @@ analyzeBtn.onclick=async()=>{
       ev.words = ev.words || [];
     });
     
-    const modeString = modeObj.isMinor ? 'Minor' : 'Major';
+    const modeString = key.minor ? 'Minor' : 'Major';
     
     window.__STATE = { 
       bpm: audioData.bpm, 
@@ -1045,9 +1030,9 @@ analyzeBtn.onclick=async()=>{
       if (pollCount >= 20) clearInterval(pollInterval);
     }, 100);
     
-    modeBadge.textContent = modeString + ` (${modeObj.confidence}%)`;
+    modeBadge.textContent = modeString;
     
-    // v14.50: הצגת פרופיל
+    // v16.0: הצגת פרופיל
     if (detectedProfile) {
       profileBadge.style.display = 'inline-flex';
       profileValue.textContent = detectedProfile.toUpperCase();
@@ -1077,7 +1062,11 @@ analyzeBtn.onclick=async()=>{
       buildFullLyricsSheet(isRTL);
     }
     
-    ok(`✅ v14.50 AI [${detectedProfile.toUpperCase()}] - ${timeline.length} אקורדים`);
+    // Count refinements
+    const refinements = timeline.filter(c => c.refinedBy).length;
+    const refinerStatus = refinements > 0 ? ` [${refinements} תיקונים]` : '';
+    
+    ok(`✅ v16.0 Modular [${detectedProfile.toUpperCase()}]${refinerStatus} - ${timeline.length} אקורדים`);
     hookPlaybackLive(); 
     refreshSheetTabView();
     playBtn.disabled=false; 
