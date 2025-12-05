@@ -305,15 +305,15 @@ C Am F G C Am F G Em
 
 <!-- 🎸 BassEngine (OPTIONAL - standalone bass detection for debugging/analysis) -->
 <!-- Note: ChordEngine has built-in bass detection, this is for separate analysis -->
-<script src="BassEngine_ENHANCED.js"></script>
+<script src="BassEngine_MOBILE.js"></script>
 
 <!-- 🎵 MajorMinorRefiner (OPTIONAL - post-processing major/minor corrections) -->
 <!-- Provides additional validation after main chord detection -->
-<script src="MajorMinorRefiner_AGGRESSIVE.js"></script>
+<script src="MajorMinorRefiner_MOBILE.js"></script>
 
 <!-- 🎼 ChordEngine (REQUIRED - main chord detection engine) -->
 <!-- Includes: bass detection, key detection, HMM tracking, post-processing -->
-<script src="ChordEngine_ULTIMATE_v2.js"></script>
+<script src="ChordEngine_MOBILE.js"></script>
 
 <!-- Support files -->
 <script src="SyncEngine_v6.14_FIXED.js" onerror="console.warn('SyncEngine not loaded')"></script>
@@ -325,7 +325,7 @@ C Am F G C Am F G Em
 let engine;
 window.addEventListener('DOMContentLoaded', () => {
   if (typeof ChordEngineEnhanced === 'undefined') {
-    alert('❌ ChordEngine_ULTIMATE_v2.js לא נטען!');
+    alert('❌ ChordEngine_MOBILE.js לא נטען!');
     throw new Error('Engine not loaded');
   }
   try {
@@ -1056,23 +1056,6 @@ analyzeBtn.onclick=async()=>{
         downloadBtn.id = 'csvDownloadBtn';
         debugEl.parentElement.appendChild(downloadBtn);
       }
-    }
-      
-      dbg += `═══════════════════════════════════════\n`;
-      
-      if (result.tonic) {
-        dbg += `\n🎹 TONIC: ${result.tonic.label} (conf: ${result.tonic.confidence}%)\n`;
-      }
-      
-      if (result.chords && result.chords.length > 0) {
-        dbg += `\n🎸 FIRST 10 CHORDS:\n`;
-        result.chords.slice(0, 10).forEach((c, i) => {
-          const refined = c.refinedBy ? ' [REFINED]' : '';
-          dbg += `   ${i+1}. ${c.label}${refined} @ ${c.t?.toFixed(2)}s\n`;
-        });
-      }
-      
-      debugEl.textContent = dbg;
     }
     
     // 🔹 שמירת התוצאה לדוח
