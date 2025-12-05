@@ -931,11 +931,15 @@ analyzeBtn.onclick=async()=>{
     
     // ✅ v16.0 - Call with options to enable Bass + Refiner
     const result = await engine.detect(audioData.audioBuffer, {
-      useBassEngine: true,          // Enable bass analysis
-      useMajorMinorRefiner: true,   // Enable major/minor refinement
-      bassEnergyPercentile: 75,
-      refinerDecisionThreshold: 0.20,
-      refinerMinConfidenceToOverride: 0.65,
+      useBassEngine: true,          // ✅ Enable bass analysis
+      useMajorMinorRefiner: true,   // ✅ Enable major/minor refinement
+      bassMultiplier: 1.2,           // Bass weight
+      
+      // ⚡ AGGRESSIVE Major/Minor detection (passed to MajorMinorRefiner)
+      // These override the defaults in ChordEngine
+      minConfidenceToOverride: 0.40,  // Was 0.65 → Much more aggressive!
+      decisionThreshold: 0.15,         // Was 0.20 → Clearer decisions
+      
       debug: true
     });
     
