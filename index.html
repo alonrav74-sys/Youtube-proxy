@@ -234,7 +234,8 @@ analyzeBtn.onclick = async () => {
     });
     
     // 🔬 Build debug data structure
-    DEBUG_DATA = ChordDebugger.buildDebugData(result);
+    const capoValue = parseInt(capoEl.value || '0', 10);
+    DEBUG_DATA = ChordDebugger.buildDebugData(result, capoValue);
     
     // Update stats
     totalChordsEl.textContent = DEBUG_DATA.length;
