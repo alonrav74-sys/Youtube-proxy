@@ -97,6 +97,9 @@
     <section class="panel">
       <div class="row">
         <input id="file" type="file" accept="audio/*,video/*" />
+        <label>🎸 קאפו:
+          <input id="capo" type="number" value="0" min="0" max="11" style="width:80px" />
+        </label>
         <button id="analyzeBtn">🔍 נתח + דיבאג מלא</button>
         <button id="downloadCsvBtn" disabled>💾 הורד CSV מפורט</button>
       </div>
@@ -177,6 +180,7 @@ window.addEventListener('DOMContentLoaded', () => {
 const fileEl = document.getElementById('file');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+const capoEl = document.getElementById('capo');
 const statusEl = document.getElementById('status');
 const errorEl = document.getElementById('error');
 const debugTableBody = document.getElementById('debugTableBody');
