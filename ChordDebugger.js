@@ -348,6 +348,165 @@ class ChordDebugger {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  /**
+   * חישוב סטטיסטיקות
+   */
+  static _calculateStats(data) {
+    return {
+      total: data.length,
+      refinerChanged: data.filter(d => d.refinerApplied).length,
+      bassChanged: data.filter(d => d.bassApplied).length,
+      unchanged: data.filter(d => d.winner === 'base').length
+    };
+  }
+
+  /**
+   * רנדור ממשק דיבאג מלא
+   */
+  static renderDebugUI(data, capo = 0) {
+    if (!data || !data.length) return '<div style="color:#94a3b8;padding:30px">אין נתונים</div>';
+    
+    // Store for filtering
+    this._currentData = data;
+    
+    const stats = this._calculateStats(data);
+    
+    return `
+      <div style="font-family: 'Geist', system-ui, sans-serif; direction: rtl;">
+        <!-- Stats -->
+        <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div style="padding: 12px 20px; background: #1e293b; border-radius: 8px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">סה"כ אקורדים</div>
+            <div style="font-size: 24px; font-weight: 600; color: #f1f5f9;">${stats.total}</div>
+          </div>
+          <div style="padding: 12px 20px; background: #1e293b; border-radius: 8px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🎵 Refiner שינה</div>
+            <div style="font-size: 24px; font-weight: 600; color: #22c55e;">${stats.refinerChanged}</div>
+          </div>
+          <div style="padding: 12px 20px; background: #1e293b; border-radius: 8px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🎸 Bass שינה</div>
+            <div style="font-size: 24px; font-weight: 600; color: #3b82f6;">${stats.bassChanged}</div>
+          </div>
+          ${capo > 0 ? `
+          <div style="padding: 12px 20px; background: #1e293b; border-radius: 8px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🎸 קאפו</div>
+            <div style="font-size: 24px; font-weight: 600; color: #f59e0b;">${capo}</div>
+          </div>
+          ` : ''}
+        </div>
+
+        <!-- Filters -->
+        <div style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button onclick="ChordDebugger.filterTable('all')" 
+                  id="filter-all"
+                  class="debug-filter-btn active"
+                  style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+            הכל
+          </button>
+          <button onclick="ChordDebugger.filterTable('refiner')" 
+                  id="filter-refiner"
+                  class="debug-filter-btn"
+                  style="padding: 8px 16px; background: #1e293b; color: #cbd5e1; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+            רק Refiner שינה
+          </button>
+          <button onclick="ChordDebugger.filterTable('bass')" 
+                  id="filter-bass"
+                  class="debug-filter-btn"
+                  style="padding: 8px 16px; background: #1e293b; color: #cbd5e1; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+            רק Bass שינה
+          </button>
+          <button onclick="ChordDebugger.filterTable('changed')" 
+                  id="filter-changed"
+                  class="debug-filter-btn"
+                  style="padding: 8px 16px; background: #1e293b; color: #cbd5e1; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+            כל השינויים
+          </button>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x: auto; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b;">
+          <table id="debug-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+              <tr style="background: #1e293b; color: #94a3b8; font-weight: 500;">
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; width: 40px;">#</th>
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; width: 60px;">זמן</th>
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; width: 80px;">🎼 מנוע<br>בסיסי</th>
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; min-width: 120px;">🎵 Refiner<br><small style="font-size:10px;font-weight:400;color:#64748b;">מז'ור/מינור</small></th>
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; min-width: 120px;">🎸 Bass<br><small style="font-size:10px;font-weight:400;color:#64748b;">אינברסיות</small></th>
+                <th style="padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155; width: 80px;">✅ החלטה<br>סופית</th>
+                <th style="padding: 12px 8px; text-align: right; border-bottom: 1px solid #334155; min-width: 200px;">הערות</th>
+              </tr>
+            </thead>
+            <tbody id="debug-table-body">
+              ${this.renderTable(data, 'all')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Export -->
+        <div style="margin-top: 15px;">
+          <button onclick="ChordDebugger.downloadCSV(ChordDebugger._currentData)" 
+                  style="padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;">
+            📥 ייצא ל-CSV
+          </button>
+        </div>
+      </div>
+
+      <style>
+        .debug-filter-btn:hover {
+          opacity: 0.8;
+        }
+        .debug-filter-btn.active {
+          background: #3b82f6 !important;
+          color: white !important;
+        }
+        .base-col { text-align: center; }
+        .refiner-col { text-align: center; }
+        .bass-col { text-align: center; }
+        .final-col { text-align: center; background: #1e3a1e; color: #a7f3a7; font-weight: 700; }
+        
+        .base-col.winner { background: #fef3c7; color: #92400e; font-weight: 600; }
+        .refiner-col.winner { background: #dcfce7; color: #166534; font-weight: 600; }
+        .bass-col.winner { background: #dbeafe; color: #1e40af; font-weight: 600; }
+        
+        #debug-table tbody tr:hover {
+          background: #1e293b;
+        }
+        #debug-table tbody td {
+          padding: 10px 8px;
+          border-bottom: 1px solid #1e293b;
+          color: #e2e8f0;
+        }
+      </style>
+    `;
+  }
+
+  /**
+   * סינון טבלה
+   */
+  static filterTable(filter) {
+    if (!this._currentData) return;
+    
+    const tbody = document.getElementById('debug-table-body');
+    if (!tbody) return;
+    
+    tbody.innerHTML = this.renderTable(this._currentData, filter);
+    
+    // Update active button
+    document.querySelectorAll('.debug-filter-btn').forEach(btn => {
+      btn.classList.remove('active');
+      btn.style.background = '#1e293b';
+      btn.style.color = '#cbd5e1';
+    });
+    
+    const activeBtn = document.getElementById(`filter-${filter}`);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      activeBtn.style.background = '#3b82f6';
+      activeBtn.style.color = 'white';
+    }
+  }
 }
 
 // Export for use in HTML
