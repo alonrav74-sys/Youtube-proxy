@@ -34,36 +34,55 @@ class ChordDebugger {
       // ════════════════════════════════════════════════════
       // 🎵 MajorMinorRefiner - מה הוא זיהה?
       // ════════════════════════════════════════════════════
-      let refinerDetected = '—';       // מה זיהה (major/minor/unknown)
-      let refinerSuggested = baseChord; // איזה אקורד הציע
+      let refinerDetected = '—';
+      let refinerSuggested = baseChord;
       let refinerConf = null;
-      let refinerApplied = false;       // האם החליף?
+      let refinerApplied = false;
       let refinerReason = '—';
       
-      if (chord.qualityRefined) {
-        // Refiner רץ ויש לו דעה!
-        refinerDetected = chord.qualityRefined; // 'major' / 'minor' / 'unknown'
-        refinerConf = chord.qualityConfidence ? 
-          (chord.qualityConfidence * 100).toFixed(0) + '%' : '0%';
+      // ⚡ FIX: Check for ANY sign that Refiner ran
+      if (chord.refinedBy === 'MajorMinorRefiner' || 
+          chord.qualityRefined || 
+          chord.refinerConfidence !== undefined) {
         
-        if (chord.qualityRefined !== 'unknown') {
-          // בנה מה Refiner חושב שצריך להיות
-          const rootName = this._getRootName(chord.label);
-          const suggested = chord.qualityRefined === 'minor' ? 
-            rootName + 'm' : rootName;
-          refinerSuggested = this.applyCapo(suggested, capo);
-          
-          // האם הוא החליף?
-          refinerApplied = chord.refinedBy === 'MajorMinorRefiner';
-          
-          if (refinerApplied) {
-            refinerReason = `Detected ${chord.qualityRefined} → ✅ APPLIED`;
-          } else {
-            refinerReason = `Detected ${chord.qualityRefined} (${refinerConf}) → ❌ Not applied`;
-          }
+        refinerApplied = chord.refinedBy === 'MajorMinorRefiner';
+        
+        // What did it detect?
+        if (chord.qualityRefined) {
+          refinerDetected = chord.qualityRefined; // 'major' / 'minor' / 'unknown'
         } else {
-          refinerReason = 'Unknown/Ambiguous';
+          // Try to infer from refinedLabel
+          if (chord.refinedLabel) {
+            const isMinor = /m(?!aj)/.test(chord.refinedLabel);
+            refinerDetected = isMinor ? 'minor' : 'major';
+          } else {
+            refinerDetected = '?';
+          }
         }
+        
+        // What did it suggest?
+        if (chord.refinedLabel) {
+          refinerSuggested = this.applyCapo(chord.refinedLabel, capo);
+        } else if (chord.qualityRefined && chord.qualityRefined !== 'unknown') {
+          // Build from qualityRefined
+          const rootName = this._getRootName(chord.label);
+          const suggested = chord.qualityRefined === 'minor' ? rootName + 'm' : rootName;
+          refinerSuggested = this.applyCapo(suggested, capo);
+        }
+        
+        // Confidence
+        refinerConf = chord.refinerConfidence || chord.qualityConfidence;
+        if (refinerConf) {
+          refinerConf = (refinerConf * 100).toFixed(0) + '%';
+        }
+        
+        // Reason
+        if (refinerApplied) {
+          refinerReason = `${refinerDetected} (${refinerConf || '?'}) → ✅ APPLIED`;
+        } else {
+          refinerReason = `${refinerDetected} (${refinerConf || 'low'}) → ❌ Not applied`;
+        }
+        
       } else {
         refinerReason = 'Not analyzed';
       }
@@ -71,42 +90,52 @@ class ChordDebugger {
       // ════════════════════════════════════════════════════
       // 🎸 BassEngine - מה הוא זיהה?
       // ════════════════════════════════════════════════════
-      let bassDetected = '—';           // מה זיהה (note name או "no bass")
-      let bassSuggested = refinerSuggested; // איזה אקורד הציע (עם/בלי inversion)
+      let bassDetected = '—';
+      let bassSuggested = refinerSuggested;
       let bassConf = null;
-      let bassApplied = false;          // האם החליף?
+      let bassApplied = false;
       let bassReason = '—';
       
-      // Check if BassEngine ran and detected something
-      if (chord.bassNote !== undefined) {
-        // BassEngine זיהה בס!
-        bassDetected = chord.bassNote >= 0 ? 
-          this._pcToNote(chord.bassNote) : 'No bass';
-        bassConf = chord.bassConfidence ? 
-          (chord.bassConfidence * 100).toFixed(0) + '%' : null;
+      // ⚡ FIX: Check for ANY sign that BassEngine ran
+      if (chord.bassAdded || 
+          chord.changedByBass || 
+          chord.bassConfidence !== undefined ||
+          chord.bassNote !== undefined ||
+          chord.bassReason) {
         
-        // מה הוא הציע?
-        if (chord.bassNote >= 0) {
-          const rootPc = this._parseRoot(chord.label);
-          const bassMatches = chord.bassNote === rootPc;
-          
-          if (!bassMatches && chord.label.includes('/')) {
-            // הוסיף inversion
-            bassSuggested = this.applyCapo(chord.label, capo);
-            bassApplied = true;
-            bassReason = `Detected ${bassDetected} → ✅ Added inversion`;
-          } else if (chord.changedByBass) {
-            // שינה אקורד לגמרי
-            bassSuggested = this.applyCapo(chord.label, capo);
-            bassApplied = true;
-            bassReason = `Detected ${bassDetected} → ✅ Changed chord`;
-          } else {
-            // זיהה אבל לא החליף
-            bassReason = `Detected ${bassDetected} (${bassConf || 'low conf'}) → ❌ Not applied`;
-          }
+        bassApplied = chord.bassAdded || chord.changedByBass;
+        
+        // What bass did it detect?
+        if (chord.bassNote !== undefined && chord.bassNote >= 0) {
+          bassDetected = this._pcToNote(chord.bassNote);
+        } else if (chord.label && chord.label.includes('/')) {
+          // Extract bass from label
+          const parts = chord.label.split('/');
+          bassDetected = parts[1] || '?';
         } else {
-          bassReason = 'No bass detected';
+          bassDetected = 'Root';
         }
+        
+        // What did it suggest?
+        if (bassApplied) {
+          bassSuggested = this.applyCapo(chord.label, capo);
+        }
+        
+        // Confidence
+        bassConf = chord.bassConfidence;
+        if (bassConf) {
+          bassConf = (bassConf * 100).toFixed(0) + '%';
+        }
+        
+        // Reason
+        if (chord.changedByBass) {
+          bassReason = `Detected ${bassDetected} → ✅ Changed chord`;
+        } else if (chord.bassAdded) {
+          bassReason = `Detected ${bassDetected} → ✅ Added inversion`;
+        } else {
+          bassReason = `Detected ${bassDetected} (${bassConf || 'low'}) → ❌ Not applied`;
+        }
+        
       } else {
         bassReason = 'Not analyzed';
       }
