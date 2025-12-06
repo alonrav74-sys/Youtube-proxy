@@ -7,21 +7,25 @@
  * 🎵 MajorMinorRefiner  
  * 🎸 BassEngine
  * ✅ החלטה סופית
+ * 
+ * ⚠️ כל האקורדים מוצגים אחרי קאפו (כמו שהגיטריסט רואה)
  */
 
 class ChordDebugger {
   
   /**
    * בונה טבלת דיבאג מלאה מתוצאות המנוע
+   * @param {Object} result - תוצאה מ-engine.detect()
+   * @param {number} capo - מיקום קאפו (0-11)
    */
-  static buildDebugData(result) {
+  static buildDebugData(result, capo = 0) {
     if (!result || !result.chords) return [];
     
     const debugData = [];
     
     result.chords.forEach((chord, idx) => {
       // 🎼 מנוע בסיסי - מה הוא זיהה בהתחלה
-      const baseChord = chord.originalLabel || chord._baseOutput || chord.label;
+      const baseChord = this.applyCapo(chord.originalLabel || chord._baseOutput || chord.label, capo);
       
       // 🎵 MajorMinorRefiner - מה הוא המליץ
       let refinerChord = baseChord;
@@ -29,7 +33,7 @@ class ChordDebugger {
       let refinerReason = '—';
       
       if (chord.refinedBy === 'MajorMinorRefiner') {
-        refinerChord = chord.refinedLabel || chord.label;
+        refinerChord = this.applyCapo(chord.refinedLabel || chord.label, capo);
         refinerConf = chord.refinerConfidence ? (chord.refinerConfidence * 100).toFixed(0) + '%' : null;
         refinerReason = chord.refinerReason || 'Changed mode';
       }
@@ -40,13 +44,13 @@ class ChordDebugger {
       let bassReason = '—';
       
       if (chord.bassAdded || chord.changedByBass || chord.label?.includes('/')) {
-        bassChord = chord.label;
+        bassChord = this.applyCapo(chord.label, capo);
         bassConf = chord.bassConfidence ? (chord.bassConfidence * 100).toFixed(0) + '%' : null;
         bassReason = chord.changedByBass ? 'Changed chord' : (chord.bassAdded ? 'Added inversion' : 'Bass override');
       }
       
       // ✅ החלטה סופית
-      const finalChord = chord.label;
+      const finalChord = this.applyCapo(chord.label, capo);
       
       // מי זכה?
       let winner = 'base';
@@ -59,7 +63,7 @@ class ChordDebugger {
         index: idx + 1,
         time: chord.t?.toFixed(2) || '—',
         
-        // כל מנוע
+        // כל מנוע (אחרי קאפו!)
         baseChord: baseChord,
         refinerChord: refinerChord,
         refinerConf: refinerConf,
@@ -78,6 +82,47 @@ class ChordDebugger {
     });
     
     return debugData;
+  }
+  
+  /**
+   * החלת קאפו על אקורד
+   */
+  static applyCapo(label, capo) {
+    if (!label || !capo || capo === 0) return label;
+    
+    const NOTES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+    
+    function transposeNote(noteStr, semitones) {
+      const normalized = noteStr.replace('b', '#');
+      const NOTES_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const idx = NOTES_SHARP.indexOf(normalized);
+      if(idx < 0) return noteStr;
+      const newPc = ((idx - semitones) % 12 + 12) % 12;
+      return NOTES_FLAT[newPc];
+    }
+    
+    // טיפול באקורד עם inversion (/)
+    if(label.includes('/')) {
+      const parts = label.split('/');
+      const rootPart = parts[0];
+      const bassPart = parts[1];
+      
+      const rootMatch = rootPart.match(/^([A-G](?:#|b)?)(.*)$/);
+      if(!rootMatch) return label;
+      const transposedRoot = transposeNote(rootMatch[1], capo) + (rootMatch[2] || '');
+      
+      const bassMatch = bassPart.match(/^([A-G](?:#|b)?)(.*)$/);
+      if(!bassMatch) return transposedRoot;
+      const transposedBass = transposeNote(bassMatch[1], capo) + (bassMatch[2] || '');
+      
+      return transposedRoot + '/' + transposedBass;
+    }
+    
+    // אקורד רגיל
+    const m = label.match(/^([A-G](?:#|b)?)(.*)$/);
+    if(!m) return label;
+    
+    return transposeNote(m[1], capo) + (m[2] || '');
   }
   
   /**
