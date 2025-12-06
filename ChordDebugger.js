@@ -40,49 +40,36 @@ class ChordDebugger {
       let refinerApplied = false;
       let refinerReason = '—';
       
-      // ⚡ FIX: Check for ANY sign that Refiner ran
-      if (chord.refinedBy === 'MajorMinorRefiner' || 
-          chord.qualityRefined || 
-          chord.refinerConfidence !== undefined) {
-        
+      // ⚡ Check for NEW fields from fixed Refiner
+      if (chord._refinerDetected) {
+        refinerDetected = chord._refinerDetected;
+        refinerSuggested = this.applyCapo(chord._refinerSuggested || baseChord, capo);
+        refinerConf = chord._refinerConfidence ? 
+          (chord._refinerConfidence * 100).toFixed(0) + '%' : null;
+        refinerApplied = chord._refinerApplied || false;
+        refinerReason = chord._refinerReason || (refinerApplied ? 'Applied' : 'Not applied');
+      }
+      // Fallback to old fields
+      else if (chord.refinedBy === 'MajorMinorRefiner' || chord.qualityRefined) {
         refinerApplied = chord.refinedBy === 'MajorMinorRefiner';
         
-        // What did it detect?
         if (chord.qualityRefined) {
-          refinerDetected = chord.qualityRefined; // 'major' / 'minor' / 'unknown'
-        } else {
-          // Try to infer from refinedLabel
-          if (chord.refinedLabel) {
-            const isMinor = /m(?!aj)/.test(chord.refinedLabel);
-            refinerDetected = isMinor ? 'minor' : 'major';
-          } else {
-            refinerDetected = '?';
-          }
+          refinerDetected = chord.qualityRefined;
+        } else if (chord.refinedLabel) {
+          const isMinor = /m(?!aj)/.test(chord.refinedLabel);
+          refinerDetected = isMinor ? 'minor' : 'major';
         }
         
-        // What did it suggest?
         if (chord.refinedLabel) {
           refinerSuggested = this.applyCapo(chord.refinedLabel, capo);
-        } else if (chord.qualityRefined && chord.qualityRefined !== 'unknown') {
-          // Build from qualityRefined
-          const rootName = this._getRootName(chord.label);
-          const suggested = chord.qualityRefined === 'minor' ? rootName + 'm' : rootName;
-          refinerSuggested = this.applyCapo(suggested, capo);
         }
         
-        // Confidence
         refinerConf = chord.refinerConfidence || chord.qualityConfidence;
-        if (refinerConf) {
-          refinerConf = (refinerConf * 100).toFixed(0) + '%';
-        }
+        if (refinerConf) refinerConf = (refinerConf * 100).toFixed(0) + '%';
         
-        // Reason
-        if (refinerApplied) {
-          refinerReason = `${refinerDetected} (${refinerConf || '?'}) → ✅ APPLIED`;
-        } else {
-          refinerReason = `${refinerDetected} (${refinerConf || 'low'}) → ❌ Not applied`;
-        }
-        
+        refinerReason = refinerApplied ? 
+          `${refinerDetected} → ✅` : 
+          `${refinerDetected} (${refinerConf || 'low'}) → ❌`;
       } else {
         refinerReason = 'Not analyzed';
       }
@@ -96,46 +83,42 @@ class ChordDebugger {
       let bassApplied = false;
       let bassReason = '—';
       
-      // ⚡ FIX: Check for ANY sign that BassEngine ran
-      if (chord.bassAdded || 
-          chord.changedByBass || 
-          chord.bassConfidence !== undefined ||
-          chord.bassNote !== undefined ||
-          chord.bassReason) {
-        
+      // ⚡ Check for NEW fields from fixed BassEngine
+      if (chord._bassDetected !== undefined) {
+        bassDetected = chord._bassNoteName || this._pcToNote(chord._bassDetected);
+        bassSuggested = this.applyCapo(chord._bassSuggested || chord.label, capo);
+        bassConf = chord._bassConfidence ? 
+          (chord._bassConfidence * 100).toFixed(0) + '%' : null;
+        bassApplied = chord._bassApplied || false;
+        bassReason = chord._bassReason || (bassApplied ? 'Applied' : 'Not applied');
+      }
+      // Fallback to old fields
+      else if (chord.bassAdded || chord.changedByBass || chord.bassConfidence !== undefined) {
         bassApplied = chord.bassAdded || chord.changedByBass;
         
-        // What bass did it detect?
         if (chord.bassNote !== undefined && chord.bassNote >= 0) {
           bassDetected = this._pcToNote(chord.bassNote);
         } else if (chord.label && chord.label.includes('/')) {
-          // Extract bass from label
           const parts = chord.label.split('/');
           bassDetected = parts[1] || '?';
         } else {
           bassDetected = 'Root';
         }
         
-        // What did it suggest?
         if (bassApplied) {
           bassSuggested = this.applyCapo(chord.label, capo);
         }
         
-        // Confidence
         bassConf = chord.bassConfidence;
-        if (bassConf) {
-          bassConf = (bassConf * 100).toFixed(0) + '%';
-        }
+        if (bassConf) bassConf = (bassConf * 100).toFixed(0) + '%';
         
-        // Reason
         if (chord.changedByBass) {
-          bassReason = `Detected ${bassDetected} → ✅ Changed chord`;
+          bassReason = `${bassDetected} → ✅ Changed`;
         } else if (chord.bassAdded) {
-          bassReason = `Detected ${bassDetected} → ✅ Added inversion`;
+          bassReason = `${bassDetected} → ✅ Inversion`;
         } else {
-          bassReason = `Detected ${bassDetected} (${bassConf || 'low'}) → ❌ Not applied`;
+          bassReason = `${bassDetected} (${bassConf || 'low'}) → ❌`;
         }
-        
       } else {
         bassReason = 'Not analyzed';
       }
