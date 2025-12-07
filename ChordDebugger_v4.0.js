@@ -1,15 +1,16 @@
 /**
- * ChordDebugger v4.2 - FIXED Bass Display + Better Refiner Display
+ * ChordDebugger v4.4 - CRYSTAL CLEAR
  * 
- * 🔧 תיקונים:
- * - תצוגת באס הגיונית: מראה את התו שזוהה ואיך הוא משפיע
- * - תצוגת Refiner משופרת
+ * עמודות פשוטות:
+ * 1. Base - האקורד מהמנוע הבסיסי
+ * 2. Refiner - ▲ מז'ור או ▼ מינור + אחוז
+ * 3. Bass - **רק התו שזוהה** + אחוז (לא אקורד!)
+ * 4. Final - האקורד הסופי
+ * 5. Time - זמן
  */
 
 const ChordDebugger = {
-  /**
-   * Build debug data from engine result
-   */
+  
   buildDebugData(result, capoOffset = 0) {
     const chords = result.chords || [];
     const debugData = [];
@@ -18,63 +19,61 @@ const ChordDebugger = {
       const chord = chords[i];
       
       // ═══════════════════════════════════════════════════════════════
-      // 🎵 REFINER DATA
+      // 🎵 REFINER - just major/minor
       // ═══════════════════════════════════════════════════════════════
+      const refinerAnalysis = chord.refinerAnalysis || null;
       const refinerApplied = chord.refinedBy === 'MajorMinorRefiner';
       const refinerConfidence = chord.refinerConfidence || 
-                                chord.refinerAnalysis?.qualityConfidence || 0;
-      const refinerReason = chord.reason || 
-                           chord.refinerAnalysis?.reason || 'no_data';
+                                refinerAnalysis?.qualityConfidence || 0;
       
-      const refinerAnalysis = chord.refinerAnalysis || null;
-      const detectedQuality = refinerAnalysis?.detectedQuality || 'unclear';
+      let detectedQuality = 'unclear';
       
-      // ═══════════════════════════════════════════════════════════════
-      // 🎸 BASS DATA
-      // ═══════════════════════════════════════════════════════════════
-      let bassDetected = chord.bassDetected || null;
-      const bassApplied = chord.changedByBass === true;
-      const bassConfidence = chord.bassConfidence || 0;
-      const bassFrequency = chord.bassFrequency || 0;
-
-      // ═══════════════════════════════════════════════════════════════
-      // 🔍 RECONSTRUCT CHORD STAGES
-      // ═══════════════════════════════════════════════════════════════
-      
-      // Start with the final label
-      let finalChord = chord.label;
-      let baseChord = chord.label;
-      let refinerChord = chord.label;
-      
-      // If we have originalLabel, that's the base
-      if (chord.originalLabel) {
-        baseChord = chord.originalLabel;
+      // Check from refinerAnalysis
+      if (refinerAnalysis?.detectedQuality) {
+        detectedQuality = refinerAnalysis.detectedQuality;
       }
       
-      // Work out what refiner did
-      if (refinerApplied) {
-        // Refiner changed something
-        if (chord.originalLabel) {
-          baseChord = chord.originalLabel;
+      // Or calculate from strengths
+      if (refinerAnalysis?.major3rdStrength !== undefined) {
+        const m3 = refinerAnalysis.minor3rdStrength || 0;
+        const M3 = refinerAnalysis.major3rdStrength || 0;
+        if (M3 > m3 + 0.005) detectedQuality = 'major';
+        else if (m3 > M3 + 0.005) detectedQuality = 'minor';
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 🎸 BASS - ONLY THE NOTE! Nothing else!
+      // ═══════════════════════════════════════════════════════════════
+      
+      // bassDetected should be just a note name like "E", "A", "D"
+      let bassNote = null;
+      let bassConfidence = chord.bassConfidence || 0;
+      
+      if (chord.bassDetected && chord.bassDetected !== 'NO_BASS') {
+        // Extract just the note name (in case it's something weird)
+        const noteMatch = chord.bassDetected.match(/^([A-G][#b]?)/);
+        if (noteMatch) {
+          bassNote = noteMatch[1];
+        } else {
+          bassNote = chord.bassDetected;
         }
-        // The refiner output is the label before bass
-        refinerChord = bassApplied && finalChord.includes('/') 
-          ? finalChord.split('/')[0] 
-          : finalChord;
-      } else {
-        refinerChord = baseChord;
       }
+      
+      const bassApplied = chord.changedByBass === true;
 
       // ═══════════════════════════════════════════════════════════════
-      // 🎸 APPLY CAPO
+      // 📊 CHORDS
       // ═══════════════════════════════════════════════════════════════
+      
+      let baseChord = chord.originalLabel || chord.label;
+      let finalChord = chord.label;
+
+      // Apply capo
       if (capoOffset > 0) {
         baseChord = this.applyCapo(baseChord, capoOffset);
-        refinerChord = this.applyCapo(refinerChord, capoOffset);
         finalChord = this.applyCapo(finalChord, capoOffset);
-        
-        if (bassDetected && bassDetected !== 'NO_BASS') {
-          bassDetected = this.applyCapo(bassDetected, capoOffset);
+        if (bassNote) {
+          bassNote = this.applyCapo(bassNote, capoOffset);
         }
       }
 
@@ -82,41 +81,23 @@ const ChordDebugger = {
         index: i + 1,
         time: this.formatTime(chord.t),
         timeSeconds: chord.t,
-        
-        // Base engine
-        baseChord: baseChord,
-        
-        // Refiner info
-        refinerChord: refinerChord,
-        refinerApplied: refinerApplied,
-        refinerConfidence: refinerConfidence,
-        refinerReason: refinerReason,
-        refinerAnalysis: refinerAnalysis,
-        detectedQuality: detectedQuality,
-        
-        // Bass info - SIMPLE AND CLEAR
-        bassDetected: bassDetected,  // The actual note detected
-        bassApplied: bassApplied,
-        bassConfidence: bassConfidence,
-        bassFrequency: bassFrequency,
-        
-        // Final
-        finalChord: finalChord,
-        
-        // Which stage "won"
-        winner: bassApplied ? 'bass' : (refinerApplied ? 'refiner' : 'base')
+        baseChord,
+        detectedQuality,
+        refinerConfidence,
+        refinerApplied,
+        bassNote,  // JUST THE NOTE!
+        bassConfidence,
+        bassApplied,
+        finalChord
       });
     }
 
     return debugData;
   },
 
-  /**
-   * Render debug table
-   */
   renderTable(debugData, filter = 'all') {
     if (!debugData || !debugData.length) {
-      return '<tr><td colspan="7" style="color:#94a3b8;padding:30px">אין נתונים</td></tr>';
+      return '<tr><td colspan="6" style="color:#94a3b8;padding:30px">אין נתונים</td></tr>';
     }
 
     // Apply filter
@@ -130,103 +111,67 @@ const ChordDebugger = {
     }
 
     if (!filtered.length) {
-      return '<tr><td colspan="7" style="color:#94a3b8;padding:30px">אין תוצאות מסוננות</td></tr>';
+      return '<tr><td colspan="6" style="color:#94a3b8;padding:30px">אין תוצאות</td></tr>';
     }
 
     let html = '';
 
     for (const row of filtered) {
-      const baseClass = row.winner === 'base' ? 'base-col winner' : 'base-col';
-      const refinerClass = row.winner === 'refiner' ? 'refiner-col winner' : 'refiner-col';
-      const bassClass = row.winner === 'bass' ? 'bass-col winner' : 'bass-col';
-
       // ═══════════════════════════════════════════════════════════════
-      // 🎵 REFINER CELL
+      // 🎵 REFINER CELL - just ▲ or ▼ with percentage
       // ═══════════════════════════════════════════════════════════════
-      let refinerContent = '';
-      const qualityIcon = row.detectedQuality === 'major' ? '▲' : 
-                         row.detectedQuality === 'minor' ? '▼' : '?';
-      const confPercent = (row.refinerConfidence * 100).toFixed(0);
+      let refinerCell = '';
+      const refConf = Math.round(row.refinerConfidence * 100);
       
-      if (row.refinerApplied) {
-        // Refiner CHANGED the chord
-        refinerContent = `
-          <div class="changed">${row.refinerChord}</div>
-          <small style="color:#22c55e">${qualityIcon} ${confPercent}%</small>
-        `;
-      } else if (row.refinerConfidence > 0) {
-        // Refiner analyzed but didn't change
-        refinerContent = `
-          <span style="color:#94a3b8">${row.baseChord}</span><br>
-          <small style="color:#64748b">${qualityIcon} ${confPercent}%</small>
-        `;
+      if (row.detectedQuality === 'major') {
+        const color = row.refinerApplied ? '#22c55e' : '#94a3b8';
+        refinerCell = `<span style="color:${color};font-weight:bold">▲</span> <small style="color:${color}">${refConf}%</small>`;
+      } else if (row.detectedQuality === 'minor') {
+        const color = row.refinerApplied ? '#22c55e' : '#94a3b8';
+        refinerCell = `<span style="color:${color};font-weight:bold">▼</span> <small style="color:${color}">${refConf}%</small>`;
       } else {
-        refinerContent = `<span style="color:#64748b">—</span>`;
+        refinerCell = `<span style="color:#64748b">—</span>`;
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 🎸 BASS CELL - FIXED! Simple and logical
+      // 🎸 BASS CELL - JUST THE NOTE!
       // ═══════════════════════════════════════════════════════════════
-      let bassContent = '';
+      let bassCell = '';
       
-      if (!row.bassDetected || row.bassDetected === 'NO_BASS') {
-        // No bass detected
-        bassContent = `<span style="color:#94a3b8">NO_BASS</span>`;
-      } else if (row.bassApplied) {
-        // Bass CHANGED something - show the result
-        bassContent = `
-          <div class="changed">${row.finalChord}</div>
-          <small style="color:#38bdf8">🎸 ${row.bassDetected} (${(row.bassConfidence * 100).toFixed(0)}%)</small>
-        `;
+      if (!row.bassNote) {
+        bassCell = `<span style="color:#64748b">—</span>`;
       } else {
-        // Bass detected but matches root (no change needed)
-        bassContent = `
-          <span style="color:#94a3b8">${row.bassDetected}</span><br>
-          <small style="color:#64748b">${(row.bassConfidence * 100).toFixed(0)}% (תואם)</small>
+        const bassConf = Math.round(row.bassConfidence * 100);
+        const color = row.bassApplied ? '#38bdf8' : '#94a3b8';
+        
+        // BIG NOTE + small percentage
+        bassCell = `
+          <span style="color:${color};font-weight:bold;font-size:16px">${row.bassNote}</span>
+          <small style="color:${color};display:block">${bassConf}%</small>
         `;
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 📝 NOTES CELL
+      // 🎯 FINAL - highlight if changed
       // ═══════════════════════════════════════════════════════════════
-      let notes = [];
-      
-      if (row.refinerApplied) {
-        notes.push(`🎵 ${this.getRefinerReasonText(row.refinerReason)}`);
-      }
-      
-      if (row.bassApplied) {
-        notes.push(`🎸 בס: ${row.bassDetected}`);
-      }
-      
-      const notesContent = notes.length ? notes.join('<br>') : '<span style="color:#64748b">—</span>';
+      const changed = row.baseChord !== row.finalChord;
+      const finalStyle = changed ? 'background:#fef3c7;color:#92400e;font-weight:bold' : '';
 
+      // ═══════════════════════════════════════════════════════════════
+      // 🏗️ BUILD ROW
+      // ═══════════════════════════════════════════════════════════════
       html += `
         <tr>
-          <td>${row.index}</td>
-          <td>${row.time}</td>
-          <td class="${baseClass}">${row.baseChord}</td>
-          <td class="${refinerClass}">${refinerContent}</td>
-          <td class="${bassClass}">${bassContent}</td>
-          <td class="final-col">${row.finalChord}</td>
-          <td style="font-size:11px;color:#cbd5e1;text-align:right">${notesContent}</td>
+          <td class="base-col">${row.baseChord}</td>
+          <td class="refiner-col" style="text-align:center">${refinerCell}</td>
+          <td class="bass-col" style="text-align:center">${bassCell}</td>
+          <td style="${finalStyle}">${row.finalChord}</td>
+          <td style="color:#64748b">${row.time}</td>
         </tr>
       `;
     }
 
     return html;
-  },
-
-  getRefinerReasonText(reason) {
-    const map = {
-      'major_to_minor': 'מז\'ור → מינור',
-      'minor_to_major': 'מינור → מז\'ור',
-      'too_short': 'קצר מדי',
-      'complex_chord': 'אקורד מורכב',
-      'no_change': 'ללא שינוי',
-      'no_data': ''
-    };
-    return map[reason] || reason;
   },
 
   formatTime(seconds) {
@@ -253,27 +198,22 @@ const ChordDebugger = {
     if (idx === -1) return chord;
 
     const newIdx = ((idx - capo) % 12 + 12) % 12;
-    const newRoot = flats[newIdx];
-
-    return newRoot + suffix;
+    return flats[newIdx] + suffix;
   },
 
   downloadCSV(debugData, filename) {
-    const headers = ['#', 'Time', 'Base', 'Refiner', 'Refiner%', 'Quality', 'Bass Note', 'Bass%', 'Final', 'Winner'];
+    const headers = ['Base', 'Quality', 'Quality%', 'Bass Note', 'Bass%', 'Final', 'Time'];
     let csv = headers.join(',') + '\n';
 
     for (const row of debugData) {
       csv += [
-        row.index,
-        row.time,
         `"${row.baseChord}"`,
-        `"${row.refinerChord}"`,
-        (row.refinerConfidence * 100).toFixed(0) + '%',
         `"${row.detectedQuality}"`,
-        `"${row.bassDetected || 'NO_BASS'}"`,
-        (row.bassConfidence * 100).toFixed(0) + '%',
+        Math.round(row.refinerConfidence * 100) + '%',
+        `"${row.bassNote || '-'}"`,
+        Math.round(row.bassConfidence * 100) + '%',
         `"${row.finalChord}"`,
-        `"${row.winner}"`
+        row.time
       ].join(',') + '\n';
     }
 
