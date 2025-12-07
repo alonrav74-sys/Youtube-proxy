@@ -1,12 +1,18 @@
 /**
- * BassEngine v4.2 - SMART BASS LOGIC
+ * BassEngine v4.3 - SIMPLE BASS DETECTION ONLY
  * 
- * 🔧 לוגיקה נכונה:
- * - בס = 3rd → slash chord (C/E, Am/C)
- * - בס = 5th → slash chord (C/G, Am/E)  
- * - בס = 7th → מוסיף 7! (Em + D = Em7, לא Em/D)
- * - בס = root → לא משנה
- * - בס אחר → לא משנה (או מציע אקורד חדש)
+ * 🎯 המנוע הזה עושה דבר אחד בלבד:
+ *    מזהה את תו הבס (התדר הכי נמוך והחזק)
+ * 
+ * ❌ לא עושה:
+ *    - לוגיקה של אקורדים
+ *    - החלטות על slash chords
+ *    - שינוי labels
+ * 
+ * ✅ מחזיר:
+ *    - bassDetected: התו שזוהה (C, D, E, וכו')
+ *    - bassConfidence: אחוז ביטחון
+ *    - bassFrequency: התדר ב-Hz
  */
 
 class BassEngine {
@@ -19,12 +25,12 @@ class BassEngine {
   }
 
   /**
-   * Main method: Analyze bass for entire timeline
+   * Main method: Detect bass note for each chord in timeline
+   * Returns timeline with bassDetected field added
    */
   async refineBassInTimeline(audioBuffer, timeline, key, options = {}) {
     const opts = {
-      minBassConfidence: options.minBassConfidence || 0.40,
-      minBassStrength: options.minBassStrength || 0.06,
+      minBassConfidence: options.minBassConfidence || 0.35,
       stabilityFrames: options.stabilityFrames || 2,
       debug: options.debug || false
     };
@@ -43,27 +49,13 @@ class BassEngine {
       const endTime = nextChord ? nextChord.t : duration;
       const chordDuration = endTime - startTime;
 
-      // Skip very short chords
-      if (chordDuration < 0.25) {
+      // Skip very short segments
+      if (chordDuration < 0.2) {
         refined.push({
           ...chord,
           bassDetected: 'NO_BASS',
           bassConfidence: 0,
-          changedByBass: false,
-          reason: 'too_short'
-        });
-        continue;
-      }
-
-      // Parse chord
-      const chordRoot = this.parseRoot(chord.label);
-      if (chordRoot === null) {
-        refined.push({
-          ...chord,
-          bassDetected: 'NO_BASS',
-          bassConfidence: 0,
-          changedByBass: false,
-          reason: 'cannot_parse'
+          bassFrequency: 0
         });
         continue;
       }
@@ -73,117 +65,29 @@ class BassEngine {
       const endSample = Math.min(Math.floor(endTime * sampleRate), channelData.length);
       const segment = channelData.slice(startSample, endSample);
 
-      // Detect bass note
-      const bassResult = this.detectBassFFT(segment, sampleRate, opts);
+      // 🎯 DETECT BASS NOTE - that's ALL we do!
+      const bassResult = this.detectBassNote(segment, sampleRate, opts);
 
-      // No clear bass detected
       if (bassResult.note === null || bassResult.confidence < opts.minBassConfidence) {
         refined.push({
           ...chord,
           bassDetected: 'NO_BASS',
           bassConfidence: bassResult.confidence || 0,
-          changedByBass: false,
-          reason: 'unclear_bass'
+          bassFrequency: 0
         });
-        continue;
-      }
-
-      const detectedBass = bassResult.note;
-      const bassNoteName = this.NOTES[detectedBass];
-
-      // Bass matches chord root - no change needed
-      if (detectedBass === chordRoot) {
+      } else {
+        const bassNoteName = this.NOTES[bassResult.note];
+        
         refined.push({
           ...chord,
-          bassDetected: bassNoteName,
+          bassDetected: bassNoteName,  // Just the note: "E", "A", "D", etc.
           bassConfidence: bassResult.confidence,
-          changedByBass: false,
-          reason: 'bass_matches_root'
+          bassFrequency: bassResult.frequency
         });
-        continue;
-      }
 
-      // ═══════════════════════════════════════════════════════════════
-      // 🎯 SMART BASS LOGIC
-      // ═══════════════════════════════════════════════════════════════
-      
-      const isMinor = /m(?!aj)/.test(chord.label);
-      const has7 = /7/.test(chord.label);
-      const hasMaj7 = /maj7/.test(chord.label);
-      
-      // Calculate interval from root to bass
-      const interval = this.toPc(detectedBass - chordRoot);
-      
-      let newLabel = chord.label;
-      let changedByBass = false;
-      let reason = 'bass_not_in_chord';
-
-      // ═══════════════════════════════════════════════════════════════
-      // 🎹 INTERVAL LOGIC
-      // ═══════════════════════════════════════════════════════════════
-
-      if (interval === 3 && isMinor) {
-        // Minor 3rd of minor chord → 1st inversion (Am/C)
-        newLabel = this.addSlashBass(chord.label, bassNoteName);
-        changedByBass = true;
-        reason = 'inversion_m3';
-      }
-      else if (interval === 4 && !isMinor) {
-        // Major 3rd of major chord → 1st inversion (C/E)
-        newLabel = this.addSlashBass(chord.label, bassNoteName);
-        changedByBass = true;
-        reason = 'inversion_M3';
-      }
-      else if (interval === 7) {
-        // Perfect 5th → 2nd inversion (C/G, Am/E)
-        newLabel = this.addSlashBass(chord.label, bassNoteName);
-        changedByBass = true;
-        reason = 'inversion_5th';
-      }
-      else if (interval === 10 && !has7 && !hasMaj7) {
-        // 🎯 Minor 7th (10 semitones) → ADD 7 to chord!
-        // Em + D bass = Em7 (not Em/D!)
-        // C + Bb bass = C7 (not C/Bb!)
-        newLabel = this.add7ToChord(chord.label);
-        changedByBass = true;
-        reason = 'added_7th';
-        
         if (opts.debug) {
-          console.log(`🎸 ${chord.label} + bass ${bassNoteName} (m7) → ${newLabel}`);
+          console.log(`🎸 [${this.formatTime(startTime)}] Bass: ${bassNoteName} (${Math.round(bassResult.confidence * 100)}%, ${Math.round(bassResult.frequency)}Hz)`);
         }
-      }
-      else if (interval === 11 && !has7 && !hasMaj7 && !isMinor) {
-        // Major 7th (11 semitones) on major chord → add maj7
-        // C + B bass = Cmaj7
-        newLabel = this.addMaj7ToChord(chord.label);
-        changedByBass = true;
-        reason = 'added_maj7';
-      }
-      else if (interval === 2) {
-        // 2nd (9th) → could be add9 or sus2, skip for now
-        reason = 'bass_is_2nd';
-      }
-      else if (interval === 5) {
-        // 4th → could be sus4, skip for now
-        reason = 'bass_is_4th';
-      }
-      else {
-        // Bass not clearly in chord
-        reason = 'bass_not_in_chord';
-      }
-
-      refined.push({
-        ...chord,
-        label: newLabel,
-        bassDetected: bassNoteName,
-        bassConfidence: bassResult.confidence,
-        bassFrequency: bassResult.frequency,
-        changedByBass,
-        reason
-      });
-
-      if (opts.debug && changedByBass) {
-        console.log(`🎸 ${chord.label} → ${newLabel} (bass: ${bassNoteName}, interval: ${interval}, reason: ${reason})`);
       }
     }
 
@@ -191,82 +95,40 @@ class BassEngine {
   }
 
   /**
-   * Add slash bass to chord (for inversions)
+   * 🎯 CORE FUNCTION: Detect the bass note in audio segment
    */
-  addSlashBass(label, bassNote) {
-    // Remove existing slash if any
-    const baseLabel = label.split('/')[0];
-    return baseLabel + '/' + bassNote;
-  }
-
-  /**
-   * Add 7 to chord (Em → Em7, C → C7)
-   */
-  add7ToChord(label) {
-    // Remove existing slash
-    const baseLabel = label.split('/')[0];
-    
-    // Don't add if already has 7
-    if (/7/.test(baseLabel)) return baseLabel;
-    
-    // Find where to insert 7
-    const match = baseLabel.match(/^([A-G][#b]?)(m)?(.*)$/);
-    if (!match) return baseLabel + '7';
-    
-    const root = match[1];
-    const minor = match[2] || '';
-    const suffix = match[3] || '';
-    
-    return root + minor + '7' + suffix;
-  }
-
-  /**
-   * Add maj7 to chord (C → Cmaj7)
-   */
-  addMaj7ToChord(label) {
-    const baseLabel = label.split('/')[0];
-    if (/7/.test(baseLabel)) return baseLabel;
-    
-    const match = baseLabel.match(/^([A-G][#b]?)(.*)$/);
-    if (!match) return baseLabel + 'maj7';
-    
-    return match[1] + 'maj7' + match[2];
-  }
-
-  /**
-   * Detect bass using FFT - find lowest strong peak
-   */
-  detectBassFFT(segment, sampleRate, opts) {
+  detectBassNote(segment, sampleRate, opts) {
     if (!segment || segment.length < 2048) {
       return { note: null, confidence: 0, frequency: 0 };
     }
 
-    const bassFreqMin = 35;
-    const bassFreqMax = 300;
+    const bassFreqMin = 30;   // Lowest bass (B0 = 31Hz)
+    const bassFreqMax = 350;  // Highest bass we care about
     const fftSize = 4096;
     const hopSize = 2048;
     
     const detections = [];
 
+    // Analyze multiple frames
     for (let start = 0; start + fftSize <= segment.length; start += hopSize) {
       const frame = segment.slice(start, start + fftSize);
-      const result = this.detectBassInFrame(frame, sampleRate, fftSize, bassFreqMin, bassFreqMax);
-      if (result.note !== null) {
+      const result = this.analyzeFrame(frame, sampleRate, fftSize, bassFreqMin, bassFreqMax);
+      
+      if (result.note !== null && result.confidence > 0.2) {
         detections.push(result);
       }
     }
 
+    // Need stable detection
     if (detections.length < opts.stabilityFrames) {
-      // Not enough stable detections
       if (detections.length > 0) {
         // Return best single detection
-        const best = detections.reduce((a, b) => b.confidence > a.confidence ? b : a);
-        return best;
+        return detections.reduce((a, b) => b.confidence > a.confidence ? b : a);
       }
       return { note: null, confidence: 0, frequency: 0 };
     }
 
-    // Find most common note
+    // Find most common note (voting)
     const noteCounts = {};
     for (const d of detections) {
       noteCounts[d.note] = (noteCounts[d.note] || 0) + 1;
@@ -281,108 +143,124 @@ class BassEngine {
       }
     }
 
-    // Average confidence for this note
-    const sameNote = detections.filter(d => d.note === bestNote);
-    const avgConf = sameNote.reduce((s, d) => s + d.confidence, 0) / sameNote.length;
-    const avgFreq = sameNote.reduce((s, d) => s + d.frequency, 0) / sameNote.length;
+    // Average confidence and frequency for winning note
+    const winners = detections.filter(d => d.note === bestNote);
+    const avgConf = winners.reduce((s, d) => s + d.confidence, 0) / winners.length;
+    const avgFreq = winners.reduce((s, d) => s + d.frequency, 0) / winners.length;
 
-    // Stability factor
+    // Stability bonus
     const stability = maxCount / detections.length;
+    const finalConfidence = Math.min(1.0, avgConf * (0.6 + stability * 0.4));
 
     return {
       note: bestNote,
-      confidence: avgConf * (0.5 + stability * 0.5),
+      confidence: finalConfidence,
       frequency: avgFreq
     };
   }
 
   /**
-   * Detect bass in single frame
+   * Analyze single frame for bass frequency
    */
-  detectBassInFrame(frame, sampleRate, fftSize, fMin, fMax) {
+  analyzeFrame(frame, sampleRate, fftSize, fMin, fMax) {
     const N = frame.length;
     
-    // Hann window
-    const windowed = new Float32Array(N);
+    // Check energy
     let energy = 0;
     for (let i = 0; i < N; i++) {
-      const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-      windowed[i] = frame[i] * w;
-      energy += windowed[i] * windowed[i];
+      energy += frame[i] * frame[i];
     }
     energy = Math.sqrt(energy / N);
-
-    if (energy < 0.005) {
+    
+    if (energy < 0.003) {
       return { note: null, confidence: 0, frequency: 0 };
     }
 
+    // Apply Hann window
+    const windowed = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
+      windowed[i] = frame[i] * w;
+    }
+
     // FFT
-    const { mags } = this.fft(windowed, fftSize);
+    const mags = this.fft(windowed);
 
     // Find bins for bass range
     const binMin = Math.floor(fMin * fftSize / sampleRate);
     const binMax = Math.ceil(fMax * fftSize / sampleRate);
 
-    // Find strongest peak in bass range
-    let maxMag = 0;
-    let maxBin = -1;
-
-    for (let b = binMin; b <= binMax && b < mags.length; b++) {
-      if (mags[b] > maxMag) {
-        maxMag = mags[b];
-        maxBin = b;
-      }
-    }
-
-    if (maxBin < 0) {
-      return { note: null, confidence: 0, frequency: 0 };
-    }
-
-    // Quadratic interpolation
-    let interpBin = maxBin;
-    if (maxBin > 0 && maxBin < mags.length - 1) {
-      const y1 = mags[maxBin - 1];
-      const y2 = mags[maxBin];
-      const y3 = mags[maxBin + 1];
-      const denom = 2 * (2 * y2 - y1 - y3);
-      if (Math.abs(denom) > 0.0001) {
-        interpBin = maxBin + (y3 - y1) / denom;
-      }
-    }
-
-    const frequency = interpBin * sampleRate / fftSize;
-    const midiNote = 69 + 12 * Math.log2(frequency / 440);
-    const pitchClass = this.toPc(Math.round(midiNote));
-
-    // Calculate confidence
+    // Calculate average magnitude in bass range
     let sum = 0, count = 0;
     for (let b = binMin; b <= binMax && b < mags.length; b++) {
       sum += mags[b];
       count++;
     }
     const avgMag = sum / (count || 1);
-    const confidence = Math.min(1.0, (maxMag / (avgMag + 0.001)) * 0.25);
 
-    return { note: pitchClass, confidence, frequency };
+    // Find peaks in bass range
+    const peaks = [];
+    for (let b = binMin + 1; b < binMax - 1 && b < mags.length - 1; b++) {
+      if (mags[b] > mags[b - 1] && mags[b] > mags[b + 1] && mags[b] > avgMag * 1.5) {
+        // Quadratic interpolation for better frequency
+        const y1 = mags[b - 1];
+        const y2 = mags[b];
+        const y3 = mags[b + 1];
+        const denom = 2 * (2 * y2 - y1 - y3);
+        let interpBin = b;
+        if (Math.abs(denom) > 0.0001) {
+          interpBin = b + (y3 - y1) / denom;
+        }
+        
+        const freq = interpBin * sampleRate / fftSize;
+        peaks.push({ bin: b, freq, mag: mags[b] });
+      }
+    }
+
+    if (peaks.length === 0) {
+      return { note: null, confidence: 0, frequency: 0 };
+    }
+
+    // Choose the LOWEST strong peak (that's the bass!)
+    peaks.sort((a, b) => a.freq - b.freq);
+    
+    // Take lowest peak that's strong enough
+    let chosen = peaks[0];
+    for (const peak of peaks) {
+      if (peak.mag >= chosen.mag * 0.7) {
+        chosen = peak;
+        break;
+      }
+    }
+
+    // Convert to pitch class
+    const midiNote = 69 + 12 * Math.log2(chosen.freq / 440);
+    const pitchClass = this.toPc(Math.round(midiNote));
+
+    // Confidence based on peak strength
+    const confidence = Math.min(1.0, (chosen.mag / (avgMag + 0.001)) * 0.2);
+
+    return {
+      note: pitchClass,
+      confidence,
+      frequency: chosen.freq
+    };
   }
 
   /**
-   * FFT
+   * Simple FFT - returns magnitude array
    */
-  fft(input, size) {
-    const N = size || input.length;
+  fft(input) {
+    const N = input.length;
     const re = new Float32Array(N);
     const im = new Float32Array(N);
-    
-    for (let i = 0; i < Math.min(input.length, N); i++) {
-      re[i] = input[i];
-    }
+    re.set(input);
 
+    // Bit reversal
     let j = 0;
     for (let i = 0; i < N; i++) {
       if (i < j) {
         [re[i], re[j]] = [re[j], re[i]];
-        [im[i], im[j]] = [im[j], im[i]];
       }
       let m = N >> 1;
       while (m >= 1 && j >= m) {
@@ -392,53 +270,45 @@ class BassEngine {
       j += m;
     }
 
+    // FFT
     for (let len = 2; len <= N; len <<= 1) {
       const angle = -2 * Math.PI / len;
-      const wLenReal = Math.cos(angle);
-      const wLenImag = Math.sin(angle);
+      const wLenRe = Math.cos(angle);
+      const wLenIm = Math.sin(angle);
       
       for (let i = 0; i < N; i += len) {
-        let wReal = 1, wImag = 0;
+        let wRe = 1, wIm = 0;
         
         for (let k = 0; k < len / 2; k++) {
           const idx = i + k + len / 2;
-          const tReal = re[idx] * wReal - im[idx] * wImag;
-          const tImag = re[idx] * wImag + im[idx] * wReal;
+          const tRe = re[idx] * wRe - im[idx] * wIm;
+          const tIm = re[idx] * wIm + im[idx] * wRe;
           
-          re[idx] = re[i + k] - tReal;
-          im[idx] = im[i + k] - tImag;
-          re[i + k] += tReal;
-          im[i + k] += tImag;
+          re[idx] = re[i + k] - tRe;
+          im[idx] = im[i + k] - tIm;
+          re[i + k] += tRe;
+          im[i + k] += tIm;
           
-          const nextWReal = wReal * wLenReal - wImag * wLenImag;
-          wImag = wReal * wLenImag + wImag * wLenReal;
-          wReal = nextWReal;
+          const nextWRe = wRe * wLenRe - wIm * wLenIm;
+          wIm = wRe * wLenIm + wIm * wLenRe;
+          wRe = nextWRe;
         }
       }
     }
 
+    // Magnitudes
     const mags = new Float32Array(N / 2);
     for (let i = 0; i < N / 2; i++) {
       mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
     }
 
-    return { mags, N };
+    return mags;
   }
 
-  /**
-   * Parse chord root
-   */
-  parseRoot(label) {
-    if (!label || typeof label !== 'string') return null;
-    
-    const match = label.match(/^([A-G][#b]?)/);
-    if (!match) return null;
-
-    let note = match[1];
-    const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
-    note = flatToSharp[note] || note;
-
-    return this.NOTES.indexOf(note);
+  formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
   }
 }
 
