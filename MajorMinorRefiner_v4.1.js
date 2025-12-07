@@ -1,19 +1,22 @@
 /**
- * MajorMinorRefiner v4.1 - FIXED QUALITY VALIDATOR
+ * MajorMinorRefiner v4.2 - IMPROVED 3rd Detection
  * 
  * 🔧 תיקונים עיקריים:
- * - ניתוח מרובה פריימים (לא רק האמצע)
- * - הורדת סף ה-third strength מ-0.12 ל-0.04
- * - הורדת סף ה-root strength מ-0.15 ל-0.05
- * - הורדת יחס ה-thirdRatio מ-1.5 ל-1.2
- * - חישוב confidence משופר
+ * - זיהוי משופר של השליש (3 סמיטונים = מינור, 4 = מז'ור)
+ * - סף נמוך יותר לזיהוי
+ * - בודק את כל הפריים, לא רק חלק ממנו
+ * - לא תלוי בבאס או באקורד קודם
  * 
- * 🎯 המטרה: רק לזהות אם זה מינור או מז'ור, לא לשנות את השורש!
+ * 🎯 המטרה: רק לזהות אם זה מינור או מז'ור!
  */
 
 class MajorMinorRefiner {
   constructor() {
     this.NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  }
+
+  toPc(n) {
+    return ((n % 12) + 12) % 12;
   }
 
   /**
@@ -22,8 +25,7 @@ class MajorMinorRefiner {
   async refineChordTimeline(audioBuffer, timeline, options = {}) {
     const opts = {
       debug: options.debug || false,
-      minConfidenceToOverride: options.minConfidenceToOverride || 0.35,  // 🔧 הורד מ-0.50
-      thirdRatioThreshold: options.thirdRatioThreshold || 1.2,           // 🔧 הורד מ-1.3
+      minConfidenceToOverride: options.minConfidenceToOverride || 0.30,  // 🔧 הורד מ-0.35
     };
 
     const sampleRate = audioBuffer.sampleRate;
@@ -40,8 +42,8 @@ class MajorMinorRefiner {
       const endTime = nextChord ? nextChord.t : duration;
       const chordDuration = endTime - startTime;
 
-      // Skip very short chords (< 0.25s)
-      if (chordDuration < 0.25) {  // 🔧 הורד מ-0.3
+      // Skip very short chords
+      if (chordDuration < 0.2) {
         refined.push({
           ...chord,
           shouldOverride: false,
@@ -52,7 +54,7 @@ class MajorMinorRefiner {
         continue;
       }
 
-      // Parse chord root and current quality
+      // Parse chord
       const { root, isMajor, isMinor, baseChord } = this.parseChord(chord.label);
       
       if (root === null) {
@@ -66,7 +68,7 @@ class MajorMinorRefiner {
         continue;
       }
 
-      // Skip complex chords (sus, dim, aug, 7ths, etc.)
+      // Skip complex chords
       if (this.isComplexChord(chord.label)) {
         refined.push({
           ...chord,
@@ -78,13 +80,13 @@ class MajorMinorRefiner {
         continue;
       }
 
-      // Extract audio segment for this chord
+      // Extract audio segment
       const startSample = Math.floor(startTime * sampleRate);
       const endSample = Math.min(Math.floor(endTime * sampleRate), channelData.length);
       const segment = channelData.slice(startSample, endSample);
 
-      // 🔧 NEW: Analyze the 3rd interval with multi-frame approach
-      const quality = this.analyzeThirdQualityMultiFrame(segment, sampleRate, root);
+      // 🎯 Analyze the 3rd interval
+      const quality = this.analyzeThirdInterval(segment, sampleRate, root);
 
       // Decide if we should override
       let shouldOverride = false;
@@ -113,20 +115,19 @@ class MajorMinorRefiner {
         refinedLabel,
         qualityConfidence: quality.confidence,
         detectedQuality: quality.isMajor ? 'major' : quality.isMinor ? 'minor' : 'unclear',
-        major3rdStrength: quality.majorThird,
-        minor3rdStrength: quality.minorThird,
-        thirdRatio: quality.thirdRatio,
+        major3rdStrength: quality.major3rd,
+        minor3rdStrength: quality.minor3rd,
+        thirdRatio: quality.ratio,
         reason
       });
 
       if (opts.debug) {
         const symbol = quality.isMajor ? '▲' : quality.isMinor ? '▼' : '?';
         console.log(
-          `🎵 ${chord.label} ${symbol} ` +
-          `(M3: ${(quality.majorThird * 100).toFixed(0)}%, ` +
-          `m3: ${(quality.minorThird * 100).toFixed(0)}%, ` +
-          `ratio: ${quality.thirdRatio.toFixed(2)}, ` +
-          `conf: ${(quality.confidence * 100).toFixed(0)}%)` +
+          `🎵 ${chord.label} → ${symbol} ` +
+          `M3:${(quality.major3rd * 100).toFixed(0)}% ` +
+          `m3:${(quality.minor3rd * 100).toFixed(0)}% ` +
+          `conf:${(quality.confidence * 100).toFixed(0)}%` +
           (shouldOverride ? ` → ${refinedLabel}` : '')
         );
       }
@@ -136,137 +137,115 @@ class MajorMinorRefiner {
   }
 
   /**
-   * 🔧 NEW: Analyze 3rd quality using multiple frames
+   * 🎯 Analyze the 3rd interval - SIMPLE AND DIRECT
+   * minor 3rd = 3 semitones from root
+   * major 3rd = 4 semitones from root
    */
-  analyzeThirdQualityMultiFrame(audioSegment, sampleRate, rootPc) {
-    const toPc = n => ((n % 12) + 12) % 12;
-    
-    if (!audioSegment || audioSegment.length < 1024) {
-      return { isMajor: false, isMinor: false, confidence: 0, thirdRatio: 1.0, majorThird: 0, minorThird: 0 };
+  analyzeThirdInterval(segment, sampleRate, rootPc) {
+    if (!segment || segment.length < 512) {
+      return { isMajor: false, isMinor: false, confidence: 0, major3rd: 0, minor3rd: 0, ratio: 1 };
     }
 
-    const fftSize = 4096;
-    const hopSize = 2048;
-    const frames = [];
+    // Use multiple frame sizes for better detection
+    const frameSizes = [2048, 4096];
+    let totalMajor3rd = 0;
+    let totalMinor3rd = 0;
+    let totalRoot = 0;
+    let frameCount = 0;
 
-    // 🔧 NEW: Extract multiple frames
-    for (let i = 0; i + fftSize <= audioSegment.length; i += hopSize) {
-      frames.push(audioSegment.slice(i, i + fftSize));
-    }
-
-    if (frames.length === 0) {
-      // Segment too short - use what we have
-      const padded = new Float32Array(fftSize);
-      padded.set(audioSegment.slice(0, Math.min(audioSegment.length, fftSize)));
-      frames.push(padded);
-    }
-
-    // Compute chroma for each frame and average
-    const avgChroma = new Float32Array(12);
-    let validFrames = 0;
-
-    for (const frame of frames) {
-      const chroma = this.computeChroma(frame, sampleRate);
-      if (chroma) {
-        for (let i = 0; i < 12; i++) {
-          avgChroma[i] += chroma[i];
+    for (const fftSize of frameSizes) {
+      const hopSize = fftSize / 2;
+      
+      for (let start = 0; start + fftSize <= segment.length; start += hopSize) {
+        const frame = segment.slice(start, start + fftSize);
+        const chroma = this.computeChromaFromFrame(frame, sampleRate, fftSize);
+        
+        if (chroma) {
+          totalRoot += chroma[rootPc] || 0;
+          totalMinor3rd += chroma[this.toPc(rootPc + 3)] || 0;  // 3 semitones = minor
+          totalMajor3rd += chroma[this.toPc(rootPc + 4)] || 0;  // 4 semitones = major
+          frameCount++;
         }
-        validFrames++;
       }
     }
 
-    if (validFrames === 0) {
-      return { isMajor: false, isMinor: false, confidence: 0, thirdRatio: 1.0, majorThird: 0, minorThird: 0 };
+    if (frameCount === 0 || totalRoot < 0.01) {
+      return { isMajor: false, isMinor: false, confidence: 0, major3rd: 0, minor3rd: 0, ratio: 1 };
     }
 
-    // Average the chroma
-    for (let i = 0; i < 12; i++) {
-      avgChroma[i] /= validFrames;
-    }
+    // Average
+    const avgRoot = totalRoot / frameCount;
+    const avgMinor3rd = totalMinor3rd / frameCount;
+    const avgMajor3rd = totalMajor3rd / frameCount;
 
-    // Get root, major 3rd, and minor 3rd strengths
-    const rootStrength = avgChroma[toPc(rootPc)] || 0;
-    const majorThird = avgChroma[toPc(rootPc + 4)] || 0;
-    const minorThird = avgChroma[toPc(rootPc + 3)] || 0;
-    const fifth = avgChroma[toPc(rootPc + 7)] || 0;
-
-    // 🔧 LOWER threshold - need some root presence
-    if (rootStrength < 0.05) {  // היה 0.15
-      return { isMajor: false, isMinor: false, confidence: 0, thirdRatio: 1.0, majorThird, minorThird };
-    }
-
-    // Calculate ratio between major and minor 3rd
-    const thirdRatio = (majorThird + 0.001) / (minorThird + 0.001);
-
+    // 🎯 Simple decision: which 3rd is stronger?
+    const ratio = (avgMajor3rd + 0.001) / (avgMinor3rd + 0.001);
+    
     let isMajor = false;
     let isMinor = false;
     let confidence = 0;
 
-    // 🔧 LOWER thresholds for detection
-    // Major 3rd is stronger
-    if (thirdRatio > 1.2 && majorThird > 0.04) {  // היה 1.5 ו-0.12
+    // 🔧 LOWER thresholds - easier to detect
+    if (ratio > 1.15 && avgMajor3rd > 0.02) {
+      // Major 3rd is stronger
       isMajor = true;
-      // Confidence based on how clear the difference is
-      const ratioBased = Math.min(1.0, (thirdRatio - 1.0) * 0.5);
-      const strengthBased = Math.min(1.0, majorThird * 5);
-      confidence = (ratioBased + strengthBased) / 2;
-    }
-    // Minor 3rd is stronger
-    else if (thirdRatio < 0.83 && minorThird > 0.04) {  // היה 0.67 ו-0.12
+      confidence = Math.min(1.0, (ratio - 1.0) * 0.5 + avgMajor3rd * 3);
+    } else if (ratio < 0.87 && avgMinor3rd > 0.02) {
+      // Minor 3rd is stronger
       isMinor = true;
-      const ratioBased = Math.min(1.0, (1.0 / thirdRatio - 1.0) * 0.5);
-      const strengthBased = Math.min(1.0, minorThird * 5);
-      confidence = (ratioBased + strengthBased) / 2;
-    }
-    // 🔧 NEW: Check even if ratios are close but one is clearly present
-    else if (majorThird > 0.08 && majorThird > minorThird) {
+      confidence = Math.min(1.0, (1.0 / ratio - 1.0) * 0.5 + avgMinor3rd * 3);
+    } else if (avgMajor3rd > 0.05 && avgMajor3rd > avgMinor3rd * 1.05) {
+      // Weak but present major
       isMajor = true;
-      confidence = Math.min(0.5, (majorThird - minorThird) * 3);
-    }
-    else if (minorThird > 0.08 && minorThird > majorThird) {
+      confidence = Math.min(0.5, (avgMajor3rd - avgMinor3rd) * 5);
+    } else if (avgMinor3rd > 0.05 && avgMinor3rd > avgMajor3rd * 1.05) {
+      // Weak but present minor
       isMinor = true;
-      confidence = Math.min(0.5, (minorThird - majorThird) * 3);
+      confidence = Math.min(0.5, (avgMinor3rd - avgMajor3rd) * 5);
     }
 
-    // 🔧 Boost confidence if fifth is also present (validates the chord)
-    if (fifth > 0.06 && confidence > 0) {
-      confidence = Math.min(1.0, confidence * 1.2);
-    }
-
-    return { isMajor, isMinor, confidence, thirdRatio, majorThird, minorThird };
+    return {
+      isMajor,
+      isMinor,
+      confidence,
+      major3rd: avgMajor3rd,
+      minor3rd: avgMinor3rd,
+      ratio
+    };
   }
 
   /**
-   * Compute chromagram for audio frame
+   * Compute chroma from a single frame
    */
-  computeChroma(frame, sampleRate) {
-    if (!frame || frame.length < 1024) return null;
-
+  computeChromaFromFrame(frame, sampleRate, fftSize) {
     const N = frame.length;
-    const chroma = new Float32Array(12);
+    if (N < 512) return null;
 
-    // Hann window
+    // Apply Hann window
     const windowed = new Float32Array(N);
     for (let i = 0; i < N; i++) {
-      const window = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-      windowed[i] = frame[i] * window;
+      const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
+      windowed[i] = frame[i] * w;
     }
 
     // FFT
     const { mags } = this.fft(windowed);
-
-    // Map frequencies to pitch classes
-    // 🔧 Focus on range where 3rd intervals are clearest (100-1500 Hz)
+    
+    // Build chroma
+    const chroma = new Float32Array(12);
+    
+    // Focus on frequency range where 3rd intervals are clearest
     for (let bin = 1; bin < mags.length; bin++) {
-      const freq = bin * sampleRate / N;
+      const freq = bin * sampleRate / fftSize;
       
-      if (freq < 60 || freq > 2500) continue;  // 🔧 הרחבתי מ-80-2000
+      // 🔧 Wider range: 60Hz - 3000Hz
+      if (freq < 60 || freq > 3000) continue;
 
       const midi = 69 + 12 * Math.log2(freq / 440);
-      const pc = ((Math.round(midi) % 12) + 12) % 12;
+      const pc = this.toPc(Math.round(midi));
       
-      // 🔧 Weight lower harmonics more (they're more reliable for chord quality)
-      const weight = freq < 500 ? 1.5 : 1.0;
+      // Weight mid frequencies more (where 3rds are clearest)
+      const weight = (freq >= 150 && freq <= 1500) ? 1.5 : 1.0;
       chroma[pc] += mags[bin] * weight;
     }
 
@@ -282,7 +261,7 @@ class MajorMinorRefiner {
   }
 
   /**
-   * Simple FFT implementation
+   * Simple FFT
    */
   fft(input) {
     const n = input.length;
@@ -293,7 +272,6 @@ class MajorMinorRefiner {
     const im = new Float32Array(N);
     re.set(input);
 
-    // Bit-reversal
     let j = 0;
     for (let i = 0; i < N; i++) {
       if (i < j) {
@@ -308,7 +286,6 @@ class MajorMinorRefiner {
       j += m;
     }
 
-    // FFT
     for (let len = 2; len <= N; len <<= 1) {
       const angle = -2 * Math.PI / len;
       const wLenReal = Math.cos(angle);
@@ -318,14 +295,14 @@ class MajorMinorRefiner {
         let wReal = 1;
         let wImag = 0;
         
-        for (let j = 0; j < len / 2; j++) {
-          const tReal = re[i + j + len / 2] * wReal - im[i + j + len / 2] * wImag;
-          const tImag = re[i + j + len / 2] * wImag + im[i + j + len / 2] * wReal;
+        for (let k = 0; k < len / 2; k++) {
+          const tReal = re[i + k + len / 2] * wReal - im[i + k + len / 2] * wImag;
+          const tImag = re[i + k + len / 2] * wImag + im[i + k + len / 2] * wReal;
           
-          re[i + j + len / 2] = re[i + j] - tReal;
-          im[i + j + len / 2] = im[i + j] - tImag;
-          re[i + j] += tReal;
-          im[i + j] += tImag;
+          re[i + k + len / 2] = re[i + k] - tReal;
+          im[i + k + len / 2] = im[i + k] - tImag;
+          re[i + k] += tReal;
+          im[i + k] += tImag;
           
           const nextWReal = wReal * wLenReal - wImag * wLenImag;
           wImag = wReal * wLenImag + wImag * wLenReal;
@@ -343,14 +320,13 @@ class MajorMinorRefiner {
   }
 
   /**
-   * Parse chord label to extract root and quality
+   * Parse chord label
    */
   parseChord(label) {
     if (!label || typeof label !== 'string') {
       return { root: null, isMajor: false, isMinor: false, baseChord: '' };
     }
 
-    // Extract root note
     const match = label.match(/^([A-G][#b]?)/);
     if (!match) {
       return { root: null, isMajor: false, isMinor: false, baseChord: '' };
@@ -358,22 +334,15 @@ class MajorMinorRefiner {
 
     const baseChord = match[1];
     
-    // Normalize flats to sharps for lookup
     const flatToSharp = {
       'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#'
     };
     let normalized = baseChord;
     if (flatToSharp[baseChord]) {
       normalized = flatToSharp[baseChord];
-    } else if (baseChord.includes('b')) {
-      // Handle single flats like "Cb" -> "B"
-      const noteMap = {'Cb': 'B', 'Fb': 'E'};
-      normalized = noteMap[baseChord] || baseChord.replace('b', '#');
     }
     
     const root = this.NOTES.indexOf(normalized);
-
-    // Check if it's minor (has 'm' but not 'maj')
     const isMinor = /m(?!aj)/.test(label);
     const isMajor = !isMinor && !/dim|aug|sus/.test(label);
 
@@ -381,10 +350,11 @@ class MajorMinorRefiner {
   }
 
   /**
-   * Check if chord is complex (sus, dim, aug, 7ths, etc.)
+   * Check if chord is complex
    */
   isComplexChord(label) {
-    return /sus|dim|aug|7|9|11|13|6|add/.test(label);
+    // 🔧 Don't skip 7ths - they still have clear 3rds!
+    return /sus|dim|aug/.test(label);
   }
 }
 
