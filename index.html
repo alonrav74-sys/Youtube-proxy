@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChordFinder Pro v14.37</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #eee; min-height: 100vh; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 30px; color: #4ecdc4; }
+    .upload-area { background: #0f3460; border: 2px dashed #4ecdc4; border-radius: 12px; padding: 40px; text-align: center; margin-bottom: 20px; cursor: pointer; transition: all 0.3s; }
+    .upload-area:hover { background: #1a4a7a; border-color: #7efff5; }
+    .upload-area.dragover { background: #1a5a8a; border-color: #7efff5; transform: scale(1.02); }
+    input[type="file"] { display: none; }
+    .btn { background: linear-gradient(135deg, #4ecdc4, #44a8a1); color: #fff; border: none; padding: 12px 30px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: all 0.3s; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(78,205,196,0.4); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .progress { display: none; margin: 20px 0; }
+    .progress-bar { height: 8px; background: #0f3460; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #4ecdc4, #44a8a1); width: 0%; transition: width 0.3s; }
+    .progress-text { text-align: center; margin-top: 8px; font-size: 14px; color: #aaa; }
+    .results { display: none; margin-top: 30px; }
+    .key-info { background: #0f3460; border-radius: 12px; padding: 20px; margin-bottom: 20px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px; }
+    .key-info div { text-align: center; }
+    .key-info .value { font-size: 28px; color: #4ecdc4; font-weight: bold; }
+    .key-info .label { font-size: 12px; color: #888; margin-top: 5px; }
+    .chords-container { background: #0f3460; border-radius: 12px; padding: 20px; max-height: 400px; overflow-y: auto; }
+    .chord-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid #1a4a7a; }
+    .chord-row:last-child { border-bottom: none; }
+    .chord-time { width: 60px; color: #888; font-size: 13px; }
+    .chord-label { flex: 1; font-size: 18px; font-weight: bold; color: #4ecdc4; }
+    .chord-label.changed { color: #ffd93d; }
+    .chord-meta { font-size: 11px; color: #666; }
+    .options { background: #0f3460; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+    .options label { display: flex; align-items: center; gap: 10px; margin: 8px 0; cursor: pointer; }
+    .options input[type="checkbox"] { width: 18px; height: 18px; accent-color: #4ecdc4; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎸 ChordFinder Pro v14.37</h1>
+    
+    <div class="options">
+      <label><input type="checkbox" id="useBass" checked> השתמש ב-BassEngine להיפוכים</label>
+      <label><input type="checkbox" id="useMM" checked> השתמש ב-MajorMinorRefiner</label>
+      <label><input type="checkbox" id="showDebug"> הצג מידע דיבוג</label>
+    </div>
+    
+    <div class="upload-area" id="uploadArea">
+      <p style="font-size: 18px; margin-bottom: 15px;">גרור קובץ אודיו לכאן</p>
+      <p style="color: #888; margin-bottom: 20px;">או לחץ לבחירת קובץ</p>
+      <button class="btn" id="selectBtn">בחר קובץ</button>
+      <input type="file" id="fileInput" accept="audio/*">
+    </div>
+    
+    <div class="progress" id="progress">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">מתחיל...</div>
+    </div>
+    
+    <div class="results" id="results">
+      <div class="key-info" id="keyInfo"></div>
+      <div class="chords-container" id="chordsContainer"></div>
+    </div>
+  </div>
+
+  <script src="BassEngine.js"></script>
+  <script src="MajorMinorRefiner.js"></script>
+  <script src="ChordDebugger.js"></script>
+  <script src="ChordEngineEnhanced.js"></script>
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const selectBtn = document.getElementById('selectBtn');
+    const progress = document.getElementById('progress');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const results = document.getElementById('results');
+    const keyInfo = document.getElementById('keyInfo');
+    const chordsContainer = document.getElementById('chordsContainer');
+
+    selectBtn.onclick = () => fileInput.click();
+    uploadArea.onclick = (e) => { if (e.target !== selectBtn) fileInput.click(); };
+    
+    uploadArea.ondragover = (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); };
+    uploadArea.ondragleave = () => uploadArea.classList.remove('dragover');
+    uploadArea.ondrop = (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]); };
+    
+    fileInput.onchange = () => { if (fileInput.files.length) processFile(fileInput.files[0]); };
+
+    async function processFile(file) {
+      progress.style.display = 'block';
+      results.style.display = 'none';
+      progressFill.style.width = '0%';
+      progressText.textContent = 'טוען קובץ...';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        progressText.textContent = 'מנתח אקורדים...';
+        progressFill.style.width = '20%';
+
+        const engine = new ChordEngineEnhanced();
+        const result = await engine.detect(audioBuffer, {
+          harmonyMode: 'jazz',
+          useBassEngine: document.getElementById('useBass').checked,
+          useMajorMinorRefiner: document.getElementById('useMM').checked,
+          progressCallback: (info) => {
+            progressFill.style.width = `${Math.round(info.progress * 100)}%`;
+            progressText.textContent = info.stage === 'key_detected' ? `סולם: ${info.key}` : info.stage;
+          }
+        });
+
+        if (document.getElementById('showDebug').checked && window.ChordDebugger) {
+          const debugger_ = new ChordDebugger();
+          debugger_.log(result);
+          const overlay = debugger_.createOverlay(result);
+          if (overlay) document.body.appendChild(overlay);
+        }
+
+        displayResults(result);
+      } catch (err) {
+        progressText.textContent = 'שגיאה: ' + err.message;
+        console.error(err);
+      }
+    }
+
+    function displayResults(result) {
+      progress.style.display = 'none';
+      results.style.display = 'block';
+
+      const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const keyName = notes[result.key.root] + (result.key.minor ? 'm' : '');
+      
+      keyInfo.innerHTML = `
+        <div><div class="value">${keyName}</div><div class="label">סולם</div></div>
+        <div><div class="value">${Math.round(result.key.confidence * 100)}%</div><div class="label">ביטחון</div></div>
+        <div><div class="value">${result.bpm}</div><div class="label">BPM</div></div>
+        <div><div class="value">${result.stats.totalChords}</div><div class="label">אקורדים</div></div>
+        <div><div class="value">${result.stats.bassChanges || 0}</div><div class="label">שינויי בס</div></div>
+        <div><div class="value">${result.stats.mmChanges || 0}</div><div class="label">שינויי M/m</div></div>
+      `;
+
+      chordsContainer.innerHTML = result.chords.map(chord => {
+        const changed = chord.changedByBass || chord.refinedBy;
+        const meta = [];
+        if (chord.changedByBass) meta.push('Bass');
+        if (chord.refinedBy) meta.push('M/m');
+        if (chord.ornamentType && chord.ornamentType !== 'structural') meta.push(chord.ornamentType);
+        
+        return `<div class="chord-row">
+          <span class="chord-time">${formatTime(chord.t)}</span>
+          <span class="chord-label ${changed ? 'changed' : ''}">${chord.label}</span>
+          ${meta.length ? `<span class="chord-meta">${meta.join(', ')}</span>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+  </script>
+</body>
+</html>
