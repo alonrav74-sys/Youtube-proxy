@@ -151,24 +151,23 @@
       <div id="debuggerTab" class="tab-content">
         <h3>🔬 דיבאגר - טבלת אקורדים</h3>
         <div class="info-box">
-          טבלה מפורטת של כל האקורדים שזוהו עם זמנים, confidence ופונקציה הרמונית
+          טבלה מפורטת: מה כל מנוע זיהה (Engine, Bass, M/m) והחלטה סופית
         </div>
         <div id="debuggerTableContainer" style="margin-top:12px;max-height:500px;overflow-y:auto">
           <table class="debugger-table">
-            <thead>
+            <thead id="debuggerTableHead">
               <tr>
                 <th>#</th>
                 <th>Time</th>
-                <th>🎼 Original</th>
-                <th>➡️ Final</th>
+                <th>🎼 Engine</th>
                 <th>🎸 Bass</th>
                 <th>🎵 M/m</th>
+                <th>➡️ Final</th>
                 <th>Func</th>
-                <th>Notes</th>
               </tr>
             </thead>
             <tbody id="debuggerTableBody">
-              <tr><td colspan="8" style="text-align:center;color:#94a3b8">ממתין לניתוח...</td></tr>
+              <tr><td colspan="7" style="text-align:center;color:#94a3b8">ממתין לניתוח...</td></tr>
             </tbody>
           </table>
         </div>
@@ -340,41 +339,32 @@ const ytUrlBtn=document.getElementById('ytUrlBtn');
 const debuggerTableBody=document.getElementById('debuggerTableBody');
 
 // ═══════════════════════════════════════════════════════════
-// 🔬 דיבאגר - עדכון טבלה עם עמודות Original/Final
+// 🔬 דיבאגר - עדכון טבלה דרך ChordDebugger.js
 // ═══════════════════════════════════════════════════════════
 function updateDebuggerTable(result, key) {
-  if (!result || !result.chords) {
-    debuggerTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8">אין נתונים</td></tr>';
+  if (typeof ChordDebugger === 'undefined') {
+    console.warn('ChordDebugger not available');
+    debuggerTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#f59e0b">ChordDebugger לא נטען</td></tr>';
     return;
   }
   
-  const capo = parseInt(capoEl.value || '0', 10);
-  let html = '';
-  
-  result.chords.forEach((ch, idx) => {
-    if (!ch || !ch.label) return;
-    
-    const time = ch.t ? ch.t.toFixed(2) : '—';
-    const originalLabel = ch._originalLabel || ch.label;
-    const finalLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
-    const bass = ch.bass || (ch.label.includes('/') ? ch.label.split('/')[1] : '—');
-    const majorMinor = ch.label.toLowerCase().includes('m') && !ch.label.toLowerCase().includes('maj') ? 'm' : 'M';
-    const func = key ? getHarmonicFunction(ch.label, key) : '—';
-    const notes = ch.refinedBy ? '✨ Refined' : (ch.borrowed ? '🎨 Borrowed' : '');
-    
-    html += `<tr>
-      <td>${idx + 1}</td>
-      <td>${time}s</td>
-      <td style="font-weight:700;color:#94a3b8">${escapeHtml(originalLabel)}</td>
-      <td style="font-weight:700;color:#38bdf8">${escapeHtml(finalLabel)}</td>
-      <td style="color:#f59e0b">${bass}</td>
-      <td>${majorMinor}</td>
-      <td>${func}</td>
-      <td>${notes}</td>
-    </tr>`;
-  });
-  
-  debuggerTableBody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#94a3b8">אין אקורדים</td></tr>';
+  try {
+    const debugger = new ChordDebugger();
+    const capo = parseInt(capoEl.value || '0', 10);
+    const html = debugger.buildTable(
+      result, 
+      key, 
+      capo, 
+      escapeHtml, 
+      applyCapoToLabel, 
+      sanitizeLabel, 
+      getHarmonicFunction
+    );
+    debuggerTableBody.innerHTML = html;
+  } catch (e) {
+    console.error('Error in updateDebuggerTable:', e);
+    debuggerTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ff6b6b">שגיאה בבניית טבלה</td></tr>';
+  }
 }
 
 // כפתור הורדת CSV
@@ -385,23 +375,22 @@ document.getElementById('btnExportCsv').addEventListener('click', () => {
   }
   const chords = window.__lastChordResult.chords || [];
   const capo = parseInt(capoEl.value || '0', 10);
-  let csv = 'Time,Original,Final,Bass,M/m,Function,Notes\n';
+  let csv = 'Time,Engine,Bass,M/m,Final,Function\n';
   chords.forEach(ch => {
     if (!ch || !ch.label) return;
     const time = ch.t ? ch.t.toFixed(2) : '';
-    const originalLabel = ch._originalLabel || ch.label;
+    const engineLabel = ch.originalLabel || ch.label;
+    const bassFound = ch.detectedBass || '';
+    const mmFound = ch.mmDetected ? (ch.mmDetected === 'major' ? 'M' : 'm') : '';
     const finalLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
-    const bass = ch.bass || (ch.label.includes('/') ? ch.label.split('/')[1] : '');
-    const majorMinor = ch.label.toLowerCase().includes('m') && !ch.label.toLowerCase().includes('maj') ? 'm' : 'M';
     const func = window.__STATE ? getHarmonicFunction(ch.label, window.__STATE.key) : '';
-    const notes = ch.refinedBy ? 'Refined' : (ch.borrowed ? 'Borrowed' : '');
-    csv += `${time},${originalLabel},${finalLabel},${bass},${majorMinor},${func},${notes}\n`;
+    csv += `${time},${engineLabel},${bassFound},${mmFound},${finalLabel},${func}\n`;
   });
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'chords.csv';
+  a.download = 'chords_debugger.csv';
   a.click();
   URL.revokeObjectURL(url);
 });
@@ -414,17 +403,16 @@ document.getElementById('btnCopyTable').addEventListener('click', () => {
   }
   const chords = window.__lastChordResult.chords || [];
   const capo = parseInt(capoEl.value || '0', 10);
-  let text = '#\tTime\tOriginal\tFinal\tBass\tM/m\tFunc\tNotes\n';
+  let text = '#\tTime\tEngine\tBass\tM/m\tFinal\tFunc\n';
   chords.forEach((ch, idx) => {
     if (!ch || !ch.label) return;
     const time = ch.t ? ch.t.toFixed(2) : '';
-    const originalLabel = ch._originalLabel || ch.label;
+    const engineLabel = ch.originalLabel || ch.label;
+    const bassFound = ch.detectedBass || '—';
+    const mmFound = ch.mmDetected ? (ch.mmDetected === 'major' ? 'M' : 'm') : '—';
     const finalLabel = applyCapoToLabel(sanitizeLabel(ch.label), capo);
-    const bass = ch.bass || (ch.label.includes('/') ? ch.label.split('/')[1] : '');
-    const majorMinor = ch.label.toLowerCase().includes('m') && !ch.label.toLowerCase().includes('maj') ? 'm' : 'M';
     const func = window.__STATE ? getHarmonicFunction(ch.label, window.__STATE.key) : '';
-    const notes = ch.refinedBy ? 'Refined' : (ch.borrowed ? 'Borrowed' : '');
-    text += `${idx+1}\t${time}s\t${originalLabel}\t${finalLabel}\t${bass}\t${majorMinor}\t${func}\t${notes}\n`;
+    text += `${idx+1}\t${time}s\t${engineLabel}\t${bassFound}\t${mmFound}\t${finalLabel}\t${func}\n`;
   });
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('btnCopyTable');
@@ -716,7 +704,7 @@ analyzeBtn.onclick=async()=>{
   liveSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
   fullSheetEl.innerHTML='<div style="color:#cbd5e1;padding:20px">מנתח...</div>';
   fullTranscriptEl.textContent='ממתין...';
-  debuggerTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8">מנתח...</td></tr>';
+  debuggerTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8">מנתח...</td></tr>';
   LIVE_STREAM=[]; 
   LIVE_POINTER=0;
   WHISPER_SEGMENTS = [];
