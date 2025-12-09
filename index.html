@@ -349,9 +349,9 @@ function updateDebuggerTable(result, key) {
   }
   
   try {
-    const debugger = new ChordDebugger();
+    const chordDebugger = new ChordDebugger();
     const capo = parseInt(capoEl.value || '0', 10);
-    const html = debugger.buildTable(
+    const html = chordDebugger.buildTable(
       result, 
       key, 
       capo, 
