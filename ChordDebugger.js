@@ -62,37 +62,23 @@ class ChordDebugger {
       
       const time = ch.t ? ch.t.toFixed(2) : '—';
       
-      // 🔍 DEBUG: מה יש בתוך ה-chord object?
-      const debugInfo = JSON.stringify({
-        bassDetected: ch.bassDetected,
-        bassConfidence: ch.bassConfidence,
-        refinerAnalysis: ch.refinerAnalysis,
-        changedByBass: ch.changedByBass,
-        refinedBy: ch.refinedBy
-      }, null, 2);
-      
       // 🎼 מה המנוע המרכזי זיהה (לפני שינויים) - עם קאפו!
       const engineDetected = ch.originalLabel || ch.label;
       const engineWithCapo = applyCapoToLabel(sanitizeLabel(engineDetected), capo);
       const engineDisplay = escapeHtml(engineWithCapo);
       
-      // 🎸 מה BassEngine זיהה כתו בס (לא "אין" - התו בפועל!)
+      // 🎸 מה BassEngine זיהה - הצג את הערך הגולמי!
       let bassDisplay = '<span style="color:#666">—</span>';
-      if (ch.bassDetected !== undefined && ch.bassDetected !== 'NO_BASS' && ch.bassDetected !== null) {
-        const conf = ch.bassConfidence ? (ch.bassConfidence * 100).toFixed(0) : '0';
-        const bassWithCapo = applyCapoToLabel(ch.bassDetected, capo);
-        const bassNote = escapeHtml(bassWithCapo);
-        bassDisplay = `<span style="color:#f59e0b;font-weight:700">${bassNote}</span><br><small style="color:#888">${conf}%</small>`;
+      const rawBass = `bass=${ch.bassDetected}, conf=${ch.bassConfidence}`;
+      if (ch.bassDetected !== undefined) {
+        bassDisplay = `<span style="color:#f59e0b;font-size:11px">${escapeHtml(rawBass)}</span>`;
       }
       
-      // 🎵 מה MajorMinorRefiner זיהה (major/minor)
+      // 🎵 מה MajorMinorRefiner זיהה - הצג את הערך הגולמי!
       let mmDisplay = '<span style="color:#666">—</span>';
-      if (ch.refinerAnalysis?.detectedQuality && ch.refinerAnalysis.detectedQuality !== 'unclear') {
-        const quality = ch.refinerAnalysis.detectedQuality;
-        const symbol = quality === 'major' ? 'M' : 'm';
-        const conf = ch.refinerAnalysis.qualityConfidence ? (ch.refinerAnalysis.qualityConfidence * 100).toFixed(0) : '0';
-        const color = symbol === 'M' ? '#38bdf8' : '#a855f7';
-        mmDisplay = `<span style="color:${color};font-weight:700;font-size:16px">${symbol}</span><br><small style="color:#888">${conf}%</small>`;
+      if (ch.refinerAnalysis) {
+        const rawMM = `qual=${ch.refinerAnalysis.detectedQuality}, conf=${ch.refinerAnalysis.qualityConfidence}`;
+        mmDisplay = `<span style="color:#a855f7;font-size:11px">${escapeHtml(rawMM)}</span>`;
       }
       
       // ➡️ ההחלטה הסופית (אחרי כל השינויים)
@@ -126,7 +112,7 @@ class ChordDebugger {
         changedBy = '🎸🎵';
       }
       
-      html += `<tr title="${escapeHtml(debugInfo)}">
+      html += `<tr>
         <td>${idx + 1}</td>
         <td>${time}s</td>
         <td style="color:${engineColor};font-weight:600">${engineDisplay}</td>
@@ -153,6 +139,7 @@ class ChordDebugger {
       <th>🎵 M/m</th>
       <th>➡️ Final</th>
       <th>Func</th>
+      <th>🔍 Debug</th>
     </tr>`;
   }
 
