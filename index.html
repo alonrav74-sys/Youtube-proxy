@@ -762,6 +762,40 @@ analyzeBtn.onclick=async()=>{
     const stats = result.stats;
     const detectedProfile = result.profile || 'auto';
     
+    // 🎯 RUN MODULES AGAIN TO GET RAW DATA FOR DEBUGGER!
+    window.__moduleResults = { bass: [], refiner: [] };
+    
+    try {
+      if (typeof BassEngine !== 'undefined') {
+        const bassEngine = new BassEngine();
+        const bassResults = await bassEngine.refineBassInTimeline(
+          audioData.audioBuffer,
+          timeline,
+          key,
+          { bassMultiplier: 1.2 }
+        );
+        window.__moduleResults.bass = bassResults;
+        console.log('🎸 Saved bass results:', bassResults.length);
+      }
+    } catch(e) {
+      console.error('❌ BassEngine failed:', e);
+    }
+    
+    try {
+      if (typeof MajorMinorRefiner !== 'undefined') {
+        const refiner = new MajorMinorRefiner();
+        const refinerResults = await refiner.refineChordTimeline(
+          audioData.audioBuffer,
+          timeline,
+          { debug: false }
+        );
+        window.__moduleResults.refiner = refinerResults;
+        console.log('🎵 Saved refiner results:', refinerResults.length);
+      }
+    } catch(e) {
+      console.error('❌ MajorMinorRefiner failed:', e);
+    }
+    
     showAnalyzing('שלב 3/3: עיבוד...');
     
     timeline.forEach(ev => {
