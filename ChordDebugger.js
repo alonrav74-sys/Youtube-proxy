@@ -62,27 +62,35 @@ class ChordDebugger {
       
       const time = ch.t ? ch.t.toFixed(2) : '—';
       
+      // 🔍 DEBUG: מה יש בתוך ה-chord object?
+      const debugInfo = JSON.stringify({
+        bassDetected: ch.bassDetected,
+        bassConfidence: ch.bassConfidence,
+        refinerAnalysis: ch.refinerAnalysis,
+        changedByBass: ch.changedByBass,
+        refinedBy: ch.refinedBy
+      }, null, 2);
+      
       // 🎼 מה המנוע המרכזי זיהה (לפני שינויים) - עם קאפו!
       const engineDetected = ch.originalLabel || ch.label;
       const engineWithCapo = applyCapoToLabel(sanitizeLabel(engineDetected), capo);
       const engineDisplay = escapeHtml(engineWithCapo);
       
-      // 🎸 מה BassEngine מצא
+      // 🎸 מה BassEngine זיהה כתו בס (לא "אין" - התו בפועל!)
       let bassDisplay = '<span style="color:#666">—</span>';
-      if (ch.bassDetected && ch.bassConfidence !== undefined) {
-        const conf = (ch.bassConfidence * 100).toFixed(0);
-        // החל קאפו גם על הבאס!
+      if (ch.bassDetected !== undefined && ch.bassDetected !== 'NO_BASS' && ch.bassDetected !== null) {
+        const conf = ch.bassConfidence ? (ch.bassConfidence * 100).toFixed(0) : '0';
         const bassWithCapo = applyCapoToLabel(ch.bassDetected, capo);
         const bassNote = escapeHtml(bassWithCapo);
         bassDisplay = `<span style="color:#f59e0b;font-weight:700">${bassNote}</span><br><small style="color:#888">${conf}%</small>`;
       }
       
-      // 🎵 מה MajorMinorRefiner מצא
+      // 🎵 מה MajorMinorRefiner זיהה (major/minor)
       let mmDisplay = '<span style="color:#666">—</span>';
-      if (ch.refinerAnalysis && ch.refinerAnalysis.detectedQuality && ch.refinerAnalysis.qualityConfidence !== undefined) {
+      if (ch.refinerAnalysis?.detectedQuality && ch.refinerAnalysis.detectedQuality !== 'unclear') {
         const quality = ch.refinerAnalysis.detectedQuality;
-        const symbol = quality === 'major' ? 'M' : (quality === 'minor' ? 'm' : '?');
-        const conf = (ch.refinerAnalysis.qualityConfidence * 100).toFixed(0);
+        const symbol = quality === 'major' ? 'M' : 'm';
+        const conf = ch.refinerAnalysis.qualityConfidence ? (ch.refinerAnalysis.qualityConfidence * 100).toFixed(0) : '0';
         const color = symbol === 'M' ? '#38bdf8' : '#a855f7';
         mmDisplay = `<span style="color:${color};font-weight:700;font-size:16px">${symbol}</span><br><small style="color:#888">${conf}%</small>`;
       }
@@ -118,40 +126,13 @@ class ChordDebugger {
         changedBy = '🎸🎵';
       }
       
-      // 🎯 Decision - מי החליט ומה הביטחון?
-      let decisionDisplay = '<span style="color:#666">—</span>';
-      let decisionSource = '🎼'; // Default: Engine
-      let decisionConfidence = 0;
-      
-      if (ch.changedByBass && ch.bassConfidence) {
-        decisionSource = '🎸';
-        decisionConfidence = ch.bassConfidence;
-      } else if (ch.refinedBy && ch.refinerConfidence) {
-        decisionSource = '🎵';
-        decisionConfidence = ch.refinerConfidence;
-      } else if (ch.refinerAnalysis?.qualityConfidence) {
-        // המנוע העיקרי - אבל יש לנו את confidence של Refiner
-        decisionSource = '🎼';
-        decisionConfidence = ch.refinerAnalysis.qualityConfidence;
-      }
-      
-      if (decisionConfidence > 0) {
-        const conf = (decisionConfidence * 100).toFixed(0);
-        let color = '#4ade80'; // ירוק
-        if (decisionConfidence < 0.5) color = '#ef4444'; // אדום
-        else if (decisionConfidence < 0.7) color = '#fb923c'; // כתום
-        
-        decisionDisplay = `<span style="font-size:18px">${decisionSource}</span><br><span style="color:${color};font-weight:700">${conf}%</span>`;
-      }
-      
-      html += `<tr>
+      html += `<tr title="${escapeHtml(debugInfo)}">
         <td>${idx + 1}</td>
         <td>${time}s</td>
         <td style="color:${engineColor};font-weight:600">${engineDisplay}</td>
         <td style="text-align:center">${bassDisplay}</td>
         <td style="text-align:center">${mmDisplay}</td>
         <td style="color:${finalColor};font-weight:700;font-size:15px">${finalDisplay} ${changedBy}</td>
-        <td style="text-align:center">${decisionDisplay}</td>
         <td style="color:#38bdf8">${func}</td>
       </tr>`;
     });
@@ -171,7 +152,6 @@ class ChordDebugger {
       <th>🎸 Bass</th>
       <th>🎵 M/m</th>
       <th>➡️ Final</th>
-      <th>🎯 Decision</th>
       <th>Func</th>
     </tr>`;
   }
