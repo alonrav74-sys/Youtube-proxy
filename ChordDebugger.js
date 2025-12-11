@@ -67,17 +67,19 @@ class ChordDebugger {
       const engineWithCapo = applyCapoToLabel(sanitizeLabel(engineDetected), capo);
       const engineDisplay = escapeHtml(engineWithCapo);
       
-      // 🎸 מה BassEngine זיהה - הצג את הערך הגולמי!
+      // 🎸 מה BassEngine זיהה - קרא מ-window.__moduleResults!
       let bassDisplay = '<span style="color:#666">—</span>';
-      const rawBass = `bass=${ch.bassDetected}, conf=${ch.bassConfidence}`;
-      if (ch.bassDetected !== undefined) {
+      const bassResult = window.__moduleResults?.bass?.[idx];
+      if (bassResult) {
+        const rawBass = `bass=${bassResult.bassDetected}, conf=${(bassResult.bassConfidence || 0).toFixed(2)}`;
         bassDisplay = `<span style="color:#f59e0b;font-size:11px">${escapeHtml(rawBass)}</span>`;
       }
       
-      // 🎵 מה MajorMinorRefiner זיהה - הצג את הערך הגולמי!
+      // 🎵 מה MajorMinorRefiner זיהה - קרא מ-window.__moduleResults!
       let mmDisplay = '<span style="color:#666">—</span>';
-      if (ch.refinerAnalysis) {
-        const rawMM = `qual=${ch.refinerAnalysis.detectedQuality}, conf=${ch.refinerAnalysis.qualityConfidence}`;
+      const refinerResult = window.__moduleResults?.refiner?.[idx];
+      if (refinerResult) {
+        const rawMM = `qual=${refinerResult.detectedQuality}, conf=${(refinerResult.qualityConfidence || 0).toFixed(2)}`;
         mmDisplay = `<span style="color:#a855f7;font-size:11px">${escapeHtml(rawMM)}</span>`;
       }
       
