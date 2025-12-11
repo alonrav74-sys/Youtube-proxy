@@ -67,20 +67,25 @@ class ChordDebugger {
       const engineWithCapo = applyCapoToLabel(sanitizeLabel(engineDetected), capo);
       const engineDisplay = escapeHtml(engineWithCapo);
       
-      // 🎸 מה BassEngine זיהה - קרא מ-window.__moduleResults!
+      // 🎸 מה BassEngine זיהה - קרא מ-window.__moduleResults והחל קאפו!
       let bassDisplay = '<span style="color:#666">—</span>';
       const bassResult = window.__moduleResults?.bass?.[idx];
-      if (bassResult) {
-        const rawBass = `bass=${bassResult.bassDetected}, conf=${(bassResult.bassConfidence || 0).toFixed(2)}`;
-        bassDisplay = `<span style="color:#f59e0b;font-size:11px">${escapeHtml(rawBass)}</span>`;
+      if (bassResult && bassResult.bassDetected && bassResult.bassDetected !== 'NO_BASS') {
+        // החל קאפו על תו הבאס!
+        const bassWithCapo = applyCapoToLabel(bassResult.bassDetected, capo);
+        const conf = ((bassResult.bassConfidence || 0) * 100).toFixed(0);
+        bassDisplay = `<span style="color:#f59e0b;font-weight:700">${escapeHtml(bassWithCapo)}</span><br><small style="color:#888">${conf}%</small>`;
       }
       
-      // 🎵 מה MajorMinorRefiner זיהה - קרא מ-window.__moduleResults!
+      // 🎵 מה MajorMinorRefiner זיהה - הצג M או m
       let mmDisplay = '<span style="color:#666">—</span>';
       const refinerResult = window.__moduleResults?.refiner?.[idx];
-      if (refinerResult) {
-        const rawMM = `qual=${refinerResult.detectedQuality}, conf=${(refinerResult.qualityConfidence || 0).toFixed(2)}`;
-        mmDisplay = `<span style="color:#a855f7;font-size:11px">${escapeHtml(rawMM)}</span>`;
+      if (refinerResult && refinerResult.detectedQuality && refinerResult.detectedQuality !== 'unclear') {
+        const quality = refinerResult.detectedQuality;
+        const symbol = quality === 'major' ? 'M' : 'm';
+        const conf = ((refinerResult.qualityConfidence || 0) * 100).toFixed(0);
+        const color = symbol === 'M' ? '#38bdf8' : '#a855f7';
+        mmDisplay = `<span style="color:${color};font-weight:700;font-size:16px">${symbol}</span><br><small style="color:#888">${conf}%</small>`;
       }
       
       // ➡️ ההחלטה הסופית (אחרי כל השינויים)
