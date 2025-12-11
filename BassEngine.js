@@ -1,12 +1,17 @@
 /**
- * BassEngine v5.2 - Significant Physical Bass
- * -------------------------------------------
+ * BassEngine v5.2 - Significant Physical Bass (Upgraded)
+ * -------------------------------------------------------
  * עקרונות:
  * - עובד רק על תחום הבאס (low-pass + בדיקת יחס אנרגיה נמוכים/גבוהים)
  * - בודק אם בכלל יש באס משמעותי בפריים, אחרת מחזיר null
- * - עושה אוטוקורלציה על הסיגנל המסונן לנמוכים בלבד
+ * - עושה YIN detection על הסיגנל המסונן לנמוכים בלבד
  * - ברמת timeline: לכל אקורד לוקחים את הבאס עם ה-confidence הכי גבוה
  *   בחלון זמן קטן סביב האקורד. אם אין → NO_BASS.
+ * 
+ * שדרוגים:
+ * - Butterworth 2-pole filter במקום חד-קוטבי
+ * - YIN algorithm במקום אוטוקורלציה פשוטה
+ * - FFT validation לאימות התוצאה
  */
 class BassEngine {
   constructor() {
@@ -41,29 +46,48 @@ class BassEngine {
   }
 
   /**
-   * הפרדת נמוכים/גבוהים עם low-pass חד-קוטבי פשוט
+   * הפרדת נמוכים/גבוהים עם Butterworth 2-pole low-pass
    */
   _separateLowHigh(samples, sr) {
     const N = samples.length;
     const low = new Float32Array(N);
     const high = new Float32Array(N);
 
-    // cutoff ~200Hz (בקירוב) - מספיק כדי להדגיש את הבאס
-    const alpha = 2 * Math.PI * 200 / sr;
-    const a = alpha / (1 + alpha);
+    // Butterworth 2-pole filter ~180Hz
+    const cutoff = 180;
+    const w0 = 2 * Math.PI * cutoff / sr;
+    const cosW0 = Math.cos(w0);
+    const sinW0 = Math.sin(w0);
+    const alpha = sinW0 / (2 * 0.707); // Q = 0.707 (Butterworth)
 
-    let prevLow = 0;
+    const b0 = (1 - cosW0) / 2;
+    const b1 = 1 - cosW0;
+    const b2 = (1 - cosW0) / 2;
+    const a0 = 1 + alpha;
+    const a1 = -2 * cosW0;
+    const a2 = 1 - alpha;
+
+    // Normalize
+    const b0n = b0 / a0;
+    const b1n = b1 / a0;
+    const b2n = b2 / a0;
+    const a1n = a1 / a0;
+    const a2n = a2 / a0;
+
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
     let lowEnergy = 0;
     let highEnergy = 0;
 
     for (let i = 0; i < N; i++) {
       const x = samples[i];
-      const y = prevLow + a * (x - prevLow); // low-pass
-      prevLow = y;
-      const h = x - y;                        // high component
+      const y = b0n * x + b1n * x1 + b2n * x2 - a1n * y1 - a2n * y2;
+      const h = x - y;
 
       low[i] = y;
       high[i] = h;
+
+      x2 = x1; x1 = x;
+      y2 = y1; y1 = y;
 
       lowEnergy  += y * y;
       highEnergy += h * h;
@@ -73,7 +97,143 @@ class BassEngine {
   }
 
   /**
-   * זיהוי באס בפריים בודד, ללא הרמוניה - רק תדר פיזיקלי משמעותי
+   * YIN Algorithm - זיהוי פיץ' מדויק
+   */
+  _yinDetect(samples, sr) {
+    const minPeriod = Math.floor(sr / this.bassRange.max);
+    const maxPeriod = Math.min(
+      Math.floor(sr / this.bassRange.min),
+      Math.floor(samples.length / 2)
+    );
+
+    if (maxPeriod <= minPeriod) return null;
+
+    const W = maxPeriod;
+    const yinThreshold = 0.15;
+
+    // Step 1: Difference function
+    const diff = new Float32Array(maxPeriod + 1);
+    diff[0] = 0;
+
+    for (let tau = 1; tau <= maxPeriod; tau++) {
+      let sum = 0;
+      for (let j = 0; j < W; j++) {
+        if (j + tau < samples.length) {
+          const d = samples[j] - samples[j + tau];
+          sum += d * d;
+        }
+      }
+      diff[tau] = sum;
+    }
+
+    // Step 2: Cumulative Mean Normalized Difference (CMNDF)
+    const cmndf = new Float32Array(maxPeriod + 1);
+    cmndf[0] = 1;
+    let runningSum = 0;
+
+    for (let tau = 1; tau <= maxPeriod; tau++) {
+      runningSum += diff[tau];
+      cmndf[tau] = diff[tau] / (runningSum / tau + 1e-10);
+    }
+
+    // Step 3: Absolute threshold - מצא פריודה ראשונה מתחת לסף
+    let bestTau = -1;
+    for (let tau = minPeriod; tau <= maxPeriod; tau++) {
+      if (cmndf[tau] < yinThreshold) {
+        // מצא מינימום מקומי
+        while (tau + 1 <= maxPeriod && cmndf[tau + 1] < cmndf[tau]) {
+          tau++;
+        }
+        bestTau = tau;
+        break;
+      }
+    }
+
+    // אם לא נמצא - חפש מינימום גלובלי
+    if (bestTau < 0) {
+      let minVal = Infinity;
+      for (let tau = minPeriod; tau <= maxPeriod; tau++) {
+        if (cmndf[tau] < minVal) {
+          minVal = cmndf[tau];
+          bestTau = tau;
+        }
+      }
+      if (minVal > 0.5) return null;
+    }
+
+    // Step 4: Parabolic interpolation
+    let refinedTau = bestTau;
+    if (bestTau > 0 && bestTau < maxPeriod) {
+      const s0 = cmndf[bestTau - 1];
+      const s1 = cmndf[bestTau];
+      const s2 = cmndf[bestTau + 1];
+      const denom = 2 * (s0 - 2 * s1 + s2);
+      if (Math.abs(denom) > 1e-10) {
+        refinedTau = bestTau + (s0 - s2) / denom;
+      }
+    }
+
+    return {
+      period: refinedTau,
+      confidence: 1 - cmndf[bestTau],
+      freq: sr / refinedTau
+    };
+  }
+
+  /**
+   * FFT validation - אימות התדר עם ספקטרום
+   */
+  _fftValidate(samples, sr, yinFreq) {
+    const N = samples.length;
+    const fftSize = Math.pow(2, Math.ceil(Math.log2(N)));
+
+    // Hann window + zero-pad
+    const padded = new Float32Array(fftSize);
+    for (let i = 0; i < N; i++) {
+      const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
+      padded[i] = samples[i] * w;
+    }
+
+    // DFT על תחום הבאס בלבד
+    const minBin = Math.max(1, Math.floor(this.bassRange.min * fftSize / sr));
+    const maxBin = Math.min(Math.ceil(this.bassRange.max * fftSize / sr), fftSize / 2);
+
+    let maxMag = 0;
+    let maxFreq = 0;
+
+    for (let k = minBin; k <= maxBin; k++) {
+      let re = 0, im = 0;
+      for (let n = 0; n < fftSize; n++) {
+        const angle = -2 * Math.PI * k * n / fftSize;
+        re += padded[n] * Math.cos(angle);
+        im += padded[n] * Math.sin(angle);
+      }
+      const mag = Math.sqrt(re * re + im * im);
+      if (mag > maxMag) {
+        maxMag = mag;
+        maxFreq = k * sr / fftSize;
+      }
+    }
+
+    // בדוק התאמה
+    const ratio = maxFreq / yinFreq;
+    const tolerance = 0.15;
+
+    if (Math.abs(ratio - 1) < tolerance) {
+      return { valid: true, correction: null };
+    }
+    if (Math.abs(ratio - 2) < tolerance) {
+      return { valid: true, correction: 'down' }; // YIN תפס אוקטבה למעלה
+    }
+    if (Math.abs(ratio - 0.5) < tolerance) {
+      return { valid: true, correction: 'up' }; // YIN תפס אוקטבה למטה
+    }
+
+    return { valid: false, fftFreq: maxFreq };
+  }
+
+  /**
+   * זיהוי באס בפריים בודד - משודרג עם YIN + FFT
    */
   detectBass(samples, sr) {
     const { low, high, lowEnergy, highEnergy } = this._separateLowHigh(samples, sr);
@@ -87,12 +247,13 @@ class BassEngine {
 
     const bassEnergyRatio = lowEnergy / (totalEnergy + 1e-12);
 
-    // אם הנמוכים לא דומיננטיים בכלל → זה כנראה פריטה/רעשים, לא באס משמעותי
-    if (bassEnergyRatio < 0.45) {
+    // אם הנמוכים לא דומיננטיים בכלל → לא באס משמעותי
+    // הורדתי את הסף מ-0.45 ל-0.3 כי במיקסים מודרניים הבאס לא תמיד דומיננטי
+    if (bassEnergyRatio < 0.3) {
       return null;
     }
 
-    // Hann window על הנמוכים לייצוב האוטוקורלציה
+    // Hann window על הנמוכים
     const N = low.length;
     const windowed = new Float32Array(N);
     for (let i = 0; i < N; i++) {
@@ -100,47 +261,35 @@ class BassEngine {
       windowed[i] = low[i] * w;
     }
 
-    const minPeriod = Math.floor(sr / this.bassRange.max);
-    const maxPeriod = Math.floor(sr / this.bassRange.min);
-
-    let bestCorr = 0;
-    let bestPeriod = 0;
-
-    for (let period = minPeriod; period <= maxPeriod; period++) {
-      let corr = 0, norm1 = 0, norm2 = 0;
-      const len = Math.min(N - period, 1000);
-
-      for (let i = 0; i < len; i++) {
-        const s1 = windowed[i];
-        const s2 = windowed[i + period];
-        corr  += s1 * s2;
-        norm1 += s1 * s1;
-        norm2 += s2 * s2;
-      }
-
-      const denom = Math.sqrt(norm1 * norm2 + 1e-10);
-      if (denom === 0) continue;
-      let normCorr = corr / denom;
-
-      // ביאס קטן לכיוון תדר נמוך יותר (פונדמנטל מול אוקטבה),
-      // אבל בלי קשר להרמוניה, רק פיזיקלית.
-      const lowFreqBias = Math.pow(period / maxPeriod, 0.25);
-      normCorr *= lowFreqBias;
-
-      if (normCorr > bestCorr) {
-        bestCorr = normCorr;
-        bestPeriod = period;
-      }
-    }
-
-    // אם אין פיק מספיק חזק → מבחינתנו אין באס משמעותי בפריים הזה
-    const MIN_CORR = 0.3; // אפשר לשחק בין 0.25–0.4 לפי כמה אגרסיבי אתה רוצה
-    if (bestPeriod === 0 || bestCorr < MIN_CORR) {
+    // YIN detection
+    const yinResult = this._yinDetect(windowed, sr);
+    if (!yinResult || yinResult.confidence < 0.3) {
       return null;
     }
 
-    // תרגום ל-freq / midi / note
-    const freq = sr / bestPeriod;
+    let freq = yinResult.freq;
+    let confidence = yinResult.confidence;
+
+    // FFT validation
+    const fftCheck = this._fftValidate(windowed, sr, freq);
+    if (fftCheck.valid) {
+      if (fftCheck.correction === 'down') {
+        freq = freq / 2;
+      } else if (fftCheck.correction === 'up') {
+        freq = freq * 2;
+      }
+      confidence *= 1.1; // boost כי מאומת
+    } else {
+      confidence *= 0.75; // penalty כי לא מאומת
+    }
+
+    // סף סופי
+    const MIN_CONF = 0.35;
+    if (confidence < MIN_CONF) {
+      return null;
+    }
+
+    // תרגום ל-note
     const midi = 12 * Math.log2(freq / 440) + 69;
     const roundedMidi = Math.round(midi);
     const pc = ((roundedMidi % 12) + 12) % 12;
@@ -150,7 +299,7 @@ class BassEngine {
       pc,
       midi: roundedMidi,
       freq,
-      confidence: bestCorr * bassEnergyRatio // מחזק רק אם הנמוכים באמת דומיננטיים
+      confidence: Math.min(confidence * bassEnergyRatio, 1.0)
     };
   }
 
